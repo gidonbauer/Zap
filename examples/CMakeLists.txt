@@ -5,9 +5,6 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/")
 set(executables
   run_solver
   legacy_renderer
-
-  matrix_format
-  pipe
 )
 
 foreach(exec ${executables})

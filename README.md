@@ -16,16 +16,23 @@ $ ./run_solver <nx> <ny>
 ```
 
 The solution is written to the output directory in the files `u.dat` and `t.dat`.
-It can be rendered to a video using the provided renderer
-
+It can be rendered to a video using the provided (recommended) renderer
 ```console
 $ ./renderer ../output/u.dat ../output/t.dat solution.mp4
 ```
+or the (not recommended) legacy renderer
+```console
+$ ./legacy_renderer ../output/u.dat solution.mp4
+```
+
+The legacy renderer (`legacy_renderer.cpp`) does not depend on `TrueType`, but does not have all the functions of the recommended renderer.
+If you do not want to install the dependencies for the renderer, you can disable building it by setting the cmake-option `ZAP_BUILD_RENDERER` to `OFF`.
+Not installing FFmpeg will only create problems at runtime.
 
 ## Dependencies
 
 - [Eigen](https://eigen.tuxfamily.org/): For all matrix operations.
-- [ffmpeg](https://ffmpeg.org/): For rendering the solution.
+- [FFmpeg](https://ffmpeg.org/): For rendering the solution.
 - [FreeType](https://freetype.org/): For rendering text.
 
 FFmpeg and FreeType must be installed by the user, Eigen is provided in the `ThirdPary` folder.

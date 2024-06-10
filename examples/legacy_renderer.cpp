@@ -224,14 +224,9 @@ template <typename Float>
   assert(norm_value >= static_cast<Float>(0));
   assert(norm_value <= static_cast<Float>(1));
 
-  // NOLINTBEGIN(cppcoreguidelines-pro-bounds-constant-array-index)
-  size_t i = 0;
-  while (std::abs(norm_value - xs[i]) > dx * static_cast<Float>(0.5) && i < cols.size()) {
-    i += 1;
-  }
+  const auto i = static_cast<size_t>(std::round(norm_value / dx));
   assert(i <= cols.size());
-  return cols[i];
-  // NOLINTEND(cppcoreguidelines-pro-bounds-constant-array-index)
+  return cols[i];  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
 #else
   const auto c = static_cast<std::uint8_t>((value - min) / (max - min) * static_cast<Float>(255));
   return {.r = c, .g = c, .b = c, .a = 0xFF};
