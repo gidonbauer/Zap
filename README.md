@@ -1,10 +1,8 @@
 # Zap - Differentiating Shocks in the two-dimensional Burgers equation
 
 This repository contains a Finite Volume solver for the two-dimensional Burgers equation
-$$
-  \partial_t u + \partial_x \frac{1}{2} u^2 + \partial_y \frac{1}{2} u^2 = 0 \\
-  \Leftrightarrow{} \partial_t u + u \partial_x u + u \partial_y u = 0
-$$
+$$ \partial_t u + \partial_x \frac{1}{2} u^2 + \partial_y \frac{1}{2} u^2 = 0 $$
+$$ \Leftrightarrow{} \partial_t u + u \partial_x u + u \partial_y u = 0 $$
 with given initial- and boundary conditions.
 
 ## Quickstart
