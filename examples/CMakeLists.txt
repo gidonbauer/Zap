@@ -1,0 +1,41 @@
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/")
+
+# find_package(OpenMP REQUIRED)
+
+set(executables
+  run_solver
+  legacy_renderer
+
+  matrix_format
+  pipe
+)
+
+foreach(exec ${executables})
+    # - Define executables -------------
+    add_executable(${exec} ${exec}.cpp)
+
+    # - Define include path ------------
+    target_include_directories(${exec}        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
+    target_include_directories(${exec} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
+
+    # - Link libraries -----------------
+    # target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
+endforeach()
+
+# ================================================ 
+
+if (ZAP_BUILD_RENDERER)
+    find_package(Freetype REQUIRED)
+    
+    # - Renderer that uses freetype --------
+    add_executable(renderer renderer.cpp)
+    
+    # - Define include path ----------------
+    target_include_directories(renderer        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
+    target_include_directories(renderer SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
+    target_include_directories(renderer SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+    
+    # - Link libraries ---------------------
+    target_link_libraries(renderer PRIVATE ${FREETYPE_LIBRARIES})
+    # target_link_libraries(renderer PRIVATE OpenMP::OpenMP_CXX)
+endif()

@@ -1,0 +1,9 @@
+.mypy_cache/
+.cache/
+vscode/
+
+build/
+output/
+
+python/
+
