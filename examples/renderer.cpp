@@ -40,7 +40,7 @@ auto start_ffmpeg(size_t width,
     const auto resolution = std::format("{}x{}", width, height);
     const auto blocksize  = std::to_string(width * height * sizeof(Rd::RGB));
     // clang-format off
-    int ret = execlp("/opt/homebrew/bin/ffmpeg", // NOLINT
+    int ret = execlp("ffmpeg", // NOLINT
         "ffmpeg",
         // "-loglevel", "verbose",
         "-y",
@@ -106,14 +106,24 @@ auto main(int argc, char** argv) -> int {
     return 1;
   }
 
-  constexpr size_t TEXT_HEIGHT = 100UZ;
-  Rd::Canvas canvas(static_cast<size_t>(u_reader.cols()),
+  constexpr size_t TEXT_HEIGHT      = 100UZ;
+  constexpr size_t MIN_CANVAS_WIDTH = 600UZ;
+  Rd::Canvas canvas(std::max(MIN_CANVAS_WIDTH, static_cast<size_t>(u_reader.cols())),
                     static_cast<size_t>(u_reader.rows()) + TEXT_HEIGHT);
-  Rd::Box text_box{.col = 10, .row = 0, .width = canvas.width() - 10, .height = TEXT_HEIGHT};
-  Rd::Box graph_box{.col    = 0,
-                    .row    = text_box.height,
-                    .width  = canvas.width(),
-                    .height = canvas.height() - text_box.height};
+  Rd::Box text_box{
+      .col    = 10,
+      .row    = 0,
+      .width  = canvas.width() - 10,
+      .height = TEXT_HEIGHT,
+  };
+
+  const size_t avail_padding = canvas.width() - static_cast<size_t>(u_reader.cols());
+  Rd::Box graph_box{
+      .col    = avail_padding / 2UZ,
+      .row    = text_box.height,
+      .width  = static_cast<size_t>(u_reader.cols()),
+      .height = static_cast<size_t>(u_reader.rows()),
+  };
   constexpr std::string_view font_file = "../assets/LinLibertine_R.ttf";
   if (!canvas.load_font(font_file)) {
     Igor::Warn("Could not load font from file `{}`.", font_file);
