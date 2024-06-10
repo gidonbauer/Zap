@@ -61,7 +61,7 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  constexpr auto tend = static_cast<Float>(2.00);
+  constexpr auto tend = static_cast<Float>(4.0);
 
   auto boundary = [](Zap::Matrix<Float>& u_next,
                      const Zap::Matrix<Float>& u_curr,

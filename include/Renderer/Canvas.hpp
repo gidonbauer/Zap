@@ -2,12 +2,14 @@
 #define ZAP_RENDERER_CANVAS_HPP_
 
 #include <cassert>
-#include <cstdio>
 #include <fstream>
 #include <vector>
 
+#include <unistd.h>
+
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include <freetype/ftglyph.h>
 
 #include "Color.hpp"
 #include "Igor.hpp"
@@ -173,13 +175,13 @@ class Canvas {
     const auto g_advance = static_cast<size_t>(metrics.horiAdvance >> 6);
     assert(g_advance >= g_width);
 
-    if (g_advance > m_width - hori_pos) {
-      Igor::Warn("Glyph is too wide ({}) for canvas with width {} and horizontal position {}",
-                 g_advance,
-                 m_width,
-                 hori_pos);
-      return false;
-    }
+    // if (g_advance > m_width - hori_pos) {
+    //   Igor::Warn("Glyph is too wide ({}) for canvas with width {} and horizontal position {}",
+    //              g_advance,
+    //              m_width,
+    //              hori_pos);
+    //   return false;
+    // }
 
     glyph_box = {
         .col    = hori_pos + g_bear_x,
@@ -198,31 +200,65 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto draw_text(std::string_view str, Box box) noexcept -> bool {
+  [[nodiscard]] constexpr auto
+  draw_text(std::string_view str, Box box, bool centered) noexcept -> bool {
     if (!box_in_canvas(box)) {
       Igor::Warn("Box {} is not within the canvas with dimension {}x{}", box, m_width, m_height);
       return false;
     }
 
-    Box glyph_box{};
-    size_t hori_pos = box.col;
-    for (char c : str) {
-      if (!load_letter(c)) {
+    struct GlyphWrapper {
+      FT_Glyph glyph = nullptr;
+
+      constexpr GlyphWrapper() noexcept                                             = default;
+      constexpr GlyphWrapper(const GlyphWrapper& other) noexcept                    = delete;
+      constexpr GlyphWrapper(GlyphWrapper&& other) noexcept                         = delete;
+      constexpr auto operator=(const GlyphWrapper& other) noexcept -> GlyphWrapper& = delete;
+      constexpr auto operator=(GlyphWrapper&& other) noexcept -> GlyphWrapper&      = delete;
+      constexpr ~GlyphWrapper() noexcept { FT_Done_Glyph(glyph); }
+    };
+
+    size_t length = 0UZ;
+    std::vector<Box> glyph_boxes(str.size());
+    std::vector<GlyphWrapper> glyphs(str.size());
+    for (size_t idx = 0; idx < str.size(); ++idx) {
+      if (!load_letter(str[idx])) {
+        return false;
+      }
+      const auto& glyph = m_ft_face->glyph;
+
+      if (!get_gylph_box(box, glyph, length, glyph_boxes[idx])) {
+        Igor::Warn("Could not get box for glyph.");
         return false;
       }
 
-      const auto& glyph = m_ft_face->glyph;
+      if (const auto err = FT_Get_Glyph(glyph, &(glyphs[idx].glyph)); err != FT_Err_Ok) {
+        Igor::Warn("Could not copy glyph to local buffer: Error code {}", err);
+        return false;
+      }
+    }
+
+    if (length > box.width) {
+      Igor::Warn("Text is too long ({}) for box with width {}", length, box.width);
+      return false;
+    }
+
+    size_t offset = static_cast<size_t>(centered) * (box.width - length) / 2UZ;
+    for (Box& b : glyph_boxes) {
+      b.col += offset;
+    }
+
+    for (size_t idx = 0; idx < str.size(); ++idx) {
+      const auto& glyph     = glyphs[idx].glyph;
+      const auto& glyph_box = glyph_boxes[idx];
+
       if (glyph->format != ft_glyph_format_bitmap) {
         Igor::Warn("Invalid glyph format, needs to be bitmap format.");
         return false;
       }
 
-      if (!get_gylph_box(box, glyph, hori_pos, glyph_box)) {
-        Igor::Warn("Could not get box for glyph.");
-        return false;
-      }
-
-      if (!draw_buffer(glyph->bitmap.buffer, glyph_box, greyscale_to_RGB)) {
+      FT_BitmapGlyph bm_glyph = reinterpret_cast<FT_BitmapGlyph>(glyph);  // NOLINT
+      if (!draw_buffer(bm_glyph->bitmap.buffer, glyph_box, greyscale_to_RGB)) {
         Igor::Warn("Could not draw glyph to canvas.");
         return false;
       }
@@ -272,9 +308,8 @@ class Canvas {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto to_raw_stream(pid_t stream) const noexcept -> bool {
     const auto data_size_bytes = m_data.size() * sizeof(PixelType);
-    const auto bytes_writen    = write(stream,
-                                    reinterpret_cast<const char*>(m_data.data()),  // NOLINT
-                                    data_size_bytes);
+    const auto bytes_writen =
+        write(stream, reinterpret_cast<const char*>(m_data.data()), data_size_bytes);  // NOLINT
 
     if (bytes_writen == -1) {
       Igor::Warn("Writing data to pipe failed: {}", std::strerror(errno));

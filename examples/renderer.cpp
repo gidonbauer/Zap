@@ -111,9 +111,9 @@ auto main(int argc, char** argv) -> int {
   Rd::Canvas canvas(std::max(MIN_CANVAS_WIDTH, static_cast<size_t>(u_reader.cols())),
                     static_cast<size_t>(u_reader.rows()) + TEXT_HEIGHT);
   Rd::Box text_box{
-      .col    = 10,
+      .col    = 0,
       .row    = 0,
-      .width  = canvas.width() - 10,
+      .width  = canvas.width(),
       .height = TEXT_HEIGHT,
   };
 
@@ -138,7 +138,7 @@ auto main(int argc, char** argv) -> int {
     canvas.clear({});
 
     if (const std::string str = std::format("t = {:.6f}", t_reader(0, 0));
-        !canvas.draw_text(str, text_box)) {
+        !canvas.draw_text(str, text_box, true)) {
       Igor::Warn("Could not render string `{}` to canvas.", str);
       return 1;
     }
