@@ -29,3 +29,5 @@ $ ./renderer ../output/u.dat ../output/t.dat solution.mp4
 - [Eigen](https://eigen.tuxfamily.org/): For all matrix operations.
 - [ffmpeg](https://ffmpeg.org/): For rendering the solution.
 - [FreeType](https://freetype.org/): For rendering text.
+
+FFmpeg and FreeType must be installed by the user, Eigen is provided in the `ThirdPary` folder.
