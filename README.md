@@ -25,9 +25,10 @@ or the (not recommended) legacy renderer
 $ ./legacy_renderer ../output/u.dat solution.mp4
 ```
 
-The legacy renderer (`legacy_renderer.cpp`) does not depend on `TrueType`, but does not have all the functions of the recommended renderer.
+The legacy renderer (`legacy_renderer.cpp`) does not depend on `FreeType`, but does not have all the functions of the recommended renderer.
 If you do not want to install the dependencies for the renderer, you can disable building it by setting the cmake-option `ZAP_BUILD_RENDERER` to `OFF`.
 Not installing FFmpeg will only create problems at runtime.
+Both renderers depend on Unix functions and will only work on Unix compliant operating systems (`pipe`, `write`, ...), e.g. MacOS or Linux (only tested on MacOS).
 
 ## Dependencies
 
