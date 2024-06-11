@@ -140,7 +140,7 @@ auto main(int argc, char** argv) -> int {
     if (const std::string str = std::format("t = {:.6f}", t_reader(0, 0));
         !canvas.draw_text(str, text_box, true)) {
       Igor::Warn("Could not render string `{}` to canvas.", str);
-      return 1;
+      goto error_after_ffmpeg;  // NOLINT
     }
 
     const auto& data      = u_reader.data();
@@ -152,20 +152,29 @@ auto main(int argc, char** argv) -> int {
             u_reader.is_row_major(),
             true)) {
       Igor::Warn("Could not draw graph to canvas.");
-      return 1;
+      goto error_after_ffmpeg;  // NOLINT
     }
 
     if (!canvas.to_raw_stream(ffmpeg_stream)) {
       Igor::Warn("Could not write canvas to FFmpeg.");
-      return 1;
+      goto error_after_ffmpeg;  // NOLINT
     }
   }
 
   if (!end_ffmpeg(ffmpeg_pid, ffmpeg_stream)) {
     Igor::Warn("Could not properly end FFmpeg.");
-    return 1;
+    goto error_after_ffmpeg;  // NOLINT
   }
-  const auto t_dur =
-      std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - t_begin);
-  Igor::Info("Rendering took {}.", t_dur);
+  {
+    const auto t_dur =
+        std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - t_begin);
+    Igor::Info("Rendering took {}.", t_dur);
+  }
+
+  return 0;
+error_after_ffmpeg:
+  if (kill(ffmpeg_pid, SIGKILL) == -1) {
+    Igor::Warn("Could not kill FFmpeg: {}", std::strerror(errno));
+  }
+  return 1;
 }
