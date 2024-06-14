@@ -46,7 +46,10 @@ namespace Zap::Renderer {
 
 // -------------------------------------------------------------------------------------------------
 class Canvas {
+ public:
   using PixelType = RGB;
+
+ private:
   std::vector<PixelType> m_data;
   size_t m_width;
   size_t m_height;

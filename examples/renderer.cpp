@@ -38,7 +38,10 @@ auto start_ffmpeg(size_t width,
     Igor::Info("Start FFmpeg...");
 
     const auto resolution = std::format("{}x{}", width, height);
-    const auto blocksize  = std::to_string(width * height * sizeof(Rd::RGB));
+    const auto blocksize  = std::to_string(width * height * sizeof(Rd::Canvas::PixelType));
+    static_assert(sizeof(Rd::Canvas::PixelType) == 24UZ / 8UZ,
+                  "FFmpeg assumes that the pixels are in the rgb24 format, but the size of the "
+                  "pixel datatype of the canvas is too large.");
     // clang-format off
     int ret = execlp("ffmpeg", // NOLINT
         "ffmpeg",
