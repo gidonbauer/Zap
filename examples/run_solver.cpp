@@ -12,9 +12,9 @@ auto main(int argc, char** argv) -> int {
 
   using Float          = double;
   constexpr auto x_min = static_cast<Float>(0.0);
-  constexpr auto x_max = static_cast<Float>(1.0);
+  constexpr auto x_max = static_cast<Float>(10.0);
   constexpr auto y_min = static_cast<Float>(0.0);
-  constexpr auto y_max = static_cast<Float>(1.0);
+  constexpr auto y_max = static_cast<Float>(10.0);
 
   auto parse_size_t = [](const char* cstr) -> size_t {
     char* end        = nullptr;
@@ -54,8 +54,11 @@ auto main(int argc, char** argv) -> int {
   Zap::Matrix<Float> u0(static_cast<int>(ny), static_cast<int>(nx));
   for (int yi = 0; yi < static_cast<int>(ny); ++yi) {
     for (int xi = 0; xi < static_cast<int>(nx); ++xi) {
-      u0(yi, xi) =
-          (x(xi) + y(yi)) * static_cast<Float>((x(xi) * x(xi) + y(yi) * y(yi)) <= 0.5 * 0.5);
+      u0(yi, xi) = static_cast<Float>(std::pow(x(xi) - (x_min + x_max) / 2, 2) +
+                                          std::pow(y(yi) - (y_min + y_max) / 2, 2) <=
+                                      1.0 * 1.0);
+      // u0(yi, xi) =
+      //     (x(xi) + y(yi)) * static_cast<Float>((x(xi) * x(xi) + y(yi) * y(yi)) <= 0.5 * 0.5);
       // u0(yi, xi) = x(xi) * static_cast<Float>(x(xi) <= 0.5);
       // u0(yi, xi) = y(yi) * static_cast<Float>(y(yi) <= 0.5);
     }
