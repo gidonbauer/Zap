@@ -4,8 +4,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "IO/IncMatrixReader.hpp"
 #include "Igor.hpp"
-#include "ReadMatrixInc.hpp"
 
 constexpr auto READ_END  = 0UZ;
 constexpr auto WRITE_END = 1UZ;
@@ -243,7 +243,7 @@ auto main(int argc, char** argv) -> int {
   const auto input_file  = argv[1];  // NOLINT
   const auto output_file = argv[2];  // NOLINT
 
-  Zap::IncMatrixReader<Float> reader{input_file};
+  Zap::IO::IncMatrixReader<Float> reader{input_file};
 
   Igor::Info("Num. elements = {}", reader.num_elem());
   Igor::Info("#rows = {}", reader.rows());

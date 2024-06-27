@@ -5,6 +5,8 @@
 #include <cassert>
 #include <cstdint>
 
+#include "Igor.hpp"
+
 namespace Zap::Renderer {
 
 using Greyscale = std::uint8_t;
@@ -24,8 +26,19 @@ enum class Float2RGB {
   COLORMAP,
 };
 
-template <Float2RGB conv = Float2RGB::COLORMAP, typename Float>
+template <Float2RGB conv = Float2RGB::COLORMAP, typename Float, bool WARN_ON_NAN = false>
 [[nodiscard]] constexpr auto float_to_rgb(Float value, Float min, Float max) noexcept -> RGB {
+  auto is_nan_or_inf = [](Float v) { return std::isnan(v) || std::isinf(v); };
+  if (is_nan_or_inf(value) || is_nan_or_inf(min) || is_nan_or_inf(max)) {
+    if constexpr (WARN_ON_NAN) {
+      Igor::Warn("Got NaN or Inf values in provided data: value = {}, min = {}, max = {}",
+                 value,
+                 min,
+                 max);
+    }
+    return RGB{.r = 0xFF, .g = 0x00, .b = 0x00};
+  }
+
   if constexpr (conv == Float2RGB::GREYSCALE) {
     const auto c = static_cast<std::uint8_t>((value - min) / (max - min) * static_cast<Float>(255));
     return {.r = c, .g = c, .b = c};
@@ -33,6 +46,7 @@ template <Float2RGB conv = Float2RGB::COLORMAP, typename Float>
 
   const auto get_pixel = [=]([[maybe_unused]] const auto& xs, Float dx, const auto& cols) {
     const auto norm_value = (value - min) / (max - min);
+    assert(!is_nan_or_inf(norm_value));
     assert(norm_value >= static_cast<Float>(0));
     assert(norm_value <= static_cast<Float>(1));
 

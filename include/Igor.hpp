@@ -1,8 +1,31 @@
+// Copyright 2024 Gidon Bauer <gidon.bauer@rwth-aachen.de>
+
+// Permission is hereby granted, free of charge, to any person obtaining
+// a copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to
+// permit persons to whom the Software is furnished to do so, subject to
+// the following conditions:
+
+// The above copyright notice and this permission notice shall be
+// included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+// EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+// NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+// LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+// WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 #ifndef IGOR_HPP_
 #define IGOR_HPP_
 
-#include <cxxabi.h>
+#include <cassert>
+#include <chrono>
 #include <format>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <source_location>
@@ -10,6 +33,8 @@
 #include <type_traits>
 #include <utility>
 #include <version>
+
+#include <cxxabi.h>
 
 static_assert(__cpp_lib_source_location >= 201907L, "Requires source_location.");
 // static_assert(__cpp_lib_format >= 201907L, "Requires std::format.");
@@ -44,11 +69,13 @@ enum class Level : std::uint8_t {
   TODO,
   PANIC,
   DEBUG,
+  TIME,
 };
 
 consteval auto level_stream(Level level) noexcept -> std::ostream& {
   switch (level) {
     case Level::INFO:
+    case Level::TIME:
       return std::cout;
     case Level::WARN:
     case Level::TODO:
@@ -70,6 +97,8 @@ consteval auto level_repr(Level level) noexcept {
       return "\033[31m[ERROR]\033[0m ";
     case Level::DEBUG:
       return "\033[94m[DEBUG]\033[0m ";
+    case Level::TIME:
+      return "\033[94m[TIME]\033[0m ";
   }
 }
 
@@ -95,6 +124,19 @@ class Print {
     }
   }
 };
+
+// -------------------------------------------------------------------------------------------------
+template <typename... Args>
+class [[maybe_unused]] Time final
+    : detail::Print<detail::Level::TIME, ExitCode::NO_EARLY_EXIT, Args...> {
+  using P = detail::Print<detail::Level::TIME, ExitCode::NO_EARLY_EXIT, Args...>;
+
+ public:
+  constexpr Time(std::format_string<Args...> fmt, Args&&... args) noexcept
+      : P{fmt, std::forward<Args>(args)...} {}
+};
+template <typename... Args>
+Time(std::format_string<Args...>, Args&&...) -> Time<Args...>;
 
 }  // namespace detail
 
@@ -233,6 +275,87 @@ template <typename T>
 template <typename T>
 [[nodiscard]] constexpr auto type_name(T /*ignored*/) -> std::string {
   return type_name<T>();
+}
+
+// - Times the duration of the scope in wall-clock time --------------------------------------------
+class ScopeTimer {
+  std::string m_scope_name;
+  std::chrono::high_resolution_clock::time_point m_t_begin;
+
+ public:
+  [[nodiscard]] ScopeTimer(std::string scope_name = "Scope") noexcept
+      : m_scope_name(std::move(scope_name)),
+        m_t_begin(std::chrono::high_resolution_clock::now()) {}
+
+  ScopeTimer(const ScopeTimer& other) noexcept                    = delete;
+  ScopeTimer(ScopeTimer&& other) noexcept                         = delete;
+  auto operator=(const ScopeTimer& other) noexcept -> ScopeTimer& = delete;
+  auto operator=(ScopeTimer&& other) noexcept -> ScopeTimer&      = delete;
+  ~ScopeTimer() noexcept {
+    const auto t_duration =
+        std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_t_begin);
+    detail::Time("{} took {}.", m_scope_name, t_duration);
+  }
+};
+
+#define IGOR_COMBINE1(X, Y) X##Y                // NOLINT
+#define IGOR_COMBINE(X, Y) IGOR_COMBINE1(X, Y)  // NOLINT
+
+// NOLINTNEXTLINE
+#define IGOR_TIME_SCOPE(...)                                                                       \
+  if (const auto IGOR_COMBINE(IGOR__SCOPE__TIMER__NAME__, __LINE__) =                              \
+          Igor::ScopeTimer{__VA_ARGS__};                                                           \
+      true)
+
+// - Simple command line progress bar --------------------------------------------------------------
+class ProgressBar {
+  std::size_t m_max_progress;
+  std::size_t m_length;
+  std::size_t m_progress = 0UZ;
+
+  enum : char {
+    DONE_CHAR     = '#',
+    NOT_DONE_CHAR = '.',
+  };
+
+ public:
+  constexpr ProgressBar(std::size_t max_progress, std::size_t length) noexcept
+      : m_max_progress(max_progress),
+        m_length(length - 5UZ) {
+    assert(length < std::numeric_limits<int>::max());
+  }
+
+  constexpr void update() noexcept {
+    m_progress = std::min(m_progress + 1, m_max_progress);
+    show();
+  }
+
+  void show() const noexcept {
+    const auto done_length = (m_length * m_progress) / m_max_progress;
+    const auto done_prct   = (100UZ * m_progress) / m_max_progress;
+    std::cout << "\r[";
+    std::cout << std::string(done_length, DONE_CHAR);
+    std::cout << std::string(m_length - done_length, NOT_DONE_CHAR);
+    std::cout << "] ";
+    std::cout << std::setw(3) << done_prct << "%" << std::flush;
+  }
+};
+
+// - Transforms memory in bytes to a human readable string -----------------------------------------
+[[nodiscard]] auto memory_to_string(uint64_t mem_in_bytes) noexcept -> std::string {
+  using namespace std::string_literals;
+  constexpr uint64_t step_factor = 1024;
+
+  if (mem_in_bytes < step_factor) {
+    return std::to_string(mem_in_bytes) + " B"s;
+  }
+  if (mem_in_bytes < step_factor * step_factor) {
+    return std::to_string(mem_in_bytes / step_factor) + " kB"s;
+  }
+  if (mem_in_bytes < step_factor * step_factor * step_factor) {
+    return std::to_string(mem_in_bytes / (step_factor * step_factor)) + " MB"s;
+  }
+  return std::to_string(mem_in_bytes / (step_factor * step_factor * step_factor)) + " GB"s;
 }
 
 }  // namespace Igor

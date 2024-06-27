@@ -1,11 +1,11 @@
-#ifndef BURG_BOUNDARY_CONDITIONS_HPP_
-#define BURG_BOUNDARY_CONDITIONS_HPP_
+#ifndef ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_
+#define ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_
 
 #include <iosfwd>
 
 #include "Matrix.hpp"
 
-namespace Zap {
+namespace Zap::Scalar {
 
 // - Copy the value next to the boundary -----------------------------------------------------------
 template <typename Float, typename NumericalFlux>
@@ -339,6 +339,137 @@ void periodic_boundary(Matrix<Float>& u_next,
   }
 }
 
-}  // namespace Zap
+// - Boundary assumes that the value outside is the same as the cell value -------------------------
+template <typename Float, typename NumericalFlux>
+void equal_value_boundary(Matrix<Float>& u_next,
+                          const Matrix<Float>& u_curr,
+                          Float dt,
+                          Float dx,
+                          Float dy,
+                          NumericalFlux numerical_flux) noexcept {
+  assert(u_curr.rows() == u_next.rows());
+  assert(u_curr.cols() == u_next.cols());
 
-#endif  // BURG_BOUNDARY_CONDITIONS_HPP_
+  // Update bottom left corner
+  {
+    const auto F_x_minus = numerical_flux(u_curr(0, 0), u_curr(0, 0));
+    const auto F_x_plus  = numerical_flux(u_curr(0, 0), u_curr(0, 1));
+    const auto F_y_minus = numerical_flux(u_curr(0, 0), u_curr(0, 0));
+    const auto F_y_plus  = numerical_flux(u_curr(0, 0), u_curr(1, 0));
+
+    u_next(0, 0) =
+        u_curr(0, 0) - (dt / dx) * (F_x_plus - F_x_minus) - (dt / dy) * (F_y_plus - F_y_minus);
+  }
+
+  // Update bottom right corner
+  {
+    const auto F_x_minus =
+        numerical_flux(u_curr(0, u_curr.cols() - 2), u_curr(0, u_curr.cols() - 1));
+    const auto F_x_plus =
+        numerical_flux(u_curr(0, u_curr.cols() - 1), u_curr(0, u_curr.cols() - 1));
+    const auto F_y_minus =
+        numerical_flux(u_curr(0, u_curr.cols() - 1), u_curr(1, u_curr.cols() - 1));
+    const auto F_y_plus =
+        numerical_flux(u_curr(0, u_curr.cols() - 1), u_curr(1, u_curr.cols() - 1));
+
+    u_next(0, u_curr.cols() - 1) = u_curr(0, u_curr.cols() - 1) -
+                                   (dt / dx) * (F_x_plus - F_x_minus) -
+                                   (dt / dy) * (F_y_plus - F_y_minus);
+  }
+
+  // Update top left corner
+  {
+    const auto F_x_minus =
+        numerical_flux(u_curr(u_curr.rows() - 1, 0), u_curr(u_curr.rows() - 1, 0));
+    const auto F_x_plus =
+        numerical_flux(u_curr(u_curr.rows() - 1, 0), u_curr(u_curr.rows() - 1, 1));
+    const auto F_y_minus =
+        numerical_flux(u_curr(u_curr.rows() - 2, 0), u_curr(u_curr.rows() - 1, 0));
+    const auto F_y_plus =
+        numerical_flux(u_curr(u_curr.rows() - 1, 0), u_curr(u_curr.rows() - 1, 0));
+
+    u_next(u_curr.rows() - 1, 0) = u_curr(u_curr.rows() - 1, 0) -
+                                   (dt / dx) * (F_x_plus - F_x_minus) -
+                                   (dt / dy) * (F_y_plus - F_y_minus);
+  }
+
+  // Update top right corner
+  {
+    const auto F_x_minus = numerical_flux(u_curr(u_curr.rows() - 1, u_curr.cols() - 2),
+                                          u_curr(u_curr.rows() - 1, u_curr.cols() - 1));
+    const auto F_x_plus  = numerical_flux(u_curr(u_curr.rows() - 1, u_curr.cols() - 1),
+                                         u_curr(u_curr.rows() - 1, u_curr.cols() - 1));
+    const auto F_y_minus = numerical_flux(u_curr(u_curr.rows() - 2, u_curr.cols() - 1),
+                                          u_curr(u_curr.rows() - 1, u_curr.cols() - 1));
+    const auto F_y_plus  = numerical_flux(u_curr(u_curr.rows() - 1, u_curr.cols() - 1),
+                                         u_curr(u_curr.rows() - 1, u_curr.cols() - 1));
+
+    u_next(u_curr.rows() - 1, u_curr.cols() - 1) = u_curr(u_curr.rows() - 1, u_curr.cols() - 1) -
+                                                   (dt / dx) * (F_x_plus - F_x_minus) -
+                                                   (dt / dy) * (F_y_plus - F_y_minus);
+  }
+
+  // Update left and right side
+  for (int row = 1; row < u_curr.rows() - 1; ++row) {
+    // Left
+    {
+      const auto F_x_minus = numerical_flux(u_curr(row, 0), u_curr(row, 0));
+      const auto F_x_plus  = numerical_flux(u_curr(row, 0), u_curr(row, 1));
+      const auto F_y_minus = numerical_flux(u_curr(row - 1, 0), u_curr(row, 0));
+      const auto F_y_plus  = numerical_flux(u_curr(row, 0), u_curr(row + 1, 0));
+
+      u_next(row, 0) =
+          u_curr(row, 0) - (dt / dx) * (F_x_plus - F_x_minus) - (dt / dy) * (F_y_plus - F_y_minus);
+    }
+
+    // Right
+    {
+      const auto F_x_minus =
+          numerical_flux(u_curr(row, u_next.cols() - 2), u_curr(row, u_next.cols() - 1));
+      const auto F_x_plus =
+          numerical_flux(u_curr(row, u_next.cols() - 1), u_curr(row, u_next.cols() - 1));
+      const auto F_y_minus =
+          numerical_flux(u_curr(row - 1, u_next.cols() - 1), u_curr(row, u_next.cols() - 1));
+      const auto F_y_plus =
+          numerical_flux(u_curr(row, u_next.cols() - 1), u_curr(row + 1, u_next.cols() - 1));
+
+      u_next(row, u_next.cols() - 1) = u_curr(row, u_next.cols() - 1) -
+                                       (dt / dx) * (F_x_plus - F_x_minus) -
+                                       (dt / dy) * (F_y_plus - F_y_minus);
+    }
+  }
+
+  // Update top and bottom side
+  for (int col = 1; col < u_curr.cols() - 1; ++col) {
+    // Bottom
+    {
+      const auto F_x_minus = numerical_flux(u_curr(0, col - 1), u_curr(0, col));
+      const auto F_x_plus  = numerical_flux(u_curr(0, col), u_curr(0, col + 1));
+      const auto F_y_minus = numerical_flux(u_curr(0, col), u_curr(0, col));
+      const auto F_y_plus  = numerical_flux(u_curr(0, col), u_curr(1, col));
+
+      u_next(0, col) =
+          u_curr(0, col) - (dt / dx) * (F_x_plus - F_x_minus) - (dt / dy) * (F_y_plus - F_y_minus);
+    }
+
+    // Top
+    {
+      const auto F_x_minus =
+          numerical_flux(u_curr(u_next.rows() - 1, col - 1), u_curr(u_next.rows() - 1, col));
+      const auto F_x_plus =
+          numerical_flux(u_curr(u_next.rows() - 1, col), u_curr(u_next.rows() - 1, col + 1));
+      const auto F_y_minus =
+          numerical_flux(u_curr(u_next.rows() - 2, col), u_curr(u_next.rows() - 1, col));
+      const auto F_y_plus =
+          numerical_flux(u_curr(u_next.rows() - 1, col), u_curr(u_next.rows() - 1, col));
+
+      u_next(u_next.rows() - 1, col) = u_curr(u_next.rows() - 1, col) -
+                                       (dt / dx) * (F_x_plus - F_x_minus) -
+                                       (dt / dy) * (F_y_plus - F_y_minus);
+    }
+  }
+}
+
+}  // namespace Zap::Scalar
+
+#endif  // ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_

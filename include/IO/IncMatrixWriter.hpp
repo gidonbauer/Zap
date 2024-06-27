@@ -1,5 +1,5 @@
-#ifndef ZAP_WRITE_MATRIX_INC_HPP_
-#define ZAP_WRITE_MATRIX_INC_HPP_
+#ifndef ZAP_IO_INC_MATRIX_WRITER_HPP_
+#define ZAP_IO_INC_MATRIX_WRITER_HPP_
 
 #include <cstdint>
 #include <fstream>
@@ -10,7 +10,7 @@
 
 #include "Igor.hpp"
 
-namespace Zap {
+namespace Zap::IO {
 
 // -------------------------------------------------------------------------------------------------
 template <typename Scalar>
@@ -167,12 +167,9 @@ class IncMatrixWriter {
 // -------------------------------------------------------------------------------------------------
 class NoopWriter {
  public:
-  template <typename T>
-  [[nodiscard]] constexpr auto write_data(const T& /*ignored*/) noexcept -> bool {
-    return true;
-  }
+  [[nodiscard]] constexpr auto write_data(const auto& /*ignored*/) noexcept -> bool { return true; }
 };
 
-}  // namespace Zap
+}  // namespace Zap::IO
 
-#endif  // ZAP_WRITE_MATRIX_INC_HPP_
+#endif  // ZAP_IO_INC_MATRIX_WRITER_HPP_

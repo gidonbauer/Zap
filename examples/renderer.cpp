@@ -5,8 +5,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include "IO/IncMatrixReader.hpp"
 #include "Igor.hpp"
-#include "ReadMatrixInc.hpp"
 #include "Renderer/Canvas.hpp"
 
 namespace Rd = Zap::Renderer;
@@ -102,8 +102,8 @@ auto main(int argc, char** argv) -> int {
   const auto t_input_file = argv[2];  // NOLINT
   const auto output_file  = argv[3];  // NOLINT
 
-  Zap::IncMatrixReader<Float> u_reader{u_input_file};
-  Zap::IncMatrixReader<Float> t_reader{t_input_file};
+  Zap::IO::IncMatrixReader<Float> u_reader{u_input_file};
+  Zap::IO::IncMatrixReader<Float> t_reader{t_input_file};
   if (u_reader.num_elem() != t_reader.num_elem()) {
     Igor::Warn("Incompatible number of elements in u ({}) and t ({}).", u_input_file, t_input_file);
     return 1;

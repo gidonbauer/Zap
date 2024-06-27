@@ -1,5 +1,5 @@
-#ifndef ZAP_SOLVER_HPP_
-#define ZAP_SOLVER_HPP_
+#ifndef ZAP_SCALAR_SOLVER_HPP_
+#define ZAP_SCALAR_SOLVER_HPP_
 
 #include <optional>
 
@@ -8,7 +8,7 @@
 #include "Igor.hpp"
 #include "Matrix.hpp"
 
-namespace Zap {
+namespace Zap::Scalar {
 
 template <typename Float>
 [[nodiscard]] constexpr auto abs_max(const Zap::Matrix<Float>& mat) noexcept -> Float {
@@ -84,8 +84,8 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
 
     // Solve for interior points
 #pragma omp parallel for
-    for (int row = 1; row < u0.rows() - 1; ++row) {
-      for (int col = 1; col < u0.cols() - 1; ++col) {
+    for (Eigen::Index row = 1; row < u0.rows() - 1; ++row) {
+      for (Eigen::Index col = 1; col < u0.cols() - 1; ++col) {
         // clang-format off
         const auto F_x_minus = godunov_flux(u_curr(row,     col - 1), u_curr(row,     col    ));
         const auto F_x_plus  = godunov_flux(u_curr(row,     col    ), u_curr(row,     col + 1));
@@ -116,6 +116,6 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
   return u_curr;
 }
 
-}  // namespace Zap
+}  // namespace Zap::Scalar
 
-#endif  // ZAP_SOLVER_HPP_
+#endif  // ZAP_SCALAR_SOLVER_HPP_

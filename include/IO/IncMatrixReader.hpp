@@ -1,9 +1,9 @@
-#ifndef ZAP_READ_MATRIX_INC_HPP_
-#define ZAP_READ_MATRIX_INC_HPP_
+#ifndef ZAP_IO_INC_MATRIX_READER_HPP_
+#define ZAP_IO_INC_MATRIX_READER_HPP_
 
-#include "WriteMatrixInc.hpp"
+#include "IO/IncMatrixWriter.hpp"
 
-namespace Zap {
+namespace Zap::IO {
 
 template <typename Scalar>
 class IncMatrixReader {
@@ -231,6 +231,6 @@ class IncMatrixReader {
   }
 };
 
-}  // namespace Zap
+}  // namespace Zap::IO
 
-#endif  // ZAP_READ_MATRIX_INC_HPP_
+#endif  // ZAP_IO_INC_MATRIX_READER_HPP_
