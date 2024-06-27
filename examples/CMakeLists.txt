@@ -1,10 +1,10 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/")
 
-# find_package(OpenMP REQUIRED)
+find_package(OpenMP REQUIRED)
 
 set(executables
   run_solver
-  legacy_renderer
+  run_cell_based
 )
 
 foreach(exec ${executables})
@@ -16,12 +16,20 @@ foreach(exec ${executables})
     target_include_directories(${exec} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
 
     # - Link libraries -----------------
-    # target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
 endforeach()
 
-# ================================================ 
+# ================================================
 
 if (ZAP_BUILD_RENDERER)
+    # - Define executables -------------
+    add_executable(legacy_renderer legacy_renderer.cpp)
+
+    # - Define include path ------------
+    target_include_directories(legacy_renderer        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
+    target_include_directories(legacy_renderer SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
+    
+    # --------------------------------------------
     find_package(Freetype REQUIRED)
     
     # - Renderer that uses freetype --------
