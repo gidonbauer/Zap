@@ -308,6 +308,27 @@ class Canvas {
     return true;
   }
 
+  constexpr auto
+  draw_rect(size_t x, size_t y, size_t w, size_t h, PixelType color) noexcept -> bool {
+    if (x > m_width || x + w >= m_width) {
+      Igor::Warn("Rect outside of canvas: canvas width = {}, x = {}, x+w = {}", m_width, x, x + w);
+      return false;
+    }
+    if (y > m_height || y + h >= m_height) {
+      Igor::Warn(
+          "Rect outside of canvas: canvas height = {}, y = {}, y+h = {}", m_height, y, y + h);
+      return false;
+    }
+
+    for (size_t row = y; row < y + h; ++row) {
+      for (size_t col = x; col < x + w; ++col) {
+        m_data[col + row * m_width] = color;
+      }
+    }
+
+    return true;
+  }
+
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto to_raw_stream(pid_t stream) const noexcept -> bool {
     const auto data_size_bytes = m_data.size() * sizeof(PixelType);

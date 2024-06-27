@@ -43,4 +43,16 @@ if (ZAP_BUILD_RENDERER)
     # - Link libraries ---------------------
     target_link_libraries(renderer PRIVATE ${FREETYPE_LIBRARIES})
     # target_link_libraries(renderer PRIVATE OpenMP::OpenMP_CXX)
+    
+    # - Cell renderer ----------------------
+    add_executable(cell_renderer cell_renderer.cpp)
+    
+    # - Define include path ----------------
+    target_include_directories(cell_renderer        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
+    target_include_directories(cell_renderer SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
+    target_include_directories(cell_renderer SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+    
+    # - Link libraries ---------------------
+    target_link_libraries(cell_renderer PRIVATE ${FREETYPE_LIBRARIES})
+    # target_link_libraries(cell_renderer PRIVATE OpenMP::OpenMP_CXX)
 endif()
