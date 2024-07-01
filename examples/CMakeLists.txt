@@ -54,5 +54,5 @@ if (ZAP_BUILD_RENDERER)
     
     # - Link libraries ---------------------
     target_link_libraries(cell_renderer PRIVATE ${FREETYPE_LIBRARIES})
-    # target_link_libraries(cell_renderer PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(cell_renderer PRIVATE OpenMP::OpenMP_CXX)
 endif()

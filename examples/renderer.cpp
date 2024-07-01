@@ -45,7 +45,7 @@ auto main(int argc, char** argv) -> int {
       .width  = static_cast<size_t>(u_reader.cols()),
       .height = static_cast<size_t>(u_reader.rows()),
   };
-  constexpr std::string_view font_file = "../assets/LinLibertine_R.ttf";
+  constexpr std::string_view font_file = "../assets/LinLibertine_RI.ttf";
   if (!canvas.load_font(font_file)) {
     Igor::Warn("Could not load font from file `{}`.", font_file);
     return 1;

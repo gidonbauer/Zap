@@ -4,6 +4,8 @@
 #include "Renderer/Canvas.hpp"
 #include "Renderer/FFmpeg.hpp"
 
+#define ZAP_PARALLEL_RENDERING
+
 namespace Rd = Zap::Renderer;
 
 template <Igor::detail::Level level>
@@ -107,10 +109,10 @@ auto main(int argc, char** argv) -> int {
 
     constexpr size_t TEXT_HEIGHT      = 100UZ;
     constexpr size_t MIN_CANVAS_WIDTH = 600UZ;
-    size_t graph_width                = u_reader.nx() * scale;
-    size_t graph_height               = u_reader.ny() * scale;
+    const size_t graph_width          = u_reader.nx() * scale;
+    const size_t graph_height         = u_reader.ny() * scale;
     Rd::Canvas canvas(std::max(MIN_CANVAS_WIDTH, graph_width), graph_height + TEXT_HEIGHT);
-    Rd::Box text_box{
+    const Rd::Box text_box{
         .col    = 0,
         .row    = 0,
         .width  = canvas.width(),
@@ -118,7 +120,7 @@ auto main(int argc, char** argv) -> int {
     };
 
     const size_t avail_padding = canvas.width() - graph_width;
-    Rd::Box graph_box{
+    const Rd::Box graph_box{
         .col    = avail_padding / 2UZ,
         .row    = text_box.height,
         .width  = graph_width,
@@ -165,6 +167,10 @@ auto main(int argc, char** argv) -> int {
         }
       }
 
+      bool failed_drawing_rects = false;
+#ifdef ZAP_PARALLEL_RENDERING
+#pragma omp parallel for
+#endif  // ZAP_PARALLEL_RENDERING
       for (const auto& cell : cells) {
         const Rd::Box rect{
             .col = static_cast<size_t>(
@@ -184,8 +190,11 @@ auto main(int argc, char** argv) -> int {
 
         if (!canvas.draw_rect(rect, graph_box, c, true)) {
           Igor::Warn("Could not draw cell");
-          return 1;
+          failed_drawing_rects = true;
         }
+      }
+      if (failed_drawing_rects) {
+        return 1;
       }
 
       if (!canvas.to_raw_stream(ffmpeg.stream())) {
