@@ -21,7 +21,7 @@ class FFmpeg {
   pid_t m_stream{};
 
  public:
-  [[nodiscard]] FFmpeg(size_t width, size_t height, std::string_view output_file) noexcept {
+  [[nodiscard]] FFmpeg(size_t width, size_t height, const std::string& output_file) noexcept {
     std::array<int, 2> pipefd{};
     if (pipe(pipefd.data()) == -1) {
       Igor::Panic("Opening pipe failed: {}", std::strerror(errno));
@@ -83,19 +83,19 @@ class FFmpeg {
   auto operator=(FFmpeg&& other) noexcept -> FFmpeg&      = delete;
 
   ~FFmpeg() noexcept {
-    bool encounter_error = false;
+    bool encountered_error = false;
     if (close(m_stream) == -1) {
       Igor::Warn("Could not close write end of pipe in parent process: {}", std::strerror(errno));
-      encounter_error = true;
+      encountered_error = true;
     }
 
     int status = 0;
     if (waitpid(m_child, &status, 0) == -1) {
       Igor::Warn("Could not wait for child process to finish: {}", std::strerror(errno));
-      encounter_error = true;
+      encountered_error = true;
     }
 
-    if (encounter_error) {
+    if (encountered_error) {
       if (kill(m_child, SIGKILL) == -1) {
         Igor::Warn("Could not kill FFmpeg: {}", std::strerror(errno));
       }
