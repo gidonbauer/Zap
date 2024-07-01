@@ -15,30 +15,36 @@ namespace Zap::IO {
 
 enum struct VTKFormat : std::uint8_t { STRUCTURED_POINTS, STRUCTURED_GRID, UNSTRUCTURED_GRID };
 
-template <VTKFormat F>
+template <VTKFormat>
 class VTKWriter;
+
+template <typename, size_t>
+class IncCellWriter;
+
+template <typename, size_t>
+class IncCellReader;
 
 }  // namespace Zap::IO
 
 namespace Zap::CellBased {
 
-template <typename Float, std::size_t DIM>
+template <typename Float, size_t DIM>
 struct CartesianCell {
   static_assert(DIM > 0, "Dimension must be at least 1.");
-  enum : std::size_t { NULL_INDEX = std::numeric_limits<std::size_t>::max() };
+  enum : size_t { NULL_INDEX = std::numeric_limits<size_t>::max() };
 
   Eigen::Vector<Float, DIM> value{};
   Float x_min{};
   Float dx{};
   Float y_min{};
   Float dy{};
-  std::size_t left_idx   = NULL_INDEX;
-  std::size_t right_idx  = NULL_INDEX;
-  std::size_t bottom_idx = NULL_INDEX;
-  std::size_t top_idx    = NULL_INDEX;
+  size_t left_idx   = NULL_INDEX;
+  size_t right_idx  = NULL_INDEX;
+  size_t bottom_idx = NULL_INDEX;
+  size_t top_idx    = NULL_INDEX;
 };
 
-template <typename Float, std::size_t DIM>
+template <typename Float, size_t DIM>
 auto operator<<(std::ostream& out,
                 const CartesianCell<Float, DIM>& cell) noexcept -> std::ostream& {
   constexpr auto end_char = '\n';
@@ -48,7 +54,7 @@ auto operator<<(std::ostream& out,
 
   out << indent << ".value = [ ";
   out << cell.value[0];
-  for (std::size_t i = 1; i < DIM; ++i) {
+  for (size_t i = 1; i < DIM; ++i) {
     out << ", " << cell.value[i];
   }
   out << " ]," << end_char;
@@ -95,37 +101,42 @@ auto operator<<(std::ostream& out,
   return out;
 }
 
-template <typename Float, std::size_t DIM>
+template <typename Float, size_t DIM>
 class Grid {
   struct m_CornerIndices {
-    std::size_t top_left;
-    std::size_t top_right;
-    std::size_t bottom_left;
-    std::size_t bottom_right;
+    size_t top_left;
+    size_t top_right;
+    size_t bottom_left;
+    size_t bottom_right;
   };
 
   using m_Cell = CartesianCell<Float, DIM>;
   std::vector<m_Cell> m_cells;
-  std::size_t m_nx;
-  std::size_t m_ny;
+  size_t m_nx;
+  size_t m_ny;
+
+  mutable std::optional<Float> m_min_delta = std::nullopt;
+  mutable std::optional<Float> m_x_min     = std::nullopt;
+  mutable std::optional<Float> m_x_max     = std::nullopt;
+  mutable std::optional<Float> m_y_min     = std::nullopt;
+  mutable std::optional<Float> m_y_max     = std::nullopt;
 
   // -----------------------------------------------------------------------------------------------
-  constexpr Grid(std::size_t nx, std::size_t ny)
+  constexpr Grid(size_t nx, size_t ny)
       : m_cells(nx * ny),
         m_nx(nx),
         m_ny(ny) {}
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto to_vec_idx(std::size_t xi,
-                                          std::size_t yi) const noexcept -> std::size_t {
+  [[nodiscard]] constexpr auto to_vec_idx(size_t xi, size_t yi) const noexcept -> size_t {
     assert(xi < m_nx);
     assert(yi < m_ny);
     return yi * m_nx + xi;
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto to_corner_idx(std::size_t xi,
-                                             std::size_t yi) const noexcept -> m_CornerIndices {
+  [[nodiscard]] constexpr auto to_corner_idx(size_t xi,
+                                             size_t yi) const noexcept -> m_CornerIndices {
     assert(xi < m_nx);
     assert(yi < m_ny);
     return {
@@ -138,16 +149,21 @@ class Grid {
 
  public:
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] static constexpr auto UniformGrid(
-      Float x_min, Float x_max, std::size_t nx, Float y_min, Float y_max, std::size_t ny) -> Grid {
+  [[nodiscard]] static constexpr auto
+  Uniform(Float x_min, Float x_max, size_t nx, Float y_min, Float y_max, size_t ny) -> Grid {
     assert(nx > 0);
     assert(ny > 0);
     Grid grid(nx, ny);
-    const auto dx = (x_max - x_min) / static_cast<Float>(nx);
-    const auto dy = (y_max - y_min) / static_cast<Float>(ny);
+    const auto dx    = (x_max - x_min) / static_cast<Float>(nx);
+    const auto dy    = (y_max - y_min) / static_cast<Float>(ny);
+    grid.m_min_delta = std::min(dx, dy);
+    grid.m_x_min     = x_min;
+    grid.m_x_max     = x_max;
+    grid.m_y_min     = y_min;
+    grid.m_y_max     = y_max;
 
-    for (std::size_t yi = 0; yi < ny; ++yi) {
-      for (std::size_t xi = 0; xi < nx; ++xi) {
+    for (size_t yi = 0; yi < ny; ++yi) {
+      for (size_t xi = 0; xi < nx; ++xi) {
         grid.m_cells[grid.to_vec_idx(xi, yi)] = m_Cell{
             .x_min      = x_min + static_cast<Float>(xi) * dx,
             .dx         = dx,
@@ -165,13 +181,13 @@ class Grid {
 
   // -----------------------------------------------------------------------------------------------
   constexpr void make_periodic() noexcept {
-    for (std::size_t xi = 0; xi < m_nx; ++xi) {
+    for (size_t xi = 0; xi < m_nx; ++xi) {
       const auto bottom_idx          = to_vec_idx(xi, 0);
       const auto top_idx             = to_vec_idx(xi, m_ny - 1);
       m_cells[bottom_idx].bottom_idx = top_idx;
       m_cells[top_idx].top_idx       = bottom_idx;
     }
-    for (std::size_t yi = 0; yi < m_ny; ++yi) {
+    for (size_t yi = 0; yi < m_ny; ++yi) {
       const auto left_idx          = to_vec_idx(0, yi);
       const auto right_idx         = to_vec_idx(m_nx - 1, yi);
       m_cells[left_idx].left_idx   = right_idx;
@@ -230,14 +246,58 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto nx() const noexcept -> size_t { return m_nx; }
+  [[nodiscard]] constexpr auto ny() const noexcept -> size_t { return m_ny; }
+
   [[nodiscard]] constexpr auto min_delta() const noexcept -> Float {
-    assert(m_cells.size() > 0);
-    return std::transform_reduce(
-        std::cbegin(m_cells),
-        std::cend(m_cells),
-        std::min(m_cells[0].dx, m_cells[0].dy),
-        [](const auto& a, const auto& b) { return std::min(a, b); },
-        [](const m_Cell& cell) { return std::min(cell.dx, cell.dy); });
+    if (!m_min_delta.has_value()) {
+      assert(m_cells.size() > 0);
+      m_min_delta = std::transform_reduce(
+          std::cbegin(m_cells),
+          std::cend(m_cells),
+          std::min(m_cells[0].dx, m_cells[0].dy),
+          [](const auto& a, const auto& b) { return std::min(a, b); },
+          [](const m_Cell& cell) { return std::min(cell.dx, cell.dy); });
+    }
+    return *m_min_delta;
+  }
+
+  [[nodiscard]] constexpr auto x_min() const noexcept -> Float {
+    if (!m_x_min.has_value()) {
+      Igor::Todo("Implement finding x_min.");
+      m_x_min = 0;
+    }
+    return *m_x_min;
+  }
+
+  [[nodiscard]] constexpr auto x_max() const noexcept -> Float {
+    if (!m_x_max.has_value()) {
+      Igor::Todo("Implement finding x_max.");
+      m_x_max = 0;
+    }
+    return *m_x_max;
+  }
+
+  [[nodiscard]] constexpr auto y_min() const noexcept -> Float {
+    if (!m_y_min.has_value()) {
+      Igor::Todo("Implement finding y_min.");
+      m_y_min = 0;
+    }
+    return *m_y_min;
+  }
+
+  [[nodiscard]] constexpr auto y_max() const noexcept -> Float {
+    if (!m_y_max.has_value()) {
+      Igor::Todo("Implement finding y_max.");
+      m_y_max = 0;
+    }
+    return *m_y_max;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept -> const m_Cell& {
+    assert(idx < m_nx * m_ny);
+    return m_cells[idx];
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -253,6 +313,12 @@ class Grid {
 
   template <Zap::IO::VTKFormat F>
   friend class Zap::IO::VTKWriter;
+
+  template <typename F, size_t D>
+  friend class Zap::IO::IncCellWriter;
+
+  template <typename F, size_t D>
+  friend class Zap::IO::IncCellReader;
 };
 
 }  // namespace Zap::CellBased

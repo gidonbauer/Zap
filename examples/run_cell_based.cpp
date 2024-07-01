@@ -2,6 +2,7 @@
 
 #include "CellBased/Cell.hpp"
 #include "CellBased/Solver.hpp"
+#include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
 #include "IO/VTKWriter.hpp"
 
@@ -10,8 +11,8 @@
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 
 auto main(int argc, char** argv) -> int {
-  using Float               = double;
-  constexpr std::size_t DIM = 1;
+  using Float          = double;
+  constexpr size_t DIM = 1;
 
   if (argc < 3) {
     Igor::Warn("Usage: {} <nx> <ny>", *argv);
@@ -27,7 +28,7 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  auto parse_size_t = [](const char* cstr) -> std::size_t {
+  auto parse_size_t = [](const char* cstr) -> size_t {
     char* end        = nullptr;
     const size_t val = std::strtoul(cstr, &end, 10);
     if (end != cstr + std::strlen(cstr)) {  // NOLINT
@@ -55,7 +56,7 @@ auto main(int argc, char** argv) -> int {
   const Float y_min = 0.0;
   const Float y_max = 5.0;
 
-  auto grid = Zap::CellBased::Grid<Float, DIM>::UniformGrid(x_min, x_max, nx, y_min, y_max, ny);
+  auto grid = Zap::CellBased::Grid<Float, DIM>::Uniform(x_min, x_max, nx, y_min, y_max, ny);
   grid.make_periodic();
 
   auto u0 = [=](Float x, Float y) {
@@ -83,10 +84,12 @@ auto main(int argc, char** argv) -> int {
     return flux(std::max(std::abs(u_left), std::abs(u_right)));
   };
 
-  Zap::IO::VTKWriter<Zap::IO::VTKFormat::UNSTRUCTURED_GRID> grid_writer{OUTPUT_DIR "grid"};
+  // Zap::IO::NoopWriter grid_writer{};
+  // Zap::IO::VTKWriter<Zap::IO::VTKFormat::UNSTRUCTURED_GRID> grid_writer{OUTPUT_DIR "grid"};
+  Zap::IO::IncCellWriter<Float, DIM> grid_writer{OUTPUT_DIR "test.grid", grid};
 
-  constexpr auto t_filename = OUTPUT_DIR "t.dat";
-  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
+  // Zap::IO::NoopWriter t_writer{};
+  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(OUTPUT_DIR "t.dat", 1, 1, 0);
 
   IGOR_TIME_SCOPE("Solver") {
     Zap::CellBased::Solver solver(godunov_flux, godunov_flux);

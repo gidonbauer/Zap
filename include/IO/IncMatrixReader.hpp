@@ -59,24 +59,24 @@ class IncMatrixReader {
 
     // Read magic string
     {
-      std::array<char, HeaderLayout::MAGIC_STRING.size()> magic_string{};
+      std::array<char, IncMatrixHeaderLayout::MAGIC_STRING.size()> magic_string{};
       if (!m_in.read(magic_string.data(), magic_string.size())) {
         Igor::Warn("Could not read magic string from `{}`: {}", m_filename, std::strerror(errno));
         return false;
       }
       if (std::string_view magic_string_sv{magic_string.data(), magic_string.size()};
-          HeaderLayout::MAGIC_STRING != magic_string_sv) {
+          IncMatrixHeaderLayout::MAGIC_STRING != magic_string_sv) {
         Igor::Warn("Invalid magic string `{}` from `{}`, expected `{}`.",
                    magic_string_sv,
                    m_filename,
-                   HeaderLayout::MAGIC_STRING);
+                   IncMatrixHeaderLayout::MAGIC_STRING);
         return false;
       }
     }
 
     // Read dtype
     {
-      std::array<char, HeaderLayout::DTYPE_SIZE> dtype{};
+      std::array<char, IncMatrixHeaderLayout::DTYPE_SIZE> dtype{};
       if (!m_in.read(dtype.data(), dtype.size())) {
         Igor::Warn("Could not read dtype from `{}`: {}", m_filename, std::strerror(errno));
         return false;
@@ -91,7 +91,7 @@ class IncMatrixReader {
 
     // Read rows
     {
-      std::array<char, HeaderLayout::ROWS_SIZE> rows{};
+      std::array<char, IncMatrixHeaderLayout::ROWS_SIZE> rows{};
       if (!m_in.read(rows.data(), rows.size())) {
         Igor::Warn("Could not read number of rows from `{}`: {}", m_filename, std::strerror(errno));
         return false;
@@ -101,7 +101,7 @@ class IncMatrixReader {
 
     // Read cols
     {
-      std::array<char, HeaderLayout::COLS_SIZE> cols{};
+      std::array<char, IncMatrixHeaderLayout::COLS_SIZE> cols{};
       if (!m_in.read(cols.data(), cols.size())) {
         Igor::Warn(
             "Could not read number of columns from `{}`: {}", m_filename, std::strerror(errno));
@@ -113,7 +113,7 @@ class IncMatrixReader {
     // Read is_row_major
     {
       char byte = 0;
-      static_assert(HeaderLayout::IS_ROW_MAJOR_SIZE == sizeof(byte));
+      static_assert(IncMatrixHeaderLayout::IS_ROW_MAJOR_SIZE == sizeof(byte));
       if (!m_in.read(&byte, sizeof(byte))) {
         Igor::Warn("Could not read `is_row_major` from `{}`: {}", m_filename, std::strerror(errno));
         return false;
@@ -131,7 +131,7 @@ class IncMatrixReader {
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto read_num_elements() -> bool {
-    assert(m_in.tellg() == HeaderLayout::HEADER_SIZE);
+    assert(m_in.tellg() == IncMatrixHeaderLayout::HEADER_SIZE);
 
     const auto begin = m_in.tellg();
     if (begin == -1) {

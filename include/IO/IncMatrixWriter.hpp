@@ -4,55 +4,14 @@
 #include <cstdint>
 #include <fstream>
 #include <string_view>
-#include <type_traits>
 
 #include <Eigen/Dense>
 
-#include "Igor.hpp"
+#include "IO/Common.hpp"
 
 namespace Zap::IO {
 
-// -------------------------------------------------------------------------------------------------
-template <typename Scalar>
-[[nodiscard]] static consteval auto dtype_short() noexcept -> std::string_view {
-  using namespace std::string_view_literals;
-  static_assert(!std::is_reference_v<Scalar>);
-  using S = std::remove_cvref_t<Scalar>;
-  if constexpr (std::is_same_v<S, std::uint8_t>) {
-    return " u8"sv;
-  }
-  if constexpr (std::is_same_v<S, std::uint16_t>) {
-    return "u16"sv;
-  }
-  if constexpr (std::is_same_v<S, std::uint32_t>) {
-    return "u32"sv;
-  }
-  if constexpr (std::is_same_v<S, std::uint64_t>) {
-    return "u64"sv;
-  }
-  if constexpr (std::is_same_v<S, std::int8_t>) {
-    return " i8"sv;
-  }
-  if constexpr (std::is_same_v<S, std::int16_t>) {
-    return "i16"sv;
-  }
-  if constexpr (std::is_same_v<S, std::int32_t>) {
-    return "i32"sv;
-  }
-  if constexpr (std::is_same_v<S, std::int64_t>) {
-    return "i64"sv;
-  }
-  if constexpr (std::is_same_v<S, float>) {
-    return "f32"sv;
-  }
-  if constexpr (std::is_same_v<S, double>) {
-    return "f64"sv;
-  }
-  Igor::Panic("Unknown scalar type `{}`", Igor::type_name<Scalar>());
-  std::unreachable();
-}
-
-namespace HeaderLayout {
+namespace IncMatrixHeaderLayout {
 
 using namespace std::string_view_literals;
 
@@ -64,7 +23,7 @@ constexpr auto IS_ROW_MAJOR_SIZE = 1UZ;
 constexpr auto HEADER_SIZE =
     MAGIC_STRING.size() + DTYPE_SIZE + ROWS_SIZE + COLS_SIZE + IS_ROW_MAJOR_SIZE;
 
-}  // namespace HeaderLayout
+}  // namespace IncMatrixHeaderLayout
 
 // -------------------------------------------------------------------------------------------------
 template <typename Scalar, int ROWS, int COLS, int OPTIONS>
@@ -101,14 +60,15 @@ class IncMatrixWriter {
   write_header(int64_t rows, int64_t cols, int8_t is_row_major) noexcept -> bool {
     using namespace std::string_view_literals;
 
-    if (!m_out.write(HeaderLayout::MAGIC_STRING.data(), HeaderLayout::MAGIC_STRING.size())) {
+    if (!m_out.write(IncMatrixHeaderLayout::MAGIC_STRING.data(),
+                     IncMatrixHeaderLayout::MAGIC_STRING.size())) {
       Igor::Warn("Could not write magic string to `{}`.", m_filename);
       return false;
     }
 
     {
       constexpr auto dtype = dtype_short<Scalar>();
-      assert(dtype.size() == HeaderLayout::DTYPE_SIZE);
+      static_assert(dtype.size() == IncMatrixHeaderLayout::DTYPE_SIZE);
       if (!m_out.write(dtype.data(), dtype.size())) {
         Igor::Warn("Could not write the data type to `{}`.", m_filename);
         return false;
@@ -116,17 +76,17 @@ class IncMatrixWriter {
     }
 
     // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
-    static_assert(sizeof(rows) == HeaderLayout::ROWS_SIZE);
+    static_assert(sizeof(rows) == IncMatrixHeaderLayout::ROWS_SIZE);
     if (!m_out.write(reinterpret_cast<const char*>(&rows), sizeof(rows))) {
       Igor::Warn("Could not write number of rows to `{}`.", m_filename);
       return false;
     }
-    static_assert(sizeof(cols) == HeaderLayout::COLS_SIZE);
+    static_assert(sizeof(cols) == IncMatrixHeaderLayout::COLS_SIZE);
     if (!m_out.write(reinterpret_cast<const char*>(&cols), sizeof(cols))) {
       Igor::Warn("Could not write number of cols to `{}`.", m_filename);
       return false;
     }
-    static_assert(sizeof(is_row_major) == HeaderLayout::IS_ROW_MAJOR_SIZE);
+    static_assert(sizeof(is_row_major) == IncMatrixHeaderLayout::IS_ROW_MAJOR_SIZE);
     if (!m_out.write(reinterpret_cast<const char*>(&is_row_major), sizeof(is_row_major))) {
       Igor::Warn("Could not write storage order to `{}`.", m_filename);
       return false;
