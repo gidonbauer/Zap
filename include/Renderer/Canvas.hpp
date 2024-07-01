@@ -21,6 +21,10 @@ struct Box {
   size_t row{};
   size_t width{};
   size_t height{};
+
+  [[nodiscard]] constexpr auto contains(size_t x, size_t y) const noexcept -> bool {
+    return (x >= col) && (x < col + width) && (y >= row) && (y < row + height);
+  }
 };
 
 }  // namespace Zap::Renderer
@@ -138,10 +142,10 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto get_gylph_box(Box text_box,
-                                             FT_GlyphSlot glyph,
-                                             size_t& hori_pos,
-                                             Box& glyph_box) const noexcept -> bool {
+  [[nodiscard]] static constexpr auto get_gylph_box(Box text_box,
+                                                    FT_GlyphSlot glyph,
+                                                    size_t& hori_pos,
+                                                    Box& glyph_box) noexcept -> bool {
     const auto above_line_height = 3UZ * text_box.height / 4UZ;
 
     assert(glyph->metrics.width >= 0);
@@ -176,7 +180,11 @@ class Canvas {
 
     assert(metrics.horiAdvance > 0);
     const auto g_advance = static_cast<size_t>(metrics.horiAdvance >> 6);
-    assert(g_advance >= g_width);
+    // if (g_advance < g_width) {
+    //   IGOR_DEBUG_PRINT(g_advance);
+    //   IGOR_DEBUG_PRINT(g_width);
+    // }
+    // assert(g_advance >= g_width);
 
     // if (g_advance > m_width - hori_pos) {
     //   Igor::Warn("Glyph is too wide ({}) for canvas with width {} and horizontal position {}",
@@ -308,26 +316,73 @@ class Canvas {
     return true;
   }
 
-  constexpr auto
-  draw_rect(size_t x, size_t y, size_t w, size_t h, PixelType color) noexcept -> bool {
-    if (x > m_width || x + w >= m_width) {
-      Igor::Warn("Rect outside of canvas: canvas width = {}, x = {}, x+w = {}", m_width, x, x + w);
-      return false;
-    }
-    if (y > m_height || y + h >= m_height) {
-      Igor::Warn(
-          "Rect outside of canvas: canvas height = {}, y = {}, y+h = {}", m_height, y, y + h);
+  // -----------------------------------------------------------------------------------------------
+  constexpr auto draw_rect(Box rect,
+                           Box bounding_box,
+                           PixelType color,
+                           bool is_y_upwards = false) noexcept -> bool {
+    if (!box_in_canvas(bounding_box)) {
+      Igor::Warn("Bounding box {} is not within canvas with dimension {}x{}.",
+                 bounding_box,
+                 m_width,
+                 m_height);
       return false;
     }
 
-    for (size_t row = y; row < y + h; ++row) {
-      for (size_t col = x; col < x + w; ++col) {
-        m_data[col + row * m_width] = color;
+    if ((rect.row + rect.height) > bounding_box.height) {
+      Igor::Warn("Rect {} is not in bounding box {}.", rect, bounding_box);
+      return false;
+    }
+
+    if ((rect.col + rect.width) > bounding_box.width) {
+      Igor::Warn("Rect {} is not in bounding box {}.", rect, bounding_box);
+      return false;
+    }
+
+    for (size_t row = 0; row < rect.height; ++row) {
+      for (size_t col = 0; col < rect.width; ++col) {
+        const size_t c_col = rect.col + bounding_box.col + col;
+        assert(c_col < m_width);
+        const size_t c_row = is_y_upwards
+                                 ? bounding_box.row + (bounding_box.height - rect.row - row - 1UZ)
+                                 : rect.row + bounding_box.row + row;
+        assert(c_row < m_height);
+        assert(bounding_box.contains(c_col, c_row));
+        m_data[c_col + c_row * m_width] = color;  // NOLINT
       }
     }
 
     return true;
   }
+
+  // constexpr auto draw_rect(size_t x,
+  //                          size_t y,
+  //                          size_t w,
+  //                          size_t h,
+  //                          PixelType color,
+  //                          bool is_y_upwards = false) noexcept -> bool {
+  //   if (x >= m_width || x + w > m_width) {
+  //     Igor::Warn("Rect outside of canvas: canvas width = {}, x = {}, x+w = {}", m_width, x, x +
+  //     w); return false;
+  //   }
+  //   if (y >= m_height || y + h > m_height) {
+  //     Igor::Warn(
+  //         "Rect outside of canvas: canvas height = {}, y = {}, y+h = {}", m_height, y, y + h);
+  //     return false;
+  //   }
+
+  //   for (size_t row = y; row < y + h; ++row) {
+  //     for (size_t col = x; col < x + w; ++col) {
+  //       if (is_y_upwards) {
+  //         m_data[col + (m_height - 1UZ - row) * m_width] = color;
+  //       } else {
+  //         m_data[col + row * m_width] = color;
+  //       }
+  //     }
+  //   }
+
+  //   return true;
+  // }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto to_raw_stream(pid_t stream) const noexcept -> bool {

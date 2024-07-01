@@ -106,7 +106,6 @@ class IncCellReader {
         return false;
       }
       std::string_view dtype_sv{dtype_arr.data(), dtype_arr.size()};
-      IGOR_DEBUG_PRINT(dtype_sv);
       if (dtype_short<Float>() != dtype_sv) {
         Igor::Warn(
             "Incompatible dtype, got `{}` but expected `{}`", dtype_sv, dtype_short<Float>());
@@ -117,28 +116,22 @@ class IncCellReader {
     if (!read_next_float(m_x_min)) {
       return false;
     }
-    IGOR_DEBUG_PRINT(m_x_min);
     if (!read_next_float(m_x_max)) {
       return false;
     }
-    IGOR_DEBUG_PRINT(m_x_max);
     if (!read_next_size_t(m_nx)) {
       return false;
     }
-    IGOR_DEBUG_PRINT(m_nx);
 
     if (!read_next_float(m_y_min)) {
       return false;
     }
-    IGOR_DEBUG_PRINT(m_y_min);
     if (!read_next_float(m_y_max)) {
       return false;
     }
-    IGOR_DEBUG_PRINT(m_y_max);
     if (!read_next_size_t(m_ny)) {
       return false;
     }
-    IGOR_DEBUG_PRINT(m_ny);
 
     {
       size_t dim{};
@@ -149,7 +142,6 @@ class IncCellReader {
         Igor::Warn("Incompatible dimension {}, expected {}", dim, DIM);
         return false;
       }
-      IGOR_DEBUG_PRINT(dim);
     }
 
     return true;
@@ -159,8 +151,6 @@ class IncCellReader {
  public:
   template <bool WARN_END = true>
   [[nodiscard]] auto read_next() -> bool {
-    Igor::ScopeTimer timer{__func__};
-
     for (size_t i = 0; i < m_nx * m_ny; ++i) {
       char cell_type{};
       if (!m_in.get(cell_type)) {
@@ -242,6 +232,16 @@ class IncCellReader {
     assert(idx < m_nx * m_ny);
     return m_cells[idx];
   }
+
+  [[nodiscard]] constexpr auto cells() const noexcept -> const std::vector<ReducedCartesianCell>& {
+    return m_cells;
+  }
+  [[nodiscard]] constexpr auto x_min() const noexcept -> Float { return m_x_min; }
+  [[nodiscard]] constexpr auto x_max() const noexcept -> Float { return m_x_max; }
+  [[nodiscard]] constexpr auto y_min() const noexcept -> Float { return m_y_min; }
+  [[nodiscard]] constexpr auto y_max() const noexcept -> Float { return m_y_max; }
+  [[nodiscard]] constexpr auto nx() const noexcept -> size_t { return m_nx; }
+  [[nodiscard]] constexpr auto ny() const noexcept -> size_t { return m_ny; }
 };
 
 }  // namespace Zap::IO

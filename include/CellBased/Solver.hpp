@@ -23,7 +23,7 @@ class Solver {
     auto& grid_curr = grid;
     auto grid_next  = grid;
 
-    if (!grid_writer.write_data(grid) || !time_writer.write_data(Float{0})) {
+    if (!grid_writer.write_data(grid_curr) || !time_writer.write_data(Float{0})) {
       return std::nullopt;
     }
 
@@ -68,7 +68,7 @@ class Solver {
 
       std::swap(grid_curr.m_cells, grid_next.m_cells);
 
-      if (!grid_writer.write_data(grid) || !time_writer.write_data(Float{0})) {
+      if (!grid_writer.write_data(grid_curr) || !time_writer.write_data(t)) {
         return std::nullopt;
       }
     }
