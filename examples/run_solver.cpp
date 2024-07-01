@@ -64,7 +64,8 @@ auto main(int argc, char** argv) -> int {
       // u0(yi, xi) = x(xi) * static_cast<Float>(x(xi) <= (x_min + x_max) / 2);
       // u0(yi, xi) = y(yi) * static_cast<Float>(y(yi) <= (y_min + y_max) / 2);
       // u0(yi, xi) = 2 * static_cast<Float>(x(xi) <= (x_min + x_max) / 2);
-      u0(yi, xi) = 2 * static_cast<Float>(x(xi) >= (x_min + x_max) / 2);
+      // u0(yi, xi) = 2 * static_cast<Float>(x(xi) >= (x_min + x_max) / 2);
+      u0(yi, xi) = static_cast<Float>(x(xi) <= (x_min + x_max) / 2) + 1;
     }
   }
 
@@ -77,8 +78,8 @@ auto main(int argc, char** argv) -> int {
                      Float dy,
                      auto numerical_flux) {
     // return Zap::Scalar::zero_flux_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
-    // return Zap::Scalar::periodic_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
-    return Zap::Scalar::equal_value_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
+    return Zap::Scalar::periodic_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
+    // return Zap::Scalar::equal_value_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
   };
 
   constexpr auto u_filename = OUTPUT_DIR "u.dat";

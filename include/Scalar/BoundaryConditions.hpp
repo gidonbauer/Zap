@@ -276,7 +276,7 @@ void periodic_boundary(Matrix<Float>& u_next,
   };
 
 #pragma omp parallel for
-  for (int row = 0; row < u_curr.rows(); ++row) {
+  for (Eigen::Index row = 0; row < u_curr.rows(); ++row) {
     // Update left side
     {
       const auto F_x_minus = numerical_flux(u_curr(row, u_curr.cols() - 1), u_curr(row, 0));
@@ -310,7 +310,7 @@ void periodic_boundary(Matrix<Float>& u_next,
   }
 
 #pragma omp parallel for
-  for (int col = 1; col < u_curr.cols() - 1; ++col) {
+  for (Eigen::Index col = 1; col < u_curr.cols() - 1; ++col) {
     // Update bottom side
     {
       const auto F_x_minus = numerical_flux(u_curr(0, col - 1), u_curr(0, col));
