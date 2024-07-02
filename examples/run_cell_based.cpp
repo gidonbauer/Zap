@@ -86,10 +86,10 @@ auto main(int argc, char** argv) -> int {
 
   // Zap::IO::NoopWriter grid_writer{};
   // Zap::IO::VTKWriter<Zap::IO::VTKFormat::UNSTRUCTURED_GRID> grid_writer{OUTPUT_DIR "grid"};
-  Zap::IO::IncCellWriter<Float, DIM> grid_writer{OUTPUT_DIR "test.grid", grid};
+  Zap::IO::IncCellWriter<Float, DIM> grid_writer{OUTPUT_DIR "u.grid", grid};
 
   // Zap::IO::NoopWriter t_writer{};
-  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(OUTPUT_DIR "t.dat", 1, 1, 0);
+  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(OUTPUT_DIR "t.mat", 1, 1, 0);
 
   IGOR_TIME_SCOPE("Solver") {
     Zap::CellBased::Solver solver(godunov_flux, godunov_flux);

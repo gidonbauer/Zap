@@ -119,6 +119,8 @@ auto main(int argc, char** argv) -> int {
         .height = TEXT_HEIGHT,
     };
 
+    Igor::Info("Resolution: {}x{}", canvas.width(), canvas.height());
+
     const size_t avail_padding = canvas.width() - graph_width;
     const Rd::Box graph_box{
         .col    = avail_padding / 2UZ,
@@ -132,9 +134,9 @@ auto main(int argc, char** argv) -> int {
       return 1;
     }
 
-    const Rd::FFmpeg ffmpeg(canvas.width(), canvas.height(), output_file);
-
     Igor::ScopeTimer timer{"Rendering"};
+
+    const Rd::FFmpeg ffmpeg(canvas.width(), canvas.height(), output_file);
     while (true) {
       const auto got_next_t = t_reader.read_next<false>();
       const auto got_next_u = u_reader.read_next<false>();
@@ -202,6 +204,7 @@ auto main(int argc, char** argv) -> int {
         return 1;
       }
     }
+
   } catch (const std::exception& e) {
     std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC) << e.what() << '\n';
     return 1;

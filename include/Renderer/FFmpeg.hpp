@@ -61,7 +61,7 @@ class FFmpeg {
         "-c:v", "libx264",
         "-vb", "2500k",
         "-pix_fmt", "yuv420p",
-        output_file.data(),
+        output_file.c_str(),
         static_cast<const char*>(nullptr));
       // clang-format on
 
