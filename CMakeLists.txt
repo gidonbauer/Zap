@@ -59,4 +59,4 @@ endif()
 
 option(ZAP_BUILD_RENDERER "Build renderer for the solution; adds dependencies on FFmpeg and FreeType" ON)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/examples/)
+add_subdirectory(${CMAKE_SOURCE_DIR}/apps/)
