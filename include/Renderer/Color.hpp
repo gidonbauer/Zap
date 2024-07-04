@@ -40,15 +40,13 @@ template <Float2RGB conv = Float2RGB::COLORMAP, typename Float, bool WARN_ON_NAN
   }
 
   if constexpr (conv == Float2RGB::GREYSCALE) {
-    const auto c = static_cast<std::uint8_t>((value - min) / (max - min) * static_cast<Float>(255));
+    const auto c = static_cast<std::uint8_t>(
+        std::clamp((value - min) / (max - min), Float{0}, Float{1}) * static_cast<Float>(255));
     return {.r = c, .g = c, .b = c};
   }
 
   const auto get_pixel = [=]([[maybe_unused]] const auto& xs, Float dx, const auto& cols) {
-    const auto norm_value = (value - min) / (max - min);
-    assert(!is_nan_or_inf(norm_value));
-    assert(norm_value >= static_cast<Float>(0));
-    assert(norm_value <= static_cast<Float>(1));
+    const auto norm_value = std::clamp((value - min) / (max - min), Float{0}, Float{1});
 
     const auto i = static_cast<size_t>(std::round(norm_value / dx));
     assert(i <= cols.size());

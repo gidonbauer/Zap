@@ -10,16 +10,18 @@ namespace Rd = Zap::Renderer;
 
 template <Igor::detail::Level level>
 constexpr void usage(std::string_view prog) {
-  std::cerr << std::format("{}Usage: {} [--scale s] <u input file> <t input file> <output file>\n",
-                           Igor::detail::level_repr(level),
-                           prog);
+  std::cerr << std::format(
+      "{}Usage: {} [--scale s] [--keep-range] <u input file> <t input file> <output file>\n",
+      Igor::detail::level_repr(level),
+      prog);
 };
 
 auto main(int argc, char** argv) -> int {
   std::string u_input_file{};
   std::string t_input_file{};
   std::string output_file{};
-  size_t scale = 1;
+  size_t scale    = 1;
+  bool keep_range = false;
 
   argc -= 1;
   std::string_view prog = *argv;
@@ -58,6 +60,8 @@ auto main(int argc, char** argv) -> int {
         std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
                   << "Scale must be larger than zero but is " << scale << '\n';
       }
+    } else if (*argv == "--keep-range"sv) {
+      keep_range = true;
     } else if (u_input_file.empty()) {
       u_input_file = *argv;
     } else if (t_input_file.empty()) {
@@ -137,7 +141,9 @@ auto main(int argc, char** argv) -> int {
     Igor::ScopeTimer timer{"Rendering"};
 
     const Rd::FFmpeg ffmpeg(canvas.width(), canvas.height(), output_file);
-    while (true) {
+    Eigen::Vector<Float, DIM> min{};
+    Eigen::Vector<Float, DIM> max{};
+    for (size_t iter = 0; true; ++iter) {
       const auto got_next_t = t_reader.read_next<false>();
       const auto got_next_u = u_reader.read_next<false>();
       if (!got_next_u && !got_next_t) {
@@ -160,12 +166,12 @@ auto main(int argc, char** argv) -> int {
 
       const auto& cells = u_reader.cells();
       assert(cells.size() > 0);
-      auto min = cells[0].value;
-      auto max = cells[0].value;
-      for (const auto& cell : cells) {
-        for (Eigen::Index i = 0; i < cell.value.rows(); ++i) {
-          min(i) = std::min(min(i), cell.value(i));
-          max(i) = std::max(max(i), cell.value(i));
+      if (iter == 0 || !keep_range) {
+        for (const auto& cell : cells) {
+          for (Eigen::Index i = 0; i < cell.value.rows(); ++i) {
+            min(i) = std::min(min(i), cell.value(i));
+            max(i) = std::max(max(i), cell.value(i));
+          }
         }
       }
 

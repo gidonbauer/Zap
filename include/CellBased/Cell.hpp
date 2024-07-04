@@ -28,11 +28,15 @@ class IncCellReader;
 
 namespace Zap::CellBased {
 
+enum : size_t {
+  SAME_VALUE_INDEX = std::numeric_limits<size_t>::max() - 2,
+  ZERO_FLUX_INDEX  = std::numeric_limits<size_t>::max() - 1,
+  NULL_INDEX       = std::numeric_limits<size_t>::max() - 0,
+};
+
 template <typename Float, size_t DIM>
 struct CartesianCell {
   static_assert(DIM > 0, "Dimension must be at least 1.");
-  enum : size_t { NULL_INDEX = std::numeric_limits<size_t>::max() };
-
   Eigen::Vector<Float, DIM> value{};
   Float x_min{};
   Float dx{};
@@ -54,8 +58,8 @@ auto operator<<(std::ostream& out,
 
   out << indent << ".value = [ ";
   out << cell.value[0];
-  for (size_t i = 1; i < DIM; ++i) {
-    out << ", " << cell.value[i];
+  for (Eigen::Index i = 1; i < static_cast<Eigen::Index>(DIM); ++i) {
+    out << ", " << cell.value(i);
   }
   out << " ]," << end_char;
 
@@ -65,34 +69,50 @@ auto operator<<(std::ostream& out,
   out << indent << ".dy = " << cell.dy << ',' << end_char;
 
   out << indent << ".left_idx = ";
-  if (cell.left_idx != cell.NULL_INDEX) {
-    out << cell.left_idx;
-  } else {
+  if (cell.left_idx == NULL_INDEX) {
     out << "NULL";
+  } else if (cell.left_idx == ZERO_FLUX_INDEX) {
+    out << "ZERO_FLUX";
+  } else if (cell.left_idx == SAME_VALUE_INDEX) {
+    out << "SAME_VALUE";
+  } else {
+    out << cell.left_idx;
   }
   out << ',' << end_char;
 
   out << indent << ".right_idx = ";
-  if (cell.right_idx != cell.NULL_INDEX) {
-    out << cell.right_idx;
-  } else {
+  if (cell.right_idx == NULL_INDEX) {
     out << "NULL";
+  } else if (cell.right_idx == ZERO_FLUX_INDEX) {
+    out << "ZERO_FLUX";
+  } else if (cell.right_idx == SAME_VALUE_INDEX) {
+    out << "SAME_VALUE";
+  } else {
+    out << cell.right_idx;
   }
   out << ',' << end_char;
 
   out << indent << ".bottom_idx = ";
-  if (cell.bottom_idx != cell.NULL_INDEX) {
-    out << cell.bottom_idx;
-  } else {
+  if (cell.bottom_idx == NULL_INDEX) {
     out << "NULL";
+  } else if (cell.bottom_idx == ZERO_FLUX_INDEX) {
+    out << "ZERO_FLUX";
+  } else if (cell.bottom_idx == SAME_VALUE_INDEX) {
+    out << "SAME_VALUE";
+  } else {
+    out << cell.bottom_idx;
   }
   out << ',' << end_char;
 
   out << indent << ".top_idx = ";
-  if (cell.top_idx != cell.NULL_INDEX) {
-    out << cell.top_idx;
-  } else {
+  if (cell.top_idx == NULL_INDEX) {
     out << "NULL";
+  } else if (cell.top_idx == ZERO_FLUX_INDEX) {
+    out << "ZERO_FLUX";
+  } else if (cell.top_idx == SAME_VALUE_INDEX) {
+    out << "SAME_VALUE";
+  } else {
+    out << cell.top_idx;
   }
   out << ',' << end_char;
 
@@ -100,6 +120,14 @@ auto operator<<(std::ostream& out,
 
   return out;
 }
+
+enum Side : int {
+  LEFT   = 0b0001,
+  RIGHT  = 0b0010,
+  BOTTOM = 0b0100,
+  TOP    = 0b1000,
+  ALL    = LEFT | RIGHT | BOTTOM | TOP,
+};
 
 template <typename Float, size_t DIM>
 class Grid {
@@ -164,35 +192,107 @@ class Grid {
 
     for (size_t yi = 0; yi < ny; ++yi) {
       for (size_t xi = 0; xi < nx; ++xi) {
+        // clang-format off
         grid.m_cells[grid.to_vec_idx(xi, yi)] = m_Cell{
             .x_min      = x_min + static_cast<Float>(xi) * dx,
             .dx         = dx,
             .y_min      = y_min + static_cast<Float>(yi) * dy,
             .dy         = dy,
-            .left_idx   = xi == 0 ? m_Cell::NULL_INDEX : grid.to_vec_idx(xi - 1, yi),
-            .right_idx  = xi == (nx - 1) ? m_Cell::NULL_INDEX : grid.to_vec_idx(xi + 1, yi),
-            .bottom_idx = yi == 0 ? m_Cell::NULL_INDEX : grid.to_vec_idx(xi, yi - 1),
-            .top_idx    = yi == (ny - 1) ? m_Cell::NULL_INDEX : grid.to_vec_idx(xi, yi + 1),
+            .left_idx   = xi == 0        ? NULL_INDEX : grid.to_vec_idx(xi - 1, yi),
+            .right_idx  = xi == (nx - 1) ? NULL_INDEX : grid.to_vec_idx(xi + 1, yi),
+            .bottom_idx = yi == 0        ? NULL_INDEX : grid.to_vec_idx(xi, yi - 1),
+            .top_idx    = yi == (ny - 1) ? NULL_INDEX : grid.to_vec_idx(xi, yi + 1),
         };
+        // clang-format on
       }
     }
     return grid;
   }
 
   // -----------------------------------------------------------------------------------------------
-  constexpr void make_periodic() noexcept {
-    for (size_t xi = 0; xi < m_nx; ++xi) {
-      const auto bottom_idx          = to_vec_idx(xi, 0);
-      const auto top_idx             = to_vec_idx(xi, m_ny - 1);
-      m_cells[bottom_idx].bottom_idx = top_idx;
-      m_cells[top_idx].top_idx       = bottom_idx;
+  constexpr void periodic_boundary(int sides = ALL) noexcept {
+    // Left side
+    if ((sides & LEFT) != 0) {
+      for (size_t yi = 0; yi < m_ny; ++yi) {
+        const auto left_idx        = to_vec_idx(0, yi);
+        const auto right_idx       = to_vec_idx(m_nx - 1, yi);
+        m_cells[left_idx].left_idx = right_idx;
+      }
     }
-    for (size_t yi = 0; yi < m_ny; ++yi) {
-      const auto left_idx          = to_vec_idx(0, yi);
-      const auto right_idx         = to_vec_idx(m_nx - 1, yi);
-      m_cells[left_idx].left_idx   = right_idx;
-      m_cells[right_idx].right_idx = left_idx;
+
+    // Right side
+    if ((sides & RIGHT) != 0) {
+      for (size_t yi = 0; yi < m_ny; ++yi) {
+        const auto left_idx          = to_vec_idx(0, yi);
+        const auto right_idx         = to_vec_idx(m_nx - 1, yi);
+        m_cells[right_idx].right_idx = left_idx;
+      }
     }
+
+    // Bottom side
+    if ((sides & BOTTOM) != 0) {
+      for (size_t xi = 0; xi < m_nx; ++xi) {
+        const auto bottom_idx          = to_vec_idx(xi, 0);
+        const auto top_idx             = to_vec_idx(xi, m_ny - 1);
+        m_cells[bottom_idx].bottom_idx = top_idx;
+      }
+    }
+
+    // Top side
+    if ((sides & TOP) != 0) {
+      for (size_t xi = 0; xi < m_nx; ++xi) {
+        const auto bottom_idx    = to_vec_idx(xi, 0);
+        const auto top_idx       = to_vec_idx(xi, m_ny - 1);
+        m_cells[top_idx].top_idx = bottom_idx;
+      }
+    }
+  }
+
+ private:
+  // -----------------------------------------------------------------------------------------------
+  constexpr void set_boundary_impl(int sides, size_t idx) noexcept {
+    // Left side
+    if ((sides & LEFT) != 0) {
+      for (size_t yi = 0; yi < m_ny; ++yi) {
+        const auto left_idx        = to_vec_idx(0, yi);
+        m_cells[left_idx].left_idx = idx;
+      }
+    }
+
+    // Right side
+    if ((sides & RIGHT) != 0) {
+      for (size_t yi = 0; yi < m_ny; ++yi) {
+        const auto right_idx         = to_vec_idx(m_nx - 1, yi);
+        m_cells[right_idx].right_idx = idx;
+      }
+    }
+
+    // Bottom side
+    if ((sides & BOTTOM) != 0) {
+      for (size_t xi = 0; xi < m_nx; ++xi) {
+        const auto bottom_idx          = to_vec_idx(xi, 0);
+        m_cells[bottom_idx].bottom_idx = idx;
+      }
+    }
+
+    // Top side
+    if ((sides & TOP) != 0) {
+      for (size_t xi = 0; xi < m_nx; ++xi) {
+        const auto top_idx       = to_vec_idx(xi, m_ny - 1);
+        m_cells[top_idx].top_idx = idx;
+      }
+    }
+  }
+
+ public:
+  // -----------------------------------------------------------------------------------------------
+  constexpr void zero_flux_boundary(int sides = ALL) noexcept {
+    set_boundary_impl(sides, ZERO_FLUX_INDEX);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  constexpr void same_value_boundary(int sides = ALL) noexcept {
+    set_boundary_impl(sides, SAME_VALUE_INDEX);
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -238,7 +338,7 @@ class Grid {
           std::cend(m_cells),
           m_cells[0].value[0],
           [](const auto& a, const auto& b) { return std::max(a, b); },
-          [](const m_Cell& cell) { return cell.value[0]; });
+          [](const m_Cell& cell) { return std::abs(cell.value[0]); });
     } else {
       Igor::Todo("Not implemented for DIM={}", DIM);
       return 0;
@@ -298,6 +398,11 @@ class Grid {
   [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept -> const m_Cell& {
     assert(idx < m_nx * m_ny);
     return m_cells[idx];
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto is_cell(size_t idx) const noexcept -> bool {
+    return idx < m_cells.size();
   }
 
   // -----------------------------------------------------------------------------------------------

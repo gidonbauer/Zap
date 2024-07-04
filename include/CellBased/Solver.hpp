@@ -35,25 +35,54 @@ class Solver {
       }
       const Float dt = std::min(0.5 * grid_curr.min_delta() / CFL_factor, tend - t);
 
+      auto get_flux = [&grid_curr](auto numerical_flux,
+                                   size_t idx,
+                                   const auto& cell,
+                                   bool cell_first) noexcept {
+        if constexpr (DIM == 1) {
+          if (grid_curr.is_cell(idx)) {
+            if (cell_first) {
+              return numerical_flux(cell.value[0], grid_curr.m_cells[idx].value[0]);
+            } else {
+              return numerical_flux(grid_curr.m_cells[idx].value[0], cell.value[0]);
+            }
+          } else {
+            switch (idx) {
+              case SAME_VALUE_INDEX:
+                return numerical_flux(cell.value[0], cell.value[0]);
+              case ZERO_FLUX_INDEX:
+                return static_cast<Float>(0);
+              case NULL_INDEX:
+                {
+                  std::stringstream s{};
+                  s << cell;
+                  Igor::Panic("NULL index for cell {}, need to setup boundary condtions.", s.str());
+                }
+              default:
+                {
+                  std::stringstream s{};
+                  s << cell;
+                  Igor::Panic("Unknown index type with value {} for cell {}.", idx, s.str());
+                }
+            }
+          }
+          std::unreachable();
+        } else {
+          Igor::Todo("Not implemented for DIM={}", DIM);
+        }
+      };
+
 #pragma omp parallel for
       for (std::size_t i = 0; i < grid_curr.m_cells.size(); ++i) {
-        auto& curr_cell = grid_curr.m_cells[i];
-        auto& next_cell = grid_next.m_cells[i];
-        assert((curr_cell.left_idx != CartesianCell<Float, DIM>::NULL_INDEX));
-        assert((curr_cell.right_idx != CartesianCell<Float, DIM>::NULL_INDEX));
-        assert((curr_cell.bottom_idx != CartesianCell<Float, DIM>::NULL_INDEX));
-        assert((curr_cell.top_idx != CartesianCell<Float, DIM>::NULL_INDEX));
+        const auto& curr_cell = grid_curr.m_cells[i];
+        auto& next_cell       = grid_next.m_cells[i];
 
         if constexpr (DIM == 1) {
+          const auto F_minus = get_flux(m_numerical_flux_x, curr_cell.left_idx, curr_cell, false);
+          const auto F_plus  = get_flux(m_numerical_flux_x, curr_cell.right_idx, curr_cell, true);
+          const auto G_minus = get_flux(m_numerical_flux_y, curr_cell.bottom_idx, curr_cell, false);
+          const auto G_plus  = get_flux(m_numerical_flux_y, curr_cell.top_idx, curr_cell, true);
           // clang-format off
-          const auto F_minus = m_numerical_flux_x(grid_curr.m_cells[curr_cell.left_idx].value[0],
-                                                  curr_cell.value[0]);
-          const auto F_plus  = m_numerical_flux_x(curr_cell.value[0],
-                                                  grid_curr.m_cells[curr_cell.right_idx].value[0]);
-          const auto G_minus = m_numerical_flux_x(grid_curr.m_cells[curr_cell.bottom_idx].value[0],
-                                                  curr_cell.value[0]);
-          const auto G_plus = m_numerical_flux_x(curr_cell.value[0],
-                                                 grid_curr.m_cells[curr_cell.top_idx].value[0]);
           next_cell.value[0] = curr_cell.value[0] -
                                (dt / curr_cell.dx) * (F_plus - F_minus) -
                                (dt / curr_cell.dy) * (G_plus - G_minus);
