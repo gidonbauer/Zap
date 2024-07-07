@@ -74,12 +74,14 @@ auto main(int argc, char** argv) -> int {
   auto boundary = [](Zap::Matrix<Float>& u_next,
                      const Zap::Matrix<Float>& u_curr,
                      Float dt,
-                     Float dx,
-                     Float dy,
+                     Float local_dx,
+                     Float local_dy,
                      auto numerical_flux) {
-    // return Zap::Scalar::zero_flux_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
-    return Zap::Scalar::periodic_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
-    // return Zap::Scalar::equal_value_boundary(u_next, u_curr, dt, dx, dy, numerical_flux);
+    // return Zap::Scalar::zero_flux_boundary(u_next, u_curr, dt, local_dx, local_dy,
+    // numerical_flux);
+    return Zap::Scalar::periodic_boundary(u_next, u_curr, dt, local_dx, local_dy, numerical_flux);
+    // return Zap::Scalar::equal_value_boundary(u_next, u_curr, dt, local_dx, local_dy,
+    // numerical_flux);
   };
 
   constexpr auto u_filename = OUTPUT_DIR "u.dat";
