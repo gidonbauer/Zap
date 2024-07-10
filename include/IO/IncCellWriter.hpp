@@ -1,10 +1,11 @@
 #ifndef ZAP_IO_INC_CELL_WRITER_HPP_
 #define ZAP_IO_INC_CELL_WRITER_HPP_
 
+#include <cassert>
 #include <fstream>
 #include <string>
 
-#include "CellBased/Cell.hpp"
+#include "CellBased/Grid.hpp"
 #include "IO/Common.hpp"
 
 namespace Zap::IO {
@@ -129,17 +130,20 @@ class IncCellWriter {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto write_data(const CellBased::Grid<Float, DIM>& grid) noexcept -> bool {
     for (const auto& cell : grid.m_cells) {
-      static_assert(
-          std::is_same_v<CellBased::CartesianCell<Float, DIM>, std::remove_cvref_t<decltype(cell)>>,
-          "Only cartesian cell is implemented");
-      // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
-      m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cartesian));
-      m_out.write(reinterpret_cast<const char*>(&cell.x_min), sizeof(cell.x_min));
-      m_out.write(reinterpret_cast<const char*>(&cell.dx), sizeof(cell.dx));
-      m_out.write(reinterpret_cast<const char*>(&cell.y_min), sizeof(cell.y_min));
-      m_out.write(reinterpret_cast<const char*>(&cell.dy), sizeof(cell.dy));
-      m_out.write(reinterpret_cast<const char*>(cell.value.data()), DIM * sizeof(Float));
-      // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+      if (cell.is_cartesian()) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+        m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cartesian));
+        m_out.write(reinterpret_cast<const char*>(&cell.x_min), sizeof(cell.x_min));
+        m_out.write(reinterpret_cast<const char*>(&cell.dx), sizeof(cell.dx));
+        m_out.write(reinterpret_cast<const char*>(&cell.y_min), sizeof(cell.y_min));
+        m_out.write(reinterpret_cast<const char*>(&cell.dy), sizeof(cell.dy));
+
+        const auto value = cell.get_cartesian().value;
+        m_out.write(reinterpret_cast<const char*>(value.data()), DIM * sizeof(Float));
+        // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+      } else {
+        Igor::Todo("Only cartesian cell is implemented");
+      }
     }
     if (!m_out) {
       Igor::Warn("Could not write data to `{}`.", m_filename);

@@ -16,18 +16,35 @@
 
 namespace Zap::Renderer {
 
+struct Point {
+  size_t col{};
+  size_t row{};
+};
+
 struct Box {
   size_t col{};
   size_t row{};
   size_t width{};
   size_t height{};
 
-  [[nodiscard]] constexpr auto contains(size_t x, size_t y) const noexcept -> bool {
-    return (x >= col) && (x < col + width) && (y >= row) && (y < row + height);
+  [[nodiscard]] constexpr auto contains(const Point& p) const noexcept -> bool {
+    return (p.col >= col) && (p.col < col + width) && (p.row >= row) && (p.row < row + height);
   }
 };
 
 }  // namespace Zap::Renderer
+
+template <>
+struct std::formatter<Zap::Renderer::Point, char> {
+  template <typename ParseContext>
+  static constexpr auto parse(ParseContext& ctx) noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  static constexpr auto format(const Zap::Renderer::Point& p, FormatContext& ctx) noexcept {
+    return std::format_to(ctx.out(), "{{.col = {}, .row = {}}}", p.col, p.row);
+  }
+};
 
 template <>
 struct std::formatter<Zap::Renderer::Box, char> {
@@ -204,6 +221,13 @@ class Canvas {
     return true;
   }
 
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto get_idx(size_t col, size_t row) const noexcept -> size_t {
+    assert(col < m_width);
+    assert(row < m_height);
+    return col + row * m_width;
+  }
+
  public:
   // -----------------------------------------------------------------------------------------------
   constexpr void clear(RGB color) noexcept {
@@ -304,12 +328,9 @@ class Canvas {
 
     for (size_t row = 0; row < box.height; ++row) {
       for (size_t col = 0; col < box.width; ++col) {
-        const size_t c_col = box.col + col;
-        assert(c_col < m_width);
-        const size_t c_row = box.row + row;
-        assert(c_row < m_height);
-
-        m_data[c_col + c_row * m_width] = to_pixel(buffer[buffer_idx(row, col)]);  // NOLINT
+        const size_t c_col            = box.col + col;
+        const size_t c_row            = box.row + row;
+        m_data[get_idx(c_col, c_row)] = to_pixel(buffer[buffer_idx(row, col)]);  // NOLINT
       }
     }
 
@@ -347,42 +368,71 @@ class Canvas {
                                  ? bounding_box.row + (bounding_box.height - rect.row - row - 1UZ)
                                  : rect.row + bounding_box.row + row;
         assert(c_row < m_height);
-        assert(bounding_box.contains(c_col, c_row));
-        m_data[c_col + c_row * m_width] = color;  // NOLINT
+        assert(bounding_box.contains({.col = c_col, .row = c_row}));
+        m_data[get_idx(c_col, c_row)] = color;  // NOLINT
       }
     }
 
     return true;
   }
 
-  // constexpr auto draw_rect(size_t x,
-  //                          size_t y,
-  //                          size_t w,
-  //                          size_t h,
-  //                          PixelType color,
-  //                          bool is_y_upwards = false) noexcept -> bool {
-  //   if (x >= m_width || x + w > m_width) {
-  //     Igor::Warn("Rect outside of canvas: canvas width = {}, x = {}, x+w = {}", m_width, x, x +
-  //     w); return false;
-  //   }
-  //   if (y >= m_height || y + h > m_height) {
-  //     Igor::Warn(
-  //         "Rect outside of canvas: canvas height = {}, y = {}, y+h = {}", m_height, y, y + h);
-  //     return false;
-  //   }
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto draw_line(const Point& p1,
+                                         const Point& p2,
+                                         const Box& bounding_box,
+                                         PixelType color) noexcept -> bool {
+    if (!box_in_canvas(bounding_box)) {
+      Igor::Warn("Bounding box {} is not in canvas with width {} and height {}.",
+                 bounding_box,
+                 m_width,
+                 m_height);
+      return false;
+    }
+    if (bounding_box.width <= p1.col || bounding_box.height <= p1.row) {
+      Igor::Warn("Bounding box {} does not contain point p1 {}.", bounding_box, p1);
+      return false;
+    }
+    if (bounding_box.width <= p2.col || bounding_box.height <= p2.row) {
+      Igor::Warn("Bounding box {} does not contain point p2 {}.", bounding_box, p2);
+      return false;
+    }
 
-  //   for (size_t row = y; row < y + h; ++row) {
-  //     for (size_t col = x; col < x + w; ++col) {
-  //       if (is_y_upwards) {
-  //         m_data[col + (m_height - 1UZ - row) * m_width] = color;
-  //       } else {
-  //         m_data[col + row * m_width] = color;
-  //       }
-  //     }
-  //   }
+    int dcol = static_cast<int>(p1.col > p2.col ? p1.col - p2.col : p2.col - p1.col);
+    int drow = -static_cast<int>(p1.row > p2.row ? p1.row - p2.row : p2.row - p1.row);
+    int scol = p1.col < p2.col ? 1 : -1;
+    int srow = p1.row < p2.row ? 1 : -1;
+    int err  = dcol + drow;
 
-  //   return true;
-  // }
+    assert(p1.col <= std::numeric_limits<int>::max());
+    assert(p1.row <= std::numeric_limits<int>::max());
+    int col = static_cast<int>(p1.col);
+    int row = static_cast<int>(p1.row);
+    while (true) {
+      assert(col >= 0);
+      assert(row >= 0);
+      size_t c_col                  = static_cast<size_t>(col) + bounding_box.col;
+      size_t c_row                  = static_cast<size_t>(row) + bounding_box.row;
+      m_data[get_idx(c_col, c_row)] = color;
+      if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) {
+        break;
+      }
+
+      if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) {
+        break;
+      }
+      int err2 = 2 * err;
+      if (err2 > drow) {
+        err += drow;
+        col += scol;
+      }
+      if (err2 < dcol) {
+        err += dcol;
+        row += srow;
+      }
+    }
+
+    return true;
+  }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto to_raw_stream(pid_t stream) const noexcept -> bool {

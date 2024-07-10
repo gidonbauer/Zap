@@ -1,6 +1,6 @@
 #include <filesystem>
+#include <numbers>
 
-#include "CellBased/Cell.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
@@ -10,6 +10,36 @@
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto parse_size_t(const char* cstr) -> size_t {
+  char* end        = nullptr;
+  const size_t val = std::strtoul(cstr, &end, 10);
+  if (end != cstr + std::strlen(cstr)) {  // NOLINT
+    Igor::Panic("String `{}` contains non-digits.", cstr);
+  }
+  if (val == 0UL) {
+    Igor::Panic("Could not parse string `{}` to size_t.", cstr);
+  }
+  if (val == std::numeric_limits<unsigned long>::max()) {
+    Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
+  }
+  return val;
+}
+
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto parse_double(const char* cstr) -> double {
+  char* end        = nullptr;
+  const double val = std::strtod(cstr, &end);
+  if (val == HUGE_VAL) {
+    Igor::Panic("Could not parse string `{}` to double: Out of range.", cstr);
+  }
+  if (cstr == end) {
+    Igor::Panic("Could not parse string `{}` to double.", cstr);
+  }
+  return val;
+}
+
+// -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
   using Float          = double;
   constexpr size_t DIM = 1;
@@ -27,32 +57,6 @@ auto main(int argc, char** argv) -> int {
       return 1;
     }
   }
-
-  auto parse_size_t = [](const char* cstr) -> size_t {
-    char* end        = nullptr;
-    const size_t val = std::strtoul(cstr, &end, 10);
-    if (end != cstr + std::strlen(cstr)) {  // NOLINT
-      Igor::Panic("String `{}` contains non-digits.", cstr);
-    }
-    if (val == 0UL) {
-      Igor::Panic("Could not parse string `{}` to size_t.", cstr);
-    }
-    if (val == std::numeric_limits<unsigned long>::max()) {
-      Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
-    }
-    return val;
-  };
-  auto parse_double = [](const char* cstr) -> double {
-    char* end        = nullptr;
-    const double val = std::strtod(cstr, &end);
-    if (val == HUGE_VAL) {
-      Igor::Panic("Could not parse string `{}` to double: Out of range.", cstr);
-    }
-    if (cstr == end) {
-      Igor::Panic("Could not parse string `{}` to double.", cstr);
-    }
-    return val;
-  };
 
   const auto nx   = parse_size_t(argv[1]);  // NOLINT
   const auto ny   = parse_size_t(argv[2]);  // NOLINT
@@ -75,28 +79,64 @@ auto main(int argc, char** argv) -> int {
   const Float y_max = 5.0;
 
   auto grid = Zap::CellBased::Grid<Float, DIM>::Uniform(x_min, x_max, nx, y_min, y_max, ny);
-  grid.periodic_boundary(Zap::CellBased::LEFT | Zap::CellBased::RIGHT);
-  grid.same_value_boundary(Zap::CellBased::BOTTOM | Zap::CellBased::TOP);
+  // grid.periodic_boundary(Zap::CellBased::LEFT | Zap::CellBased::RIGHT);
+  // grid.same_value_boundary(Zap::CellBased::BOTTOM | Zap::CellBased::TOP);
+  grid.same_value_boundary();
 
-  // grid.dump_cells(std::cout);
-  // return 0;
-
-  auto u0 = [=](Float x, [[maybe_unused]] Float y) -> Float {
-    // return (x + y) * static_cast<Float>((std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) <=
-    //                                     std::pow((x_min + x_max + y_min + y_max) / 4, 2));
-
-    return (x - x_min) * static_cast<Float>((x - x_min) < 0.5 * (x_max - x_min));
-
-    // if ((x - x_min) < 0.25 * (x_max - x_min)) {
-    //   return x;
-    // } else if ((x - x_min) < 0.5 * (x_max - x_min)) {
-    //   return 0.25 * (x_max - x_min) - (x - 0.25 * (x_max - x_min));
-    // } else {
-    //   return 0;
-    // }
+// #define RAMP_X
+#define QUARTER_CIRCLE
+#ifdef QUARTER_CIRCLE
+  auto u0 = [=](Float x, Float y) -> Float {
+    return (std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) *
+           static_cast<Float>((std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) <=
+                              std::pow((x_min + x_max + y_min + y_max) / 4, 2));
   };
-  // grid.fill_center(u0);
-  grid.fill_four_point(u0);
+
+  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+    // assert(t >= 0 && t <= 1);
+    const auto r = (x_min + x_max + y_min + y_max) / 4;
+    return Eigen::Vector<T, 2>{
+        r * std::cos(std::numbers::pi_v<Float> / 2 * t),
+        r * std::sin(std::numbers::pi_v<Float> / 2 * t),
+    };
+  };
+#elif defined(RAMP_X)
+  auto u0 = [=](Float x, Float /*y*/) -> Float {
+    return (x - x_min) * static_cast<Float>((x - x_min) < 0.5 * (x_max - x_min));
+  };
+
+  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+    assert(t >= 0 && t <= 1);
+    return Eigen::Vector<T, 2>{
+        (x_max - x_min) / 2,
+        t * (y_max - y_min) + y_min,
+    };
+  };
+#elif defined(HAT_X)
+  auto u0 = [=](Float x, Float /*y*/) -> Float {
+    if ((x - x_min) < 0.25 * (x_max - x_min)) {
+      return x;
+    } else if ((x - x_min) < 0.5 * (x_max - x_min)) {
+      return 0.25 * (x_max - x_min) - (x - 0.25 * (x_max - x_min));
+    } else {
+      return 0;
+    }
+  };
+
+  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+    static_assert(false, "Not implemented yet.");
+    return Eigen::Vector<T, 2>::Zero();
+  };
+#else
+  static_assert(false, "No initial condition defined.");
+#endif
+  if (!grid.cut_init_shock(init_shock)) {
+    return 1;
+  }
+  grid.dump_cells(std::cout);
+
+  grid.fill_center(u0);
+  // grid.fill_four_point(u0);
 
   constexpr auto flux = [](const auto& u) constexpr noexcept {
     return static_cast<Float>(0.5) * u * u;

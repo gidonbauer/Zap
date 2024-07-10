@@ -16,7 +16,7 @@ add_compile_definitions(ZAP_OUTPUT_DIR=${ZAP_OUTPUT_DIR})
 add_compile_options(-Wall -Wextra -pedantic -Wconversion -Wshadow)
 
 # - AD compile definitions ------------------------------------------------------------------------- 
-# add_compile_definitions(AD_STD_COMPATIBILITY AD_INTEROP_EIGEN AD_AUTO_SUPPORT)
+add_compile_definitions(AD_STD_COMPATIBILITY AD_INTEROP_EIGEN AD_AUTO_SUPPORT)
 
 # - Build type options -----------------------------------------------------------------------------
 if (NOT CMAKE_BUILD_TYPE)
@@ -28,7 +28,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3") # Disable -DNDEBUG flag because I want to kee
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-fsanitize=address,undefined,leak -O0)
     add_link_options(-fsanitize=address,undefined,leak)
-    # add_compile_definitions(AD_DEBUG)
+    add_compile_definitions(AD_DEBUG)
 endif()
 
 # - Check if interprocedural optimizations are available ------------------------------------------

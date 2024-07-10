@@ -167,6 +167,8 @@ auto main(int argc, char** argv) -> int {
       const auto& cells = u_reader.cells();
       assert(cells.size() > 0);
       if (iter == 0 || !keep_range) {
+        min = cells[0].value;
+        max = cells[0].value;
         for (const auto& cell : cells) {
           for (Eigen::Index i = 0; i < cell.value.rows(); ++i) {
             min(i) = std::min(min(i), cell.value(i));
