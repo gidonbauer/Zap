@@ -338,10 +338,10 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
-  constexpr auto draw_rect(Box rect,
-                           Box bounding_box,
-                           PixelType color,
-                           bool is_y_upwards = false) noexcept -> bool {
+  [[nodiscard]] constexpr auto draw_rect(Box rect,
+                                         Box bounding_box,
+                                         PixelType color,
+                                         bool is_y_upwards = false) noexcept -> bool {
     if (!box_in_canvas(bounding_box)) {
       Igor::Warn("Bounding box {} is not within canvas with dimension {}x{}.",
                  bounding_box,
@@ -377,10 +377,107 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto draw_triangle(const Point& p1,
+                                             const Point& p2,
+                                             const Point& p3,
+                                             const Box& bounding_box,
+                                             PixelType color,
+                                             bool is_y_upwards = false) noexcept -> bool {
+    if (!box_in_canvas(bounding_box)) {
+      Igor::Warn("Bounding box {} is not in canvas with width {} and height {}.",
+                 bounding_box,
+                 m_width,
+                 m_height);
+      return false;
+    }
+    if (bounding_box.width <= p1.col || bounding_box.height <= p1.row) {
+      Igor::Warn("Bounding box {} does not contain point p1 {}.", bounding_box, p1);
+      return false;
+    }
+    if (bounding_box.width <= p2.col || bounding_box.height <= p2.row) {
+      Igor::Warn("Bounding box {} does not contain point p2 {}.", bounding_box, p2);
+      return false;
+    }
+    if (bounding_box.width <= p3.col || bounding_box.height <= p3.row) {
+      Igor::Warn("Bounding box {} does not contain point p2 {}.", bounding_box, p3);
+      return false;
+    }
+
+    // From:
+    // https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+    const auto normals_pointing_outwards =
+        (static_cast<int64_t>(p2.col) - static_cast<int64_t>(p1.col)) *
+                (static_cast<int64_t>(p2.row) + static_cast<int64_t>(p1.row)) +
+            (static_cast<int64_t>(p3.col) - static_cast<int64_t>(p2.col)) *
+                (static_cast<int64_t>(p3.row) + static_cast<int64_t>(p2.row)) +
+            (static_cast<int64_t>(p1.col) - static_cast<int64_t>(p3.col)) *
+                (static_cast<int64_t>(p1.row) + static_cast<int64_t>(p3.row)) >=
+        0;
+
+    const auto min_col = std::min(p1.col, std::min(p2.col, p3.col));
+    const auto min_row = std::min(p1.row, std::min(p2.row, p3.row));
+    const auto max_col = std::max(p1.col, std::max(p2.col, p3.col));
+    const auto max_row = std::max(p1.row, std::max(p2.row, p3.row));
+
+    struct Vec2 {
+      int64_t col;
+      int64_t row;
+    };
+
+    Vec2 n1 = {
+        .col = static_cast<int64_t>(p1.row) - static_cast<int64_t>(p2.row),
+        .row = -(static_cast<int64_t>(p1.col) - static_cast<int64_t>(p2.col)),
+    };
+    Vec2 n2 = {
+        .col = static_cast<int64_t>(p2.row) - static_cast<int64_t>(p3.row),
+        .row = -(static_cast<int64_t>(p2.col) - static_cast<int64_t>(p3.col)),
+    };
+    Vec2 n3 = {
+        .col = static_cast<int64_t>(p3.row) - static_cast<int64_t>(p1.row),
+        .row = -(static_cast<int64_t>(p3.col) - static_cast<int64_t>(p1.col)),
+    };
+
+    const auto is_in_triangle = [&](size_t row, size_t col) {
+      // Line 1: p1 -> p2
+      const auto v1 = n1.col * (static_cast<int64_t>(col) - static_cast<int64_t>(p1.col)) +
+                      n1.row * (static_cast<int64_t>(row) - static_cast<int64_t>(p1.row));
+      // Line 1: p2 -> p3
+      const auto v2 = n2.col * (static_cast<int64_t>(col) - static_cast<int64_t>(p2.col)) +
+                      n2.row * (static_cast<int64_t>(row) - static_cast<int64_t>(p2.row));
+      // Line 1: p3 -> p1
+      const auto v3 = n3.col * (static_cast<int64_t>(col) - static_cast<int64_t>(p3.col)) +
+                      n3.row * (static_cast<int64_t>(row) - static_cast<int64_t>(p3.row));
+
+      if (normals_pointing_outwards) {
+        return v1 <= 0 && v2 <= 0 && v3 <= 0;
+      } else {
+        return v1 >= 0 && v2 >= 0 && v3 >= 0;
+      }
+    };
+
+    for (auto row = min_row; row <= max_row; ++row) {
+      for (auto col = min_col; col <= max_col; ++col) {
+        if (is_in_triangle(row, col)) {
+          const size_t c_col = col + bounding_box.col;
+          assert(c_col < m_width);
+          const size_t c_row = is_y_upwards ? bounding_box.row + (bounding_box.height - row - 1UZ)
+                                            : row + bounding_box.row;
+          assert(c_row < m_height);
+          assert(bounding_box.contains({.col = c_col, .row = c_row}));
+          m_data[get_idx(c_col, c_row)] = color;  // NOLINT
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto draw_line(const Point& p1,
                                          const Point& p2,
                                          const Box& bounding_box,
-                                         PixelType color) noexcept -> bool {
+                                         PixelType color,
+                                         bool is_y_upwards = false) noexcept -> bool {
     if (!box_in_canvas(bounding_box)) {
       Igor::Warn("Bounding box {} is not in canvas with width {} and height {}.",
                  bounding_box,
@@ -410,8 +507,10 @@ class Canvas {
     while (true) {
       assert(col >= 0);
       assert(row >= 0);
-      size_t c_col                  = static_cast<size_t>(col) + bounding_box.col;
-      size_t c_row                  = static_cast<size_t>(row) + bounding_box.row;
+      const size_t c_col = static_cast<size_t>(col) + bounding_box.col;
+      const size_t c_row =
+          is_y_upwards ? bounding_box.row + (bounding_box.height - static_cast<size_t>(row) - 1UZ)
+                       : bounding_box.row + static_cast<size_t>(row);
       m_data[get_idx(c_col, c_row)] = color;
       if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) {
         break;
