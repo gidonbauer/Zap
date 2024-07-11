@@ -188,11 +188,6 @@ class Grid {
   // -----------------------------------------------------------------------------------------------
   template <typename FUNC>
   constexpr void fill_center(FUNC f) noexcept {
-    constexpr Float eps = 1e-8;
-    auto approx_eq      = [](Float a, Float b) { return std::abs(a - b) <= eps; };
-    enum { ON_MIN = -1, NOT_ON = 0, ON_MAX = 1 };
-
-    size_t counter = 0;
     for (auto& cell : m_cells) {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
@@ -204,7 +199,6 @@ class Grid {
                     cell.y_min + static_cast<Float>(0.5) * cell.dy);
         }
       } else if (cell.is_cut()) {
-        Igor::Debug("Cell index = {}", counter);
         auto& cell_value = cell.get_cut();
         {
           std::stringstream s{};
@@ -212,28 +206,15 @@ class Grid {
           Igor::Debug("cell = {}", s.str());
         }
 
-        const int cut1_on_x = approx_eq(cell.x_min, cell_value.x1_cut) * ON_MIN +
-                              approx_eq(cell.x_min + cell.dx, cell_value.x1_cut) * ON_MAX;
-        const int cut1_on_y = approx_eq(cell.y_min, cell_value.y1_cut) * ON_MIN +
-                              approx_eq(cell.y_min + cell.dy, cell_value.y1_cut) * ON_MAX;
+        cell_value.left_value =
+            Eigen::Vector<Float, DIM>::Constant(std::numeric_limits<Float>::quiet_NaN());
+        cell_value.right_value =
+            Eigen::Vector<Float, DIM>::Constant(std::numeric_limits<Float>::quiet_NaN());
 
-        const int cut2_on_x = approx_eq(cell.x_min, cell_value.x2_cut) * ON_MIN +
-                              approx_eq(cell.x_min + cell.dx, cell_value.x2_cut) * ON_MAX;
-        const int cut2_on_y = approx_eq(cell.y_min, cell_value.y2_cut) * ON_MIN +
-                              approx_eq(cell.y_min + cell.dy, cell_value.y2_cut) * ON_MAX;
-        IGOR_DEBUG_PRINT(cut1_on_x);
-        IGOR_DEBUG_PRINT(cut1_on_y);
-        IGOR_DEBUG_PRINT(cut2_on_x);
-        IGOR_DEBUG_PRINT(cut2_on_y);
-
-        assert(cut1_on_x != NOT_ON || cut1_on_y != NOT_ON);
-        assert(cut2_on_x != NOT_ON || cut2_on_y != NOT_ON);
-
-        Igor::Todo("Implement fill_center for cut cells.");
+        // Igor::Todo("Implement fill_center for cut cells.");
       } else {
         Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
       }
-      ++counter;
     }
   }
 

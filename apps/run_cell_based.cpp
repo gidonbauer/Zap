@@ -133,10 +133,11 @@ auto main(int argc, char** argv) -> int {
   if (!grid.cut_init_shock(init_shock)) {
     return 1;
   }
-  grid.dump_cells(std::cout);
 
   grid.fill_center(u0);
   // grid.fill_four_point(u0);
+
+  // grid.dump_cells(std::cout);
 
   constexpr auto flux = [](const auto& u) constexpr noexcept {
     return static_cast<Float>(0.5) * u * u;
@@ -168,14 +169,17 @@ auto main(int argc, char** argv) -> int {
   constexpr auto t_file = OUTPUT_DIR "t.mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(godunov_flux, godunov_flux);
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
-      Igor::Warn("Solver failed.");
-      return 1;
-    }
-  }
-  Igor::Info("Solver finished successfully.");
-  Igor::Info("Saved grid to {}.", u_file);
-  Igor::Info("Saved time steps to {}.", t_file);
+  assert(grid_writer.write_data(grid));
+  assert(t_writer.write_data(Float{0}));
+
+  // IGOR_TIME_SCOPE("Solver") {
+  //   Zap::CellBased::Solver solver(godunov_flux, godunov_flux);
+  //   if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
+  //     Igor::Warn("Solver failed.");
+  //     return 1;
+  //   }
+  // }
+  // Igor::Info("Solver finished successfully.");
+  // Igor::Info("Saved grid to {}.", u_file);
+  // Igor::Info("Saved time steps to {}.", t_file);
 }

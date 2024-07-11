@@ -55,4 +55,16 @@ if (ZAP_BUILD_RENDERER)
     # - Link libraries ---------------------
     target_link_libraries(cell_renderer PRIVATE ${FREETYPE_LIBRARIES})
     target_link_libraries(cell_renderer PRIVATE OpenMP::OpenMP_CXX)
+    
+    # - Show initial shock -----------------
+    add_executable(show_initial_shock show_initial_shock.cpp)
+    
+    # - Define include path ----------------
+    target_include_directories(show_initial_shock        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
+    target_include_directories(show_initial_shock SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
+    target_include_directories(show_initial_shock SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+    
+    # - Link libraries ---------------------
+    target_link_libraries(show_initial_shock PRIVATE ${FREETYPE_LIBRARIES})
+    # target_link_libraries(show_initial_shock PRIVATE OpenMP::OpenMP_CXX)
 endif()

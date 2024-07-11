@@ -179,4 +179,17 @@ template <Float2RGB conv = Float2RGB::COLORMAP, typename Float, bool WARN_ON_NAN
 
 }  // namespace Zap::Renderer
 
+template <>
+struct std::formatter<Zap::Renderer::RGB, char> {
+  template <typename ParseContext>
+  static constexpr auto parse(ParseContext& ctx) noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  static constexpr auto format(const Zap::Renderer::RGB& col, FormatContext& ctx) noexcept {
+    return std::format_to(
+        ctx.out(), "{{ .r = {:#04x}, .g = {:#04x}, .b = {:#04x} }}", col.r, col.g, col.b);
+  }
+};
+
 #endif  // ZAP_RENDERER_COLOR_HPP_

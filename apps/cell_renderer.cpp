@@ -1,3 +1,6 @@
+#if 1
+auto main() -> int {}
+#else
 #include "CellBased/Cell.hpp"
 #include "IO/IncCellReader.hpp"
 #include "IO/IncMatrixReader.hpp"
@@ -218,3 +221,4 @@ auto main(int argc, char** argv) -> int {
     return 1;
   }
 }
+#endif

@@ -28,7 +28,14 @@ struct CartesianValue {
 };
 
 // -------------------------------------------------------------------------------------------------
-enum class CutType { BOTTOM_LEFT, BOTTOM_RIGHT, TOP_RIGHT, TOP_LEFT, MIDDLE_HORI, MIDDLE_VERT };
+enum class CutType : char {
+  BOTTOM_LEFT,
+  BOTTOM_RIGHT,
+  TOP_RIGHT,
+  TOP_LEFT,
+  MIDDLE_HORI,
+  MIDDLE_VERT,
+};
 
 // -------------------------------------------------------------------------------------------------
 template <typename Float, size_t DIM>

@@ -20,7 +20,7 @@ constexpr size_t HEADER_SIZE_F32 =
 constexpr size_t HEADER_SIZE_F64 =
     MAGIC_STRING.size() + DTYPE_SIZE + 8 + 8 + DIM_SIZE + 8 + 8 + DIM_SIZE + DIM_SIZE;
 
-enum struct CellType : char { Cartesian };
+enum struct CellType : char { Cartesian, Cut };
 
 }  // namespace IncCellHeaderLayout
 
@@ -141,8 +141,32 @@ class IncCellWriter {
         const auto value = cell.get_cartesian().value;
         m_out.write(reinterpret_cast<const char*>(value.data()), DIM * sizeof(Float));
         // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+      } else if (cell.is_cut()) {
+        // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
+        m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cut));
+
+        // Extend of cell
+        m_out.write(reinterpret_cast<const char*>(&cell.x_min), sizeof(cell.x_min));
+        m_out.write(reinterpret_cast<const char*>(&cell.dx), sizeof(cell.dx));
+        m_out.write(reinterpret_cast<const char*>(&cell.y_min), sizeof(cell.y_min));
+        m_out.write(reinterpret_cast<const char*>(&cell.dy), sizeof(cell.dy));
+
+        // Cut
+        const auto& cell_value = cell.get_cut();
+        m_out.put(static_cast<char>(cell_value.type));
+        m_out.write(reinterpret_cast<const char*>(&cell_value.x1_cut), sizeof(cell_value.x1_cut));
+        m_out.write(reinterpret_cast<const char*>(&cell_value.y1_cut), sizeof(cell_value.y1_cut));
+        m_out.write(reinterpret_cast<const char*>(&cell_value.x2_cut), sizeof(cell_value.x2_cut));
+        m_out.write(reinterpret_cast<const char*>(&cell_value.y2_cut), sizeof(cell_value.y2_cut));
+
+        // Value
+        m_out.write(reinterpret_cast<const char*>(cell_value.left_value.data()),
+                    DIM * sizeof(Float));
+        m_out.write(reinterpret_cast<const char*>(cell_value.right_value.data()),
+                    DIM * sizeof(Float));
+        // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
       } else {
-        Igor::Todo("Only cartesian cell is implemented");
+        Igor::Panic("Unknown cell type with variant index {}", cell.value.index());
       }
     }
     if (!m_out) {
