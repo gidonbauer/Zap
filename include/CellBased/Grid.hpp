@@ -188,6 +188,14 @@ class Grid {
   // -----------------------------------------------------------------------------------------------
   template <typename FUNC>
   constexpr void fill_center(FUNC f) noexcept {
+    const auto get_centroid = [](const auto& points) -> Eigen::Vector<Float, 2> {
+      Eigen::Vector<Float, 2> centroid = Eigen::Vector<Float, 2>::Zero();
+      for (const auto& p : points) {
+        centroid += p;
+      }
+      return centroid / points.size();
+    };
+
     for (auto& cell : m_cells) {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
@@ -199,19 +207,18 @@ class Grid {
                     cell.y_min + static_cast<Float>(0.5) * cell.dy);
         }
       } else if (cell.is_cut()) {
+        Eigen::Vector<Float, 2> left_centroid = get_centroid(get_left_points<m_Cell, Float>(cell));
+        Eigen::Vector<Float, 2> right_centroid =
+            get_centroid(get_right_points<m_Cell, Float>(cell));
+
         auto& cell_value = cell.get_cut();
-        {
-          std::stringstream s{};
-          s << cell;
-          Igor::Debug("cell = {}", s.str());
+        if constexpr (DIM == 1) {
+          cell_value.left_value(0)  = f(left_centroid(0), left_centroid(1));
+          cell_value.right_value(0) = f(right_centroid(0), right_centroid(1));
+        } else {
+          cell_value.left_value  = f(left_centroid(0), left_centroid(1));
+          cell_value.right_value = f(right_centroid(0), right_centroid(1));
         }
-
-        cell_value.left_value =
-            Eigen::Vector<Float, DIM>::Constant(std::numeric_limits<Float>::quiet_NaN());
-        cell_value.right_value =
-            Eigen::Vector<Float, DIM>::Constant(std::numeric_limits<Float>::quiet_NaN());
-
-        // Igor::Todo("Implement fill_center for cut cells.");
       } else {
         Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
       }

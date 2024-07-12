@@ -98,6 +98,114 @@ struct Cell {
 };
 
 // -------------------------------------------------------------------------------------------------
+template <typename CellType, typename Float>
+[[nodiscard]] constexpr auto
+get_left_points(const CellType& cell) noexcept -> std::vector<Eigen::Vector<Float, 2>> {
+  const auto& cell_value = cell.get_cut();
+  switch (cell_value.type) {
+    case CutType::BOTTOM_LEFT:
+      return {
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min},
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+      };
+    case CutType::BOTTOM_RIGHT:
+      return {
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min},
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min + cell.dy},
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min + cell.dy},
+      };
+    case CutType::TOP_RIGHT:
+      return {
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min},
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min + cell.dy},
+      };
+    case CutType::TOP_LEFT:
+      return {
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min + cell.dy},
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+      };
+    case CutType::MIDDLE_HORI:
+      return {
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min},
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+      };
+    case CutType::MIDDLE_VERT:
+      return {
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min},
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min + cell.dy},
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+      };
+    default:
+      Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
+      std::unreachable();
+  }
+}
+
+// -------------------------------------------------------------------------------------------------
+template <typename CellType, typename Float>
+[[nodiscard]] constexpr auto
+get_right_points(const CellType& cell) noexcept -> std::vector<Eigen::Vector<Float, 2>> {
+  const auto& cell_value = cell.get_cut();
+  switch (cell_value.type) {
+    case CutType::BOTTOM_LEFT:
+      return {
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min + cell.dy},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min + cell.dy},
+      };
+    case CutType::BOTTOM_RIGHT:
+      return {
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min},
+      };
+    case CutType::TOP_RIGHT:
+      return {
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min + cell.dy},
+      };
+    case CutType::TOP_LEFT:
+      return {
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min + cell.dy},
+      };
+    case CutType::MIDDLE_HORI:
+      return {
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min, cell.y_min + cell.dy},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min + cell.dy},
+      };
+    case CutType::MIDDLE_VERT:
+      return {
+          Eigen::Vector<Float, 2>{cell_value.x1_cut, cell_value.y1_cut},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min},
+          Eigen::Vector<Float, 2>{cell_value.x2_cut, cell_value.y2_cut},
+          Eigen::Vector<Float, 2>{cell.x_min + cell.dx, cell.y_min + cell.dy},
+      };
+    default:
+      Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
+      std::unreachable();
+  }
+}
+
+// -------------------------------------------------------------------------------------------------
 template <typename Float, size_t DIM>
 auto operator<<(std::ostream& out,
                 const CartesianValue<Float, DIM>& cart_value) noexcept -> std::ostream& {

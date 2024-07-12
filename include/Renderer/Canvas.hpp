@@ -1,7 +1,9 @@
 #ifndef ZAP_RENDERER_CANVAS_HPP_
 #define ZAP_RENDERER_CANVAS_HPP_
 
+#include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <fstream>
 #include <vector>
 
@@ -458,6 +460,104 @@ class Canvas {
     for (auto row = min_row; row <= max_row; ++row) {
       for (auto col = min_col; col <= max_col; ++col) {
         if (is_in_triangle(row, col)) {
+          const size_t c_col = col + bounding_box.col;
+          assert(c_col < m_width);
+          const size_t c_row = is_y_upwards ? bounding_box.row + (bounding_box.height - row - 1UZ)
+                                            : row + bounding_box.row;
+          assert(c_row < m_height);
+          assert(bounding_box.contains({.col = c_col, .row = c_row}));
+          m_data[get_idx(c_col, c_row)] = color;  // NOLINT
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto draw_polygon(std::vector<Point> points,
+                                            const Box& bounding_box,
+                                            PixelType color,
+                                            bool is_y_upwards = false) noexcept -> bool {
+    if (points.size() < 3) {
+      Igor::Warn("Need at least tree points to draw a polygon, but got only {}", points.size());
+      return false;
+    }
+    if (!box_in_canvas(bounding_box)) {
+      Igor::Warn("Bounding box {} is not in canvas with width {} and height {}.",
+                 bounding_box,
+                 m_width,
+                 m_height);
+      return false;
+    }
+    for (size_t i = 0; i < points.size(); ++i) {
+      const auto& p = points[i];
+      if (bounding_box.width <= p.col || bounding_box.height <= p.row) {
+        Igor::Warn("Bounding box {} does not contain point p[{}]={}.", bounding_box, i, p);
+        return false;
+      }
+    }
+
+    // Find centroid and bounding box of polygon
+    Point center{0, 0};
+    size_t min_col = points.front().col;
+    size_t max_col = points.front().col;
+    size_t min_row = points.front().row;
+    size_t max_row = points.front().row;
+    for (const auto& [col, row] : points) {
+      center.col += col;
+      center.row += row;
+      min_col = std::min(min_col, col);
+      max_col = std::max(max_col, col);
+      min_row = std::min(min_row, row);
+      max_row = std::max(max_row, row);
+    }
+    center.col /= points.size();
+    center.row /= points.size();
+
+    // Sort points in clockwise order
+    std::sort(std::begin(points), std::end(points), [&center](const Point& p1, const Point& p2) {
+      const auto a1 = std::atan2(static_cast<int64_t>(p1.col) - static_cast<int64_t>(center.col),
+                                 static_cast<int64_t>(p1.row) - static_cast<int64_t>(center.row));
+      const auto a2 = std::atan2(static_cast<int64_t>(p2.col) - static_cast<int64_t>(center.col),
+                                 static_cast<int64_t>(p2.row) - static_cast<int64_t>(center.row));
+      return a1 < a2;
+    });
+
+    // Find outwards pointing normals
+    struct Vec2 {
+      int64_t col;
+      int64_t row;
+    };
+
+    std::vector<Vec2> normals(points.size());
+    for (size_t i = 0; i < points.size(); ++i) {
+      const auto& p1 = points[i];
+      const auto& p2 = points[(i + 1) % points.size()];
+      auto& n        = normals[i];
+      n              = Vec2{
+                       .col = static_cast<int64_t>(p1.row) - static_cast<int64_t>(p2.row),
+                       .row = -(static_cast<int64_t>(p1.col) - static_cast<int64_t>(p2.col)),
+      };
+    }
+
+    const auto is_inside = [&](size_t row, size_t col) {
+      for (size_t i = 0; i < points.size(); ++i) {
+        const auto& n = normals[i];
+        const auto& p = points[i];
+        const auto v  = n.col * (static_cast<int64_t>(col) - static_cast<int64_t>(p.col)) +
+                       n.row * (static_cast<int64_t>(row) - static_cast<int64_t>(p.row));
+        if (v > 0) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    // Draw points inside of polygon
+    for (auto row = min_row; row <= max_row; ++row) {
+      for (auto col = min_col; col <= max_col; ++col) {
+        if (is_inside(row, col)) {
           const size_t c_col = col + bounding_box.col;
           assert(c_col < m_width);
           const size_t c_row = is_y_upwards ? bounding_box.row + (bounding_box.height - row - 1UZ)

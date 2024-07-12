@@ -5,11 +5,11 @@
 
 namespace Rd = Zap::Renderer;
 
-constexpr Rd::RGB BLACK  = {.r = 0x00, .g = 0x00, .b = 0x00};
-constexpr Rd::RGB RED    = {.r = 0xFF, .g = 0x00, .b = 0x00};
-constexpr Rd::RGB WHITE  = {.r = 0xFF, .g = 0xFF, .b = 0xFF};
-constexpr Rd::RGB PINK   = {.r = 0xFF, .g = 0x00, .b = 0xFF};
-constexpr Rd::RGB ORANGE = {.r = 0xFF, .g = 0xA5, .b = 0x00};
+[[maybe_unused]] constexpr Rd::RGB BLACK  = {.r = 0x00, .g = 0x00, .b = 0x00};
+[[maybe_unused]] constexpr Rd::RGB RED    = {.r = 0xFF, .g = 0x00, .b = 0x00};
+[[maybe_unused]] constexpr Rd::RGB WHITE  = {.r = 0xFF, .g = 0xFF, .b = 0xFF};
+[[maybe_unused]] constexpr Rd::RGB PINK   = {.r = 0xFF, .g = 0x00, .b = 0xFF};
+[[maybe_unused]] constexpr Rd::RGB ORANGE = {.r = 0xFF, .g = 0xA5, .b = 0x00};
 
 // -------------------------------------------------------------------------------------------------
 template <typename Float>
@@ -32,490 +32,6 @@ to_pixel_coord(Float norm_value, size_t num_cells, size_t scale) noexcept -> siz
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-draw_cut_top_right(Rd::Canvas& canvas,
-                   const Zap::IO::IncCellReader<Float, DIM>& u_reader,
-                   const typename Zap::IO::IncCellReader<Float, DIM>::ReducedCell& cell,
-                   const Rd::Box& graph_box,
-                   Eigen::Vector<Float, DIM> min,
-                   Eigen::Vector<Float, DIM> max,
-                   size_t scale) noexcept -> bool {
-  const auto& cut_value = cell.get_cut();
-  // Left side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.right_value(0), min(0), max(0));
-    const auto c = ORANGE;
-
-    const Rd::Box rect1{
-        .col = to_pixel_coord(
-            norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width = to_pixel_coord(
-            norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .height = to_pixel_coord(norm_length(cell.dy - (cut_value.y1_cut - cell.y_min),
-                                             u_reader.y_min(),
-                                             u_reader.y_max()),
-                                 u_reader.ny(),
-                                 scale),
-    };
-
-    if (!canvas.draw_rect(rect1, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Box rect2{
-        .col = to_pixel_coord(
-            norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width  = to_pixel_coord(norm_length(cell.dx - (cut_value.x2_cut - cell.x_min),
-                                            u_reader.x_min(),
-                                            u_reader.x_max()),
-                                u_reader.nx(),
-                                scale),
-        .height = to_pixel_coord(
-            norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-
-    if (!canvas.draw_rect(rect2, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(norm_point(std::min(cut_value.x1_cut, cut_value.x2_cut),
-                                         u_reader.x_min(),
-                                         u_reader.x_max()),
-                              u_reader.nx(),
-                              scale),
-        .row = to_pixel_coord(norm_point(std::min(cut_value.y1_cut, cut_value.y2_cut),
-                                         u_reader.y_min(),
-                                         u_reader.y_max()),
-                              u_reader.ny(),
-                              scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  // Right side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.left_value(0), min(0), max(0));
-    const auto c = PINK;
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(norm_point(cell.x_min + cell.dx, u_reader.x_min(), u_reader.x_max()),
-                              u_reader.nx(),
-                              scale),
-        .row = to_pixel_coord(norm_point(cell.y_min + cell.dy, u_reader.y_min(), u_reader.y_max()),
-                              u_reader.ny(),
-                              scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-draw_cut_bottom_left(Rd::Canvas& canvas,
-                     const Zap::IO::IncCellReader<Float, DIM>& u_reader,
-                     const typename Zap::IO::IncCellReader<Float, DIM>::ReducedCell& cell,
-                     const Rd::Box& graph_box,
-                     Eigen::Vector<Float, DIM> min,
-                     Eigen::Vector<Float, DIM> max,
-                     size_t scale) noexcept -> bool {
-  const auto& cut_value = cell.get_cut();
-  // Left side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.left_value(0), min(0), max(0));
-    const auto c = ORANGE;
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(
-            norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  // Right side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.right_value(0), min(0), max(0));
-    const auto c = PINK;
-
-    const Rd::Box rect1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width  = to_pixel_coord(norm_length(cell.dx - (cut_value.x1_cut - cell.x_min),
-                                            u_reader.x_min(),
-                                            u_reader.x_max()),
-                                u_reader.nx(),
-                                scale),
-        .height = to_pixel_coord(
-            norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-
-    if (!canvas.draw_rect(rect1, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Box rect2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width = to_pixel_coord(
-            norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .height = to_pixel_coord(norm_length(cell.dy - (cut_value.y1_cut - cell.y_min),
-                                             u_reader.y_min(),
-                                             u_reader.y_max()),
-                                 u_reader.ny(),
-                                 scale),
-    };
-
-    if (!canvas.draw_rect(rect2, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(norm_point(std::max(cut_value.x1_cut, cut_value.x2_cut),
-                                         u_reader.x_min(),
-                                         u_reader.x_max()),
-                              u_reader.nx(),
-                              scale),
-        .row = to_pixel_coord(norm_point(std::max(cut_value.y1_cut, cut_value.y2_cut),
-                                         u_reader.y_min(),
-                                         u_reader.y_max()),
-                              u_reader.ny(),
-                              scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-draw_cut_middle_hori(Rd::Canvas& canvas,
-                     const Zap::IO::IncCellReader<Float, DIM>& u_reader,
-                     const typename Zap::IO::IncCellReader<Float, DIM>::ReducedCell& cell,
-                     const Rd::Box& graph_box,
-                     Eigen::Vector<Float, DIM> min,
-                     Eigen::Vector<Float, DIM> max,
-                     size_t scale) noexcept -> bool {
-  const auto& cut_value = cell.get_cut();
-  // Left side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.left_value(0), min(0), max(0));
-    const auto c = ORANGE;
-
-    const Rd::Box rect{
-        .col = to_pixel_coord(
-            norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width = to_pixel_coord(
-            norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .height =
-            to_pixel_coord(norm_length(std::min(cut_value.y1_cut, cut_value.y2_cut) - cell.y_min,
-                                       u_reader.y_min(),
-                                       u_reader.y_max()),
-                           u_reader.ny(),
-                           scale),
-    };
-
-    if (!canvas.draw_rect(rect, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(
-            norm_point(cut_value.y1_cut < cut_value.y2_cut ? cut_value.x2_cut : cut_value.x1_cut,
-                       u_reader.x_min(),
-                       u_reader.x_max()),
-            u_reader.nx(),
-            scale),
-        .row = to_pixel_coord(norm_point(std::min(cut_value.y1_cut, cut_value.y2_cut),
-                                         u_reader.y_min(),
-                                         u_reader.y_max()),
-                              u_reader.ny(),
-                              scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  // Right side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.right_value(0), min(0), max(0));
-    const auto c = PINK;
-
-    const Rd::Box rect{
-        .col = to_pixel_coord(
-            norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row   = to_pixel_coord(norm_point(std::max(cut_value.y1_cut, cut_value.y2_cut),
-                                         u_reader.y_min(),
-                                         u_reader.y_max()),
-                              u_reader.ny(),
-                              scale),
-        .width = to_pixel_coord(
-            norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .height = to_pixel_coord(
-            norm_length(cell.dy - (std::max(cut_value.y1_cut, cut_value.y2_cut) - cell.y_min),
-                        u_reader.y_min(),
-                        u_reader.y_max()),
-            u_reader.ny(),
-            scale),
-    };
-
-    if (!canvas.draw_rect(rect, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(
-            norm_point(cut_value.y1_cut > cut_value.y2_cut ? cut_value.x2_cut : cut_value.x1_cut,
-                       u_reader.x_min(),
-                       u_reader.x_max()),
-            u_reader.nx(),
-            scale),
-        .row = to_pixel_coord(norm_point(std::max(cut_value.y1_cut, cut_value.y2_cut),
-                                         u_reader.y_min(),
-                                         u_reader.y_max()),
-                              u_reader.ny(),
-                              scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-draw_cut_middle_vert(Rd::Canvas& canvas,
-                     const Zap::IO::IncCellReader<Float, DIM>& u_reader,
-                     const typename Zap::IO::IncCellReader<Float, DIM>::ReducedCell& cell,
-                     const Rd::Box& graph_box,
-                     Eigen::Vector<Float, DIM> min,
-                     Eigen::Vector<Float, DIM> max,
-                     size_t scale) noexcept -> bool {
-  const auto& cut_value = cell.get_cut();
-  // Left side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.left_value(0), min(0), max(0));
-    const auto c = ORANGE;
-
-    const Rd::Box rect{
-        .col = to_pixel_coord(
-            norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width =
-            to_pixel_coord(norm_length(std::min(cut_value.x1_cut, cut_value.x2_cut) - cell.x_min,
-                                       u_reader.x_min(),
-                                       u_reader.x_max()),
-                           u_reader.nx(),
-                           scale),
-        .height = to_pixel_coord(
-            norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-
-    if (!canvas.draw_rect(rect, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(norm_point(std::min(cut_value.x1_cut, cut_value.x2_cut),
-                                         u_reader.x_min(),
-                                         u_reader.x_max()),
-                              u_reader.nx(),
-                              scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.x1_cut < cut_value.x2_cut ? cut_value.y2_cut : cut_value.y1_cut,
-                       u_reader.y_min(),
-                       u_reader.y_max()),
-            u_reader.ny(),
-            scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  // Right side
-  {
-    // const auto c = Rd::float_to_rgb(cut_value.right_value(0), min(0), max(0));
-    const auto c = PINK;
-
-    const Rd::Box rect{
-        .col = to_pixel_coord(norm_point(std::max(cut_value.x1_cut, cut_value.x2_cut),
-                                         u_reader.x_min(),
-                                         u_reader.x_max()),
-                              u_reader.nx(),
-                              scale),
-        .row = to_pixel_coord(
-            norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-        .width = to_pixel_coord(
-            norm_length(cell.dx - (std::max(cut_value.x1_cut, cut_value.x2_cut) - cell.x_min),
-                        u_reader.x_min(),
-                        u_reader.x_max()),
-            u_reader.nx(),
-            scale),
-        .height = to_pixel_coord(
-            norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-
-    if (!canvas.draw_rect(rect, graph_box, c, true)) {
-      return false;
-    }
-
-    const Rd::Point p1{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p2{
-        .col = to_pixel_coord(
-            norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
-    };
-    const Rd::Point p3{
-        .col = to_pixel_coord(norm_point(std::max(cut_value.x1_cut, cut_value.x2_cut),
-                                         u_reader.x_min(),
-                                         u_reader.x_max()),
-                              u_reader.nx(),
-                              scale),
-        .row = to_pixel_coord(
-            norm_point(cut_value.x1_cut > cut_value.x2_cut ? cut_value.y2_cut : cut_value.y1_cut,
-                       u_reader.y_min(),
-                       u_reader.y_max()),
-            u_reader.ny(),
-            scale),
-    };
-
-    if (!canvas.draw_triangle(p1, p2, p3, graph_box, c, true)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-// -------------------------------------------------------------------------------------------------
 auto main() -> int {
   using Float            = double;
   constexpr size_t DIM   = 1;
@@ -523,8 +39,8 @@ auto main() -> int {
 
   try {
     // - Setup canvas ------------------------------------------------------------------------------
-    constexpr auto t_input_file = "../output/cell_based/t_21x21.mat";
-    constexpr auto u_input_file = "../output/cell_based/u_21x21.grid";
+    constexpr auto t_input_file = "../output/cell_based/t.mat";
+    constexpr auto u_input_file = "../output/cell_based/u.grid";
     constexpr auto output_file  = "test.ppm";
 
     Zap::IO::IncMatrixReader<Float> t_reader(t_input_file);
@@ -640,93 +156,51 @@ auto main() -> int {
         }
       } else {
         const auto& cut_value = cell.get_cut();
-        switch (cut_value.type) {
-          case Zap::CellBased::CutType::BOTTOM_LEFT:
-            {
-              if (!draw_cut_bottom_left<Float, DIM>(
-                      canvas, u_reader, cell, graph_box, min, max, scale)) {
-                failed_drawing_rects = true;
-              }
-            }
-            break;
-          case Zap::CellBased::CutType::BOTTOM_RIGHT:
-            {
-              const Rd::Box rect{
-                  .col = to_pixel_coord(norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()),
-                                        u_reader.nx(),
-                                        scale),
-                  .row = to_pixel_coord(norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()),
-                                        u_reader.ny(),
-                                        scale),
-                  .width  = to_pixel_coord(norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()),
-                                          u_reader.nx(),
-                                          scale),
-                  .height = to_pixel_coord(norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()),
-                                           u_reader.ny(),
-                                           scale),
-              };
 
-              if (!canvas.draw_rect(rect, graph_box, WHITE, true)) {
-                Igor::Warn("Could not draw cell");
-                failed_drawing_rects = true;
-              }
-              Igor::Warn("Cell type BOTTOM_RIGHT is not implemented yet.");
-            }
-            break;
-          case Zap::CellBased::CutType::TOP_RIGHT:
-            {
-              if (!draw_cut_top_right<Float, DIM>(
-                      canvas, u_reader, cell, graph_box, min, max, scale)) {
-                failed_drawing_rects = true;
-              }
-            }
-            break;
-          case Zap::CellBased::CutType::TOP_LEFT:
-            {
-              const Rd::Box rect{
-                  .col = to_pixel_coord(norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()),
-                                        u_reader.nx(),
-                                        scale),
-                  .row = to_pixel_coord(norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()),
-                                        u_reader.ny(),
-                                        scale),
-                  .width  = to_pixel_coord(norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()),
-                                          u_reader.nx(),
-                                          scale),
-                  .height = to_pixel_coord(norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()),
-                                           u_reader.ny(),
-                                           scale),
-              };
+        std::vector<Eigen::Vector<Float, 2>> left_points =
+            Zap::CellBased::get_left_points<decltype(cell), Float>(cell);
+        std::vector<Rd::Point> left_canvas_points(left_points.size());
+        for (size_t i = 0; i < left_points.size(); ++i) {
+          left_canvas_points[i] = Rd::Point{
+              .col =
+                  to_pixel_coord(norm_point(left_points[i](0), u_reader.x_min(), u_reader.x_max()),
+                                 u_reader.nx(),
+                                 scale),
+              .row =
+                  to_pixel_coord(norm_point(left_points[i](1), u_reader.y_min(), u_reader.y_max()),
+                                 u_reader.ny(),
+                                 scale),
+          };
+        }
+        if (!canvas.draw_polygon(left_canvas_points,
+                                 graph_box,
+                                 Rd::float_to_rgb(cut_value.left_value(0), min(0), max(0)),
+                                 true)) {
+          Igor::Warn("Could not draw left polygon.");
+          failed_drawing_rects = true;
+        }
 
-              if (!canvas.draw_rect(rect, graph_box, WHITE, true)) {
-                Igor::Warn("Could not draw cell");
-                failed_drawing_rects = true;
-              }
-              Igor::Warn("Cell type TOP_LEFT is not implemented yet.");
-            }
-            break;
-          case Zap::CellBased::CutType::MIDDLE_HORI:
-            {
-              if (!draw_cut_middle_hori<Float, DIM>(
-                      canvas, u_reader, cell, graph_box, min, max, scale)) {
-                failed_drawing_rects = true;
-              }
-            }
-            break;
-          case Zap::CellBased::CutType::MIDDLE_VERT:
-            {
-              if (!draw_cut_middle_vert<Float, DIM>(
-                      canvas, u_reader, cell, graph_box, min, max, scale)) {
-                failed_drawing_rects = true;
-              }
-            }
-            break;
-          default:
-            {
-              Igor::Warn("Unknown cut type with value `{}`", static_cast<int>(cell.get_cut().type));
-              failed_drawing_rects = true;
-              continue;
-            }
+        std::vector<Eigen::Vector<Float, 2>> right_points =
+            Zap::CellBased::get_right_points<decltype(cell), Float>(cell);
+        std::vector<Rd::Point> right_canvas_points(right_points.size());
+        for (size_t i = 0; i < right_points.size(); ++i) {
+          right_canvas_points[i] = Rd::Point{
+              .col =
+                  to_pixel_coord(norm_point(right_points[i](0), u_reader.x_min(), u_reader.x_max()),
+                                 u_reader.nx(),
+                                 scale),
+              .row =
+                  to_pixel_coord(norm_point(right_points[i](1), u_reader.y_min(), u_reader.y_max()),
+                                 u_reader.ny(),
+                                 scale),
+          };
+        }
+        if (!canvas.draw_polygon(right_canvas_points,
+                                 graph_box,
+                                 Rd::float_to_rgb(cut_value.right_value(0), min(0), max(0)),
+                                 true)) {
+          Igor::Warn("Could not draw right polygon.");
+          failed_drawing_rects = true;
         }
 
         // Draw shock curve
@@ -755,7 +229,6 @@ auto main() -> int {
           Igor::Warn("Could not draw line");
           failed_drawing_rects = true;
         }
-        // Igor::Todo("Rendering cut cells is not implemented yet.");
       }
     }
     if (failed_drawing_rects) {
