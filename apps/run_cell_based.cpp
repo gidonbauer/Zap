@@ -79,12 +79,12 @@ auto main(int argc, char** argv) -> int {
   const Float y_max = 5.0;
 
   auto grid = Zap::CellBased::Grid<Float, DIM>::Uniform(x_min, x_max, nx, y_min, y_max, ny);
-  // grid.periodic_boundary(Zap::CellBased::LEFT | Zap::CellBased::RIGHT);
-  // grid.same_value_boundary(Zap::CellBased::BOTTOM | Zap::CellBased::TOP);
-  grid.same_value_boundary();
+  // grid.same_value_boundary();
+  grid.periodic_boundary();
 
 // #define RAMP_X
 #define QUARTER_CIRCLE
+// #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
   auto u0 = [=](Float x, Float y) -> Float {
     return (std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) *
@@ -98,6 +98,24 @@ auto main(int argc, char** argv) -> int {
     return Eigen::Vector<T, 2>{
         r * std::cos(std::numbers::pi_v<Float> / 2 * t),
         r * std::sin(std::numbers::pi_v<Float> / 2 * t),
+    };
+  };
+#elif defined(FULL_CIRCLE)
+  const auto x_mid = (x_min + x_max) / 2;
+  const auto y_mid = (y_min + y_max) / 2;
+
+  auto u0 = [=](Float x, Float y) -> Float {
+    return (std::pow(x - x_mid, 2) + std::pow(y - y_mid, 2)) *
+           static_cast<Float>((std::pow(x - x_mid, 2) + std::pow(y - y_mid, 2)) <=
+                              std::pow((x_min + x_max + y_min + y_max) / 8, 2));
+  };
+
+  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+    // assert(t >= 0 && t <= 1);
+    const auto r = (x_min + x_max + y_min + y_max) / 8;
+    return Eigen::Vector<T, 2>{
+        r * std::cos(2 * std::numbers::pi_v<Float> * t) + x_mid,
+        r * std::sin(2 * std::numbers::pi_v<Float> * t) + y_mid,
     };
   };
 #elif defined(RAMP_X)
@@ -169,17 +187,14 @@ auto main(int argc, char** argv) -> int {
   constexpr auto t_file = OUTPUT_DIR "t.mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  assert(grid_writer.write_data(grid));
-  assert(t_writer.write_data(Float{0}));
-
-  // IGOR_TIME_SCOPE("Solver") {
-  //   Zap::CellBased::Solver solver(godunov_flux, godunov_flux);
-  //   if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
-  //     Igor::Warn("Solver failed.");
-  //     return 1;
-  //   }
-  // }
-  // Igor::Info("Solver finished successfully.");
-  // Igor::Info("Saved grid to {}.", u_file);
-  // Igor::Info("Saved time steps to {}.", t_file);
+  IGOR_TIME_SCOPE("Solver") {
+    Zap::CellBased::Solver solver(godunov_flux, godunov_flux);
+    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
+      Igor::Warn("Solver failed.");
+      return 1;
+    }
+  }
+  Igor::Info("Solver finished successfully.");
+  Igor::Info("Saved grid to {}.", u_file);
+  Igor::Info("Saved time steps to {}.", t_file);
 }

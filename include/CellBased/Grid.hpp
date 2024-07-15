@@ -251,6 +251,277 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
+#ifndef CUT_NEWTON_VARIANT
+
+  template <typename ParamShock>
+  [[nodiscard]] constexpr auto cut_init_shock(ParamShock init_shock) noexcept -> bool {
+    enum { X, Y, POS_SIZE };
+    enum { ON_MIN = -1, NOT_ON, ON_MAX };
+    enum { T_BELOW_EXIT = -1, T_IS_EXIT, T_ABOVE_EXIT };
+    constexpr Float eps = 1e-8;
+
+    const auto approx_eq = [](Float a, Float b) -> bool { return std::abs(a - b) <= eps; };
+
+    const auto pos_on_boundary = [approx_eq](const Eigen::Vector<Float, POS_SIZE>& pos,
+                                             const m_Cell& cell) -> bool {
+      return ((approx_eq(pos(X), cell.x_min) || approx_eq(pos(X), cell.x_min + cell.dx)) &&
+              (pos(Y) >= cell.y_min && pos(Y) <= cell.y_min + cell.dy)) ||
+             ((approx_eq(pos(Y), cell.y_min) || approx_eq(pos(Y), cell.y_min + cell.dy)) &&
+              (pos(X) >= cell.x_min && pos(X) <= cell.x_min + cell.dx));
+    };
+
+    const auto pos_in_cell = [](const Eigen::Vector<Float, POS_SIZE>& pos, const m_Cell& cell) {
+      return pos(X) >= cell.x_min && pos(X) <= (cell.x_min + cell.dx) &&  //
+             pos(Y) >= cell.y_min && pos(Y) <= (cell.y_min + cell.dy);
+    };
+
+    const auto t_location = [init_shock, pos_on_boundary, pos_in_cell](
+                                Float t, const m_Cell& cell, Float t_entry) -> int {
+      const auto pos = init_shock(t);
+      if (t <= t_entry || (pos_in_cell(pos, cell) && !pos_on_boundary(pos, cell))) {
+        return T_BELOW_EXIT;
+      } else if (pos_on_boundary(pos, cell)) {
+        return T_IS_EXIT;
+      }
+      return T_ABOVE_EXIT;
+    };
+
+    Float t             = 0;
+    const auto init_pos = init_shock(t);
+    const auto cell_it =
+        std::find_if(std::cbegin(m_cells), std::cend(m_cells), [&](const auto& cell) {
+          return pos_in_cell(init_pos, cell);
+        });
+    if (cell_it == std::cend(m_cells)) {
+      Igor::Warn("Point {} on parametrized initial shock is not in the grid.", init_pos);
+      return false;
+    }
+    assert(std::distance(std::cbegin(m_cells), cell_it) >= 0);
+    auto cell_idx = static_cast<size_t>(std::distance(std::cbegin(m_cells), cell_it));
+
+    std::vector<size_t> cut_cell_idxs{};
+    cut_cell_idxs.push_back(static_cast<size_t>(cell_idx));
+    std::vector<Eigen::Vector<Float, POS_SIZE>> entry_points{};
+    entry_points.push_back(init_pos);
+
+    while (t < 1) {
+      const auto& cell = m_cells[cell_idx];
+      Float t_lower    = t;
+      Float t_upper    = std::min(Float{1}, t + 0.5);
+
+      bool found_exit = false;
+      while (!found_exit) {
+        int t_lower_loc = t_location(t_lower, cell, t);
+        int t_upper_loc = t_location(t_upper, cell, t);
+
+        if (t_lower_loc == T_IS_EXIT && t_upper_loc == T_IS_EXIT) {
+          Igor::Warn("lower t ({}) and upper t ({}) are both exit points.", t_lower, t_upper);
+        }
+        assert(!(t_lower_loc == T_IS_EXIT && t_upper_loc == T_IS_EXIT));
+
+        if (!(t_lower_loc == T_BELOW_EXIT || t_lower_loc == T_IS_EXIT)) {
+          Igor::Warn("lower t ({}) is outside of cell.", t_lower);
+        }
+        assert(t_lower_loc == T_BELOW_EXIT || t_lower_loc == T_IS_EXIT);
+
+        if (!(t_upper_loc == T_ABOVE_EXIT || t_upper_loc == T_IS_EXIT)) {
+          IGOR_DEBUG_PRINT(t);
+          IGOR_DEBUG_PRINT(t_lower);
+          IGOR_DEBUG_PRINT(t_upper);
+          IGOR_DEBUG_PRINT(init_shock(t_upper));
+          IGOR_DEBUG_PRINT(pos_on_boundary(init_shock(t_upper), cell));
+          Igor::Warn("upper t ({}) is inside of cell.", t_upper);
+        }
+        assert(t_upper_loc == T_ABOVE_EXIT || t_upper_loc == T_IS_EXIT);
+
+        if (t_lower_loc == T_IS_EXIT) {
+          t          = t_lower;
+          found_exit = true;
+        } else if (t_upper_loc == T_IS_EXIT) {
+          t          = t_upper;
+          found_exit = true;
+        } else {
+          const auto t_mid = (t_upper + t_lower) / 2;
+          switch (t_location(t_mid, cell, t)) {
+            case T_BELOW_EXIT:
+              t_lower = t_mid;
+              break;
+            case T_ABOVE_EXIT:
+              t_upper = t_mid;
+              break;
+            case T_IS_EXIT:
+              t          = t_mid;
+              found_exit = true;
+              break;
+          }
+        }
+      }
+      const auto next_pos = init_shock(t);
+      entry_points.push_back(next_pos);
+
+      if (approx_eq(t, Float{1})) {
+        break;
+      }
+
+      const int on_x = approx_eq(cell.x_min, next_pos(X)) * ON_MIN +
+                       approx_eq(cell.x_min + cell.dx, next_pos(X)) * ON_MAX;
+      const int on_y = approx_eq(cell.y_min, next_pos(Y)) * ON_MIN +
+                       approx_eq(cell.y_min + cell.dy, next_pos(Y)) * ON_MAX;
+      assert(on_x != NOT_ON || on_y != NOT_ON);
+
+      if (on_x != NOT_ON && on_y != NOT_ON) {
+        // Bottom left corner
+        if (on_x == ON_MIN && on_y == ON_MIN) {
+          assert(is_cell(cell.bottom_idx));
+          assert(is_cell(m_cells[cell.bottom_idx].left_idx));
+
+          cut_cell_idxs.push_back(m_cells[cell.bottom_idx].left_idx);
+          cell_idx = m_cells[cell.bottom_idx].left_idx;
+
+          // TODO: This check might lead to problems
+          assert(pos_in_cell(init_shock(t + 1e-4), m_cells[cell_idx]));
+        }
+        // Top left corner
+        else if (on_x == ON_MIN && on_y == ON_MAX) {
+          assert(is_cell(cell.top_idx));
+          assert(is_cell(m_cells[cell.top_idx].left_idx));
+
+          cut_cell_idxs.push_back(m_cells[cell.top_idx].left_idx);
+          cell_idx = m_cells[cell.top_idx].left_idx;
+
+          // TODO: This check might lead to problems
+          assert(pos_in_cell(init_shock(t + 1e-4), m_cells[cell_idx]));
+        }
+        // Bottom right corner
+        else if (on_x == ON_MAX && on_y == ON_MIN) {
+          assert(is_cell(cell.bottom_idx));
+          assert(is_cell(m_cells[cell.bottom_idx].right_idx));
+
+          cut_cell_idxs.push_back(m_cells[cell.bottom_idx].right_idx);
+          cell_idx = m_cells[cell.bottom_idx].right_idx;
+
+          // TODO: This check might lead to problems
+          assert(pos_in_cell(init_shock(t + 1e-4), m_cells[cell_idx]));
+        }
+        // Top right corner
+        else {
+          assert(is_cell(cell.top_idx));
+          assert(is_cell(m_cells[cell.top_idx].right_idx));
+
+          cut_cell_idxs.push_back(m_cells[cell.top_idx].right_idx);
+          cell_idx = m_cells[cell.top_idx].right_idx;
+
+          // TODO: This check might lead to problems
+          assert(pos_in_cell(init_shock(t + 1e-4), m_cells[cell_idx]));
+        }
+      } else {
+        // Left side
+        if (on_x == ON_MIN) {
+          assert(is_cell(cell.left_idx));
+          cut_cell_idxs.push_back(cell.left_idx);
+          cell_idx = cell.left_idx;
+        }
+        // Right side
+        else if (on_x == ON_MAX) {
+          assert(is_cell(cell.right_idx));
+          cut_cell_idxs.push_back(cell.right_idx);
+          cell_idx = cell.right_idx;
+        }
+        // Bottom side
+        else if (on_y == ON_MIN) {
+          assert(is_cell(cell.bottom_idx));
+          cut_cell_idxs.push_back(cell.bottom_idx);
+          cell_idx = cell.bottom_idx;
+        }
+        // Top side
+        else {
+          assert(is_cell(cell.top_idx));
+          cut_cell_idxs.push_back(cell.top_idx);
+          cell_idx = cell.top_idx;
+        }
+      }
+    }
+
+    assert(cut_cell_idxs.size() + 1 == entry_points.size());
+    for (size_t i = 0; i < cut_cell_idxs.size(); ++i) {
+      auto& cell_to_cut = m_cells[cut_cell_idxs[i]];
+      auto cut1_point   = entry_points[i];
+      auto cut2_point   = entry_points[i + 1];
+
+      const int cut1_on_x = approx_eq(cell_to_cut.x_min, cut1_point(X)) * ON_MIN +
+                            approx_eq(cell_to_cut.x_min + cell_to_cut.dx, cut1_point(X)) * ON_MAX;
+      const int cut1_on_y = approx_eq(cell_to_cut.y_min, cut1_point(Y)) * ON_MIN +
+                            approx_eq(cell_to_cut.y_min + cell_to_cut.dy, cut1_point(Y)) * ON_MAX;
+      assert(cut1_on_x != NOT_ON || cut1_on_y != NOT_ON);
+      Side cut1_loc = cut1_on_x == ON_MIN   ? LEFT
+                      : cut1_on_y == ON_MIN ? BOTTOM
+                      : cut1_on_x == ON_MAX ? RIGHT
+                                            : TOP;
+
+      const int cut2_on_x = approx_eq(cell_to_cut.x_min, cut2_point(X)) * ON_MIN +
+                            approx_eq(cell_to_cut.x_min + cell_to_cut.dx, cut2_point(X)) * ON_MAX;
+      const int cut2_on_y = approx_eq(cell_to_cut.y_min, cut2_point(Y)) * ON_MIN +
+                            approx_eq(cell_to_cut.y_min + cell_to_cut.dy, cut2_point(Y)) * ON_MAX;
+      assert(cut2_on_x != NOT_ON || cut2_on_y != NOT_ON);
+      Side cut2_loc = cut2_on_x == ON_MIN   ? LEFT
+                      : cut2_on_y == ON_MIN ? BOTTOM
+                      : cut2_on_x == ON_MAX ? RIGHT
+                                            : TOP;
+
+      if (cut1_loc == cut2_loc) {
+        Igor::Debug("cut1_loc = {}", static_cast<std::underlying_type_t<Side>>(cut1_loc));
+        Igor::Debug("cut2_loc = {}", static_cast<std::underlying_type_t<Side>>(cut2_loc));
+        IGOR_DEBUG_PRINT(cut1_point);
+        IGOR_DEBUG_PRINT(cut2_point);
+        Igor::Todo("Cut only on one side. I think we can just ignore then.");
+      }
+      if (cut1_loc > cut2_loc) {
+        std::swap(cut1_loc, cut2_loc);
+        std::swap(cut1_point, cut2_point);
+      }
+
+      CutType type;
+      switch (cut1_loc | cut2_loc) {
+        case LEFT | BOTTOM:
+          type = CutType::BOTTOM_LEFT;
+          break;
+        case BOTTOM | RIGHT:
+          type = CutType::BOTTOM_RIGHT;
+          break;
+        case RIGHT | TOP:
+          type = CutType::TOP_RIGHT;
+          break;
+        case TOP | LEFT:
+          type = CutType::TOP_LEFT;
+          break;
+        case LEFT | RIGHT:
+          type = CutType::MIDDLE_HORI;
+          break;
+        case BOTTOM | TOP:
+          type = CutType::MIDDLE_VERT;
+          break;
+        default:
+          Igor::Panic("Invalid combination cut1_loc = {} and cut2_loc = {}",
+                      static_cast<std::underlying_type_t<Side>>(cut1_loc),
+                      static_cast<std::underlying_type_t<Side>>(cut2_loc));
+          std::unreachable();
+      }
+
+      cell_to_cut.value = CutValue<Float, DIM>{
+          .left_value  = Eigen::Vector<Float, DIM>::Zero(),
+          .right_value = Eigen::Vector<Float, DIM>::Zero(),
+          .type        = type,
+          .x1_cut      = cut1_point(X),
+          .y1_cut      = cut1_point(Y),
+          .x2_cut      = cut2_point(X),
+          .y2_cut      = cut2_point(Y),
+      };
+    }
+
+    return true;
+  }
+
+#else
   template <typename ParamShock>
   [[nodiscard]] constexpr auto cut_init_shock(ParamShock init_shock) noexcept -> bool {
     using ad_t          = ad::gt1s<Float>::type;
@@ -453,6 +724,7 @@ class Grid {
 
     return true;
   }
+#endif  // CUT_NEWTON_VARIANT
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto abs_max_value() const noexcept -> Float {

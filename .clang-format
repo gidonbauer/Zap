@@ -16,9 +16,14 @@ AccessModifierOffset: -1
 AlignTrailingComments: true
 SpacesBeforeTrailingComments: 2
 
-AllowShortCaseLabelsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
 IndentCaseLabels: true
 IndentCaseBlocks: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
 
 PackConstructorInitializers: Never
 BreakConstructorInitializers: BeforeColon

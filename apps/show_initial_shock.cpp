@@ -35,12 +35,12 @@ to_pixel_coord(Float norm_value, size_t num_cells, size_t scale) noexcept -> siz
 auto main() -> int {
   using Float            = double;
   constexpr size_t DIM   = 1;
-  constexpr size_t scale = 100;
+  constexpr size_t scale = 50;
 
   try {
     // - Setup canvas ------------------------------------------------------------------------------
-    constexpr auto t_input_file = "../output/cell_based/t.mat";
-    constexpr auto u_input_file = "../output/cell_based/u.grid";
+    constexpr auto t_input_file = "../output/cell_based/t_21x21.mat";
+    constexpr auto u_input_file = "../output/cell_based/u_21x21.grid";
     constexpr auto output_file  = "test.ppm";
 
     Zap::IO::IncMatrixReader<Float> t_reader(t_input_file);
@@ -67,7 +67,6 @@ auto main() -> int {
         .width  = graph_width,
         .height = graph_height,
     };
-    IGOR_DEBUG_PRINT(graph_box);
     constexpr std::string_view font_file = "../assets/LinLibertine_RI.ttf";
     if (!canvas.load_font(font_file)) {
       Igor::Warn("Could not load font from file `{}`.", font_file);

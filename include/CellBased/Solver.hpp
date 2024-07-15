@@ -11,62 +11,113 @@ class Solver {
   FluxY m_numerical_flux_y;
 
   template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto apply_flux(const Grid<Float, DIM>& grid,
-                                          auto numerical_flux,
-                                          size_t idx,
-                                          const auto& cell,
-                                          bool cell_first) const noexcept {
-    if constexpr (DIM == 1) {
-      if (grid.is_cell(idx)) {
-        assert(cell.is_cartesian() && "Non-cartesian cell not implemented.");
-        assert(grid.m_cells[idx].is_cartesian() && "Non-cartesian cell not implemented.");
+  requires(DIM == 1)
+  [[nodiscard]] constexpr auto
+  apply_boundary_flux(const Cell<Float, DIM>& cell, Side side, size_t idx) const noexcept -> Float {
+    switch (idx) {
+      case SAME_VALUE_INDEX:
+        {
+          assert(cell.is_cartesian() && "Non-cartesian cell not implemented.");
+          const auto& cell_value = cell.get_cartesian().value;
+          switch (side) {
+            case LEFT:
+            case RIGHT:  return m_numerical_flux_x(cell_value(0), cell_value(0));
 
-        const auto& cell_value = std::get<CartesianValue<Float, DIM>>(cell.value).value;
-        const auto& other_cell_value =
-            std::get<CartesianValue<Float, DIM>>(grid.m_cells[idx].value).value;
+            case BOTTOM:
+            case TOP:    return m_numerical_flux_y(cell_value(0), cell_value(0));
 
-        if (cell_first) {
-          return numerical_flux(cell_value(0), other_cell_value(0));
-        } else {
-          return numerical_flux(other_cell_value(0), cell_value(0));
+            default:     Igor::Panic("Must be BOTTOM, RIGHT, TOP, or LEFT."); std::unreachable();
+          }
         }
+      case ZERO_FLUX_INDEX:
+        {
+          return static_cast<Float>(0);
+        }
+      case NULL_INDEX:
+        {
+          std::stringstream s{};
+          s << cell;
+          Igor::Panic("NULL index for cell {}, need to setup boundary condtions.", s.str());
+        }
+      default:
+        {
+          std::stringstream s{};
+          s << cell;
+          Igor::Panic("Unknown index type with value {} for cell {}.", idx, s.str());
+        }
+    }
+    std::unreachable();
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  template <typename Float, size_t DIM>
+  requires(DIM == 1)
+  [[nodiscard]] constexpr auto
+  apply_flux(const Grid<Float, DIM>& grid, const auto& cell, Side side) const noexcept -> Float {
+    size_t idx = NULL_INDEX;
+    switch (side) {
+      case BOTTOM: idx = cell.bottom_idx; break;
+      case RIGHT:  idx = cell.right_idx; break;
+      case TOP:    idx = cell.top_idx; break;
+      case LEFT:   idx = cell.left_idx; break;
+      default:     Igor::Panic("Must be BOTTOM, RIGHT, TOP, or LEFT."); std::unreachable();
+    }
+
+    if (!grid.is_cell(idx)) {
+      return apply_boundary_flux(cell, side, idx);
+    }
+
+    if (cell.is_cartesian()) {
+      const auto& cell_value = cell.get_cartesian().value;
+
+      if (grid.m_cells[idx].is_cartesian()) {
+        const auto& other_cell_value = grid.m_cells[idx].get_cartesian().value;
+
+        switch (side) {
+          case LEFT:   return m_numerical_flux_x(other_cell_value(0), cell_value(0));
+          case RIGHT:  return m_numerical_flux_x(cell_value(0), other_cell_value(0));
+
+          case BOTTOM: return m_numerical_flux_y(other_cell_value(0), cell_value(0));
+          case TOP:    return m_numerical_flux_y(cell_value(0), other_cell_value(0));
+
+          default:     Igor::Panic("Must be BOTTOM, RIGHT, TOP, or LEFT."); std::unreachable();
+        }
+      } else if (grid.m_cells[idx].is_cut()) {
+        Igor::Todo("Flux for cut cells is not implemented yet.");
+        std::unreachable();
       } else {
-        switch (idx) {
-          case SAME_VALUE_INDEX:
-            {
-              assert(cell.is_cartesian() && "Non-cartesian cell not implemented.");
-              const auto& cell_value = std::get<CartesianValue<Float, DIM>>(cell.value).value;
-              return numerical_flux(cell_value(0), cell_value(0));
-            }
-          case ZERO_FLUX_INDEX:
-            {
-              return static_cast<Float>(0);
-            }
-          case NULL_INDEX:
-            {
-              std::stringstream s{};
-              s << cell;
-              Igor::Panic("NULL index for cell {}, need to setup boundary condtions.", s.str());
-            }
-          default:
-            {
-              std::stringstream s{};
-              s << cell;
-              Igor::Panic("Unknown index type with value {} for cell {}.", idx, s.str());
-            }
-        }
+        Igor::Panic("Unknown cell type with variant index {}", grid.m_cells[idx].value.index());
+        std::unreachable();
       }
+    } else if (cell.is_cut()) {
+      Igor::Todo("Flux for cut cells is not implemented yet.");
       std::unreachable();
     } else {
-      Igor::Todo("Not implemented for DIM={}", DIM);
+      Igor::Panic("Unknown cell type with variant index {}", cell.value.index());
+      std::unreachable();
     }
   }
 
+  // -----------------------------------------------------------------------------------------------
+  template <typename Float, size_t DIM>
+  requires(DIM > 1)
+  [[nodiscard]] constexpr auto apply_flux(const Grid<Float, DIM>& grid,
+                                          const auto& cell,
+                                          Side side) const noexcept -> Eigen::Vector<Float, DIM> {
+    (void)grid;
+    (void)cell;
+    (void)side;
+    Igor::Todo("Not implemented for DIM={}", DIM);
+    std::unreachable();
+  }
+
  public:
+  // -----------------------------------------------------------------------------------------------
   constexpr Solver(FluxX F, FluxY G)
       : m_numerical_flux_x(std::move(F)),
         m_numerical_flux_y(std::move(G)) {}
 
+  // -----------------------------------------------------------------------------------------------
   template <typename Float, std::size_t DIM, typename GridWriter, typename TimeWriter>
   auto solve(Grid<Float, DIM> grid,
              Float tend,
@@ -93,14 +144,10 @@ class Solver {
         auto& next_cell       = grid_next.m_cells[i];
 
         if constexpr (DIM == 1) {
-          const auto F_minus =
-              apply_flux(grid_curr, m_numerical_flux_x, curr_cell.left_idx, curr_cell, false);
-          const auto F_plus =
-              apply_flux(grid_curr, m_numerical_flux_x, curr_cell.right_idx, curr_cell, true);
-          const auto G_minus =
-              apply_flux(grid_curr, m_numerical_flux_y, curr_cell.bottom_idx, curr_cell, false);
-          const auto G_plus =
-              apply_flux(grid_curr, m_numerical_flux_y, curr_cell.top_idx, curr_cell, true);
+          const auto F_minus = apply_flux(grid_curr, curr_cell, LEFT);
+          const auto F_plus  = apply_flux(grid_curr, curr_cell, RIGHT);
+          const auto G_minus = apply_flux(grid_curr, curr_cell, BOTTOM);
+          const auto G_plus  = apply_flux(grid_curr, curr_cell, TOP);
 
           assert(curr_cell.is_cartesian() && "Non-cartesian cell is not implemented.");
           const auto& curr_cell_value = std::get<CartesianValue<Float, DIM>>(curr_cell.value).value;
@@ -130,7 +177,7 @@ class Solver {
 
     return grid_curr;
   }
-};
+};  // namespace Zap::CellBased
 
 }  // namespace Zap::CellBased
 

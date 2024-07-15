@@ -253,24 +253,12 @@ auto operator<<(std::ostream& out,
 
   out << double_indent << ".type = ";
   switch (cut_value.type) {
-    case CutType::BOTTOM_LEFT:
-      out << "BOTTOM_LEFT";
-      break;
-    case CutType::BOTTOM_RIGHT:
-      out << "BOTTOM_RIGHT";
-      break;
-    case CutType::TOP_RIGHT:
-      out << "TOP_RIGHT";
-      break;
-    case CutType::TOP_LEFT:
-      out << "TOP_LEFT";
-      break;
-    case CutType::MIDDLE_HORI:
-      out << "MIDDLE_HORI";
-      break;
-    case CutType::MIDDLE_VERT:
-      out << "MIDDLE_VERT";
-      break;
+    case CutType::BOTTOM_LEFT:  out << "BOTTOM_LEFT"; break;
+    case CutType::BOTTOM_RIGHT: out << "BOTTOM_RIGHT"; break;
+    case CutType::TOP_RIGHT:    out << "TOP_RIGHT"; break;
+    case CutType::TOP_LEFT:     out << "TOP_LEFT"; break;
+    case CutType::MIDDLE_HORI:  out << "MIDDLE_HORI"; break;
+    case CutType::MIDDLE_VERT:  out << "MIDDLE_VERT"; break;
   }
   out << ',' << end_char;
 
