@@ -21,11 +21,12 @@ class FFmpeg {
   pid_t m_stream{};
 
  public:
-  [[nodiscard]] FFmpeg(size_t width, size_t height, const std::string& output_file) noexcept {
+  [[nodiscard]] FFmpeg(size_t width,
+                       size_t height,
+                       const std::string& output_file,
+                       size_t fps = 60) noexcept {
     std::array<int, 2> pipefd{};
-    if (pipe(pipefd.data()) == -1) {
-      Igor::Panic("Opening pipe failed: {}", std::strerror(errno));
-    }
+    if (pipe(pipefd.data()) == -1) { Igor::Panic("Opening pipe failed: {}", std::strerror(errno)); }
 
     m_child = fork();
     if (m_child == -1) {
@@ -47,6 +48,10 @@ class FFmpeg {
       static_assert(sizeof(Canvas::PixelType) == 24UZ / 8UZ,
                     "FFmpeg assumes that the pixels are in the rgb24 format, but the size of the "
                     "pixel datatype of the canvas is too large.");
+
+      assert(fps > 0);
+      const auto FPS = std::to_string(fps);
+
       // clang-format off
     int ret = execlp("ffmpeg", // NOLINT
         "ffmpeg",
@@ -55,8 +60,9 @@ class FFmpeg {
         "-f", "rawvideo",
         "-pix_fmt", "rgb24",
         "-s", resolution.c_str(),
-        "-r", "60",
+        "-r", FPS.c_str(),
         "-blocksize", blocksize.c_str(),
+        "-probesize", "10M",
         "-i", "-",
         "-c:v", "libx264",
         "-b:v", "3500k",
@@ -65,9 +71,7 @@ class FFmpeg {
         static_cast<const char*>(nullptr));
       // clang-format on
 
-      if (ret == -1) {
-        Igor::Panic("An error occured in `execlp`: {}", std::strerror(errno));
-      }
+      if (ret == -1) { Igor::Panic("An error occured in `execlp`: {}", std::strerror(errno)); }
     } else {
       if (close(pipefd[READ_END]) == -1) {
         Igor::Panic("Could not close read end of pipe in parent process: {}", std::strerror(errno));

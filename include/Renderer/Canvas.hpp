@@ -122,6 +122,11 @@ class Canvas {
       return false;
     }
 
+    return set_font_size(font_size);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto set_font_size(FT_F26Dot6 font_size) noexcept -> bool {
     if (const auto err = FT_Set_Char_Size(m_ft_face, 0, font_size * 64L, 400, 400);
         err != FT_Err_Ok) {
       Igor::Warn("Could not set char size: Error code {}.", err);
@@ -214,7 +219,7 @@ class Canvas {
     // }
 
     glyph_box = {
-        .col    = hori_pos + g_bear_x,
+        .col    = text_box.col + hori_pos + g_bear_x,
         .row    = text_box.row + above_line_height - g_bear_y,
         .width  = g_width,
         .height = g_height,
@@ -259,9 +264,7 @@ class Canvas {
     std::vector<Box> glyph_boxes(str.size());
     std::vector<GlyphWrapper> glyphs(str.size());
     for (size_t idx = 0; idx < str.size(); ++idx) {
-      if (!load_letter(str[idx])) {
-        return false;
-      }
+      if (!load_letter(str[idx])) { return false; }
       const auto& glyph = m_ft_face->glyph;
 
       if (!get_gylph_box(box, glyph, length, glyph_boxes[idx])) {
@@ -317,9 +320,7 @@ class Canvas {
     }
 
     const auto buffer_idx = [&](size_t row, size_t col) constexpr noexcept -> size_t {
-      if (is_y_upwards) {
-        row = box.height - 1UZ - row;
-      }
+      if (is_y_upwards) { row = box.height - 1UZ - row; }
 
       if (is_row_major) {
         return col + row * box.width;
@@ -547,9 +548,7 @@ class Canvas {
         const auto& p = points[i];
         const auto v  = n.col * (static_cast<int64_t>(col) - static_cast<int64_t>(p.col)) +
                        n.row * (static_cast<int64_t>(row) - static_cast<int64_t>(p.row));
-        if (v > 0) {
-          return false;
-        }
+        if (v > 0) { return false; }
       }
       return true;
     };
@@ -612,13 +611,9 @@ class Canvas {
           is_y_upwards ? bounding_box.row + (bounding_box.height - static_cast<size_t>(row) - 1UZ)
                        : bounding_box.row + static_cast<size_t>(row);
       m_data[get_idx(c_col, c_row)] = color;
-      if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) {
-        break;
-      }
+      if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) { break; }
 
-      if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) {
-        break;
-      }
+      if (static_cast<size_t>(col) == p2.col && static_cast<size_t>(row) == p2.row) { break; }
       int err2 = 2 * err;
       if (err2 > drow) {
         err += drow;
@@ -653,9 +648,7 @@ class Canvas {
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto to_ppm(std::string filename) const noexcept -> bool {
-    if (!filename.ends_with(".ppm")) {
-      filename += ".ppm";
-    }
+    if (!filename.ends_with(".ppm")) { filename += ".ppm"; }
 
     std::ofstream out(filename);
     if (!out) {

@@ -4,7 +4,8 @@ find_package(OpenMP REQUIRED)
 
 set(executables
   run_solver
-  run_cell_based
+  cell_solver_1d
+  cell_solver_2d
 )
 
 foreach(exec ${executables})

@@ -53,6 +53,12 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto to_mat_idx(size_t i) const noexcept -> std::pair<size_t, size_t> {
+    assert(i < m_cells.size());
+    return std::make_pair(i % m_nx, i / m_nx);
+  }
+
+  // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto to_corner_idx(size_t xi,
                                              size_t yi) const noexcept -> m_CornerIndices {
     assert(xi < m_nx);
@@ -230,22 +236,62 @@ class Grid {
   constexpr void fill_four_point(FUNC f) noexcept {
     for (auto& cell : m_cells) {
       if (cell.is_cartesian()) {
-        auto& value = cell.get_cartesian();
+        auto& value = cell.get_cartesian().value;
         if constexpr (DIM == 1) {
-          value(0) = (f(cell.x_min + cell.dx / 3, cell.y_min + cell.dy / 3) +
-                      f(cell.x_min + 2 * cell.dx / 3, cell.y_min + cell.dy / 3) +
-                      f(cell.x_min + cell.dx / 3, cell.y_min + 2 * cell.dy / 3) +
-                      f(cell.x_min + 2 * cell.dx / 3, cell.y_min + 2 * cell.dy / 3)) /
+          value(0) = (f(cell.x_min + cell.dx / 4, cell.y_min + cell.dy / 4) +
+                      f(cell.x_min + 3 * cell.dx / 4, cell.y_min + cell.dy / 4) +
+                      f(cell.x_min + cell.dx / 4, cell.y_min + 3 * cell.dy / 4) +
+                      f(cell.x_min + 3 * cell.dx / 4, cell.y_min + 3 * cell.dy / 4)) /
                      4;
         } else {
-          value = (f(cell.x_min + cell.dx / 3, cell.y_min + cell.dy / 3) +
-                   f(cell.x_min + 2 * cell.dx / 3, cell.y_min + cell.dy / 3) +
-                   f(cell.x_min + cell.dx / 3, cell.y_min + 2 * cell.dy / 3) +
-                   f(cell.x_min + 2 * cell.dx / 3, cell.y_min + 2 * cell.dy / 3)) /
+          value = (f(cell.x_min + cell.dx / 4, cell.y_min + cell.dy / 4) +
+                   f(cell.x_min + 3 * cell.dx / 4, cell.y_min + cell.dy / 4) +
+                   f(cell.x_min + cell.dx / 4, cell.y_min + 3 * cell.dy / 4) +
+                   f(cell.x_min + 3 * cell.dx / 4, cell.y_min + 3 * cell.dy / 4)) /
                   4;
         }
+      } else if (cell.is_cut()) {
+        auto& cut_value = cell.get_cut();
+
+        // Left side
+        {
+          const auto corners = get_left_points<m_Cell, Float>(cell);
+
+          for (size_t j = 0; j < corners.size(); ++j) {
+            Eigen::Vector<Float, 2> point = Eigen::Vector<Float, 2>::Zero();
+            for (size_t i = 0; i < corners.size(); ++i) {
+              point += (1 + (i == j)) * corners[i] / (corners.size() + 1);
+            }
+
+            if constexpr (DIM == 1) {
+              cut_value.left_value(0) += f(point(0), point(1));
+            } else {
+              cut_value.left_value += f(point(0), point(1));
+            }
+          }
+          cut_value.left_value /= static_cast<Float>(corners.size());
+        }
+
+        // Right side
+        {
+          const auto corners = get_right_points<m_Cell, Float>(cell);
+
+          for (size_t j = 0; j < corners.size(); ++j) {
+            Eigen::Vector<Float, 2> point = Eigen::Vector<Float, 2>::Zero();
+            for (size_t i = 0; i < corners.size(); ++i) {
+              point += (1 + (i == j)) * corners[i] / (corners.size() + 1);
+            }
+
+            if constexpr (DIM == 1) {
+              cut_value.right_value(0) += f(point(0), point(1));
+            } else {
+              cut_value.right_value += f(point(0), point(1));
+            }
+          }
+          cut_value.right_value /= static_cast<Float>(corners.size());
+        }
       } else {
-        Igor::Todo("Only cartesian cells are implemented.");
+        Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
       }
     }
   }
@@ -343,12 +389,8 @@ class Grid {
         } else {
           const auto t_mid = (t_upper + t_lower) / 2;
           switch (t_location(t_mid, cell, t)) {
-            case T_BELOW_EXIT:
-              t_lower = t_mid;
-              break;
-            case T_ABOVE_EXIT:
-              t_upper = t_mid;
-              break;
+            case T_BELOW_EXIT: t_lower = t_mid; break;
+            case T_ABOVE_EXIT: t_upper = t_mid; break;
             case T_IS_EXIT:
               t          = t_mid;
               found_exit = true;
@@ -359,9 +401,7 @@ class Grid {
       const auto next_pos = init_shock(t);
       entry_points.push_back(next_pos);
 
-      if (approx_eq(t, Float{1})) {
-        break;
-      }
+      if (approx_eq(t, Float{1})) { break; }
 
       const int on_x = approx_eq(cell.x_min, next_pos(X)) * ON_MIN +
                        approx_eq(cell.x_min + cell.dx, next_pos(X)) * ON_MAX;
@@ -482,24 +522,12 @@ class Grid {
 
       CutType type;
       switch (cut1_loc | cut2_loc) {
-        case LEFT | BOTTOM:
-          type = CutType::BOTTOM_LEFT;
-          break;
-        case BOTTOM | RIGHT:
-          type = CutType::BOTTOM_RIGHT;
-          break;
-        case RIGHT | TOP:
-          type = CutType::TOP_RIGHT;
-          break;
-        case TOP | LEFT:
-          type = CutType::TOP_LEFT;
-          break;
-        case LEFT | RIGHT:
-          type = CutType::MIDDLE_HORI;
-          break;
-        case BOTTOM | TOP:
-          type = CutType::MIDDLE_VERT;
-          break;
+        case LEFT | BOTTOM:  type = CutType::BOTTOM_LEFT; break;
+        case BOTTOM | RIGHT: type = CutType::BOTTOM_RIGHT; break;
+        case RIGHT | TOP:    type = CutType::TOP_RIGHT; break;
+        case TOP | LEFT:     type = CutType::TOP_LEFT; break;
+        case LEFT | RIGHT:   type = CutType::MIDDLE_HORI; break;
+        case BOTTOM | TOP:   type = CutType::MIDDLE_VERT; break;
         default:
           Igor::Panic("Invalid combination cut1_loc = {} and cut2_loc = {}",
                       static_cast<std::underlying_type_t<Side>>(cut1_loc),
@@ -584,9 +612,7 @@ class Grid {
                 (!in_cell && (r < Float{0})));  // If not in cell, then r < 0
       };
       const auto update_r = [r_condition](Float& r, Float prop_r) {
-        if (r_condition(prop_r) && std::abs(r) > std::abs(prop_r)) {
-          r = prop_r;
-        }
+        if (r_condition(prop_r) && std::abs(r) > std::abs(prop_r)) { r = prop_r; }
       };
       Float r = std::numeric_limits<Float>::infinity();
       if (der(X) != Float{0}) {
@@ -616,9 +642,7 @@ class Grid {
       if (pos_on_boundary(next_pos, cell)) {
         entry_points.push_back(next_pos);
 
-        if (finished_iteration(ad::value(t_ad))) {
-          break;
-        }
+        if (finished_iteration(ad::value(t_ad))) { break; }
 
         const int on_x = approx_eq(cell.x_min, next_pos(X)) * ON_MIN +
                          approx_eq(cell.x_min + cell.dx, next_pos(X)) * ON_MAX;
@@ -686,24 +710,12 @@ class Grid {
 
       CutType type;
       switch (cut1_loc | cut2_loc) {
-        case LEFT | BOTTOM:
-          type = CutType::BOTTOM_LEFT;
-          break;
-        case BOTTOM | RIGHT:
-          type = CutType::BOTTOM_RIGHT;
-          break;
-        case RIGHT | TOP:
-          type = CutType::TOP_RIGHT;
-          break;
-        case TOP | LEFT:
-          type = CutType::TOP_LEFT;
-          break;
-        case LEFT | RIGHT:
-          type = CutType::MIDDLE_HORI;
-          break;
-        case BOTTOM | TOP:
-          type = CutType::MIDDLE_VERT;
-          break;
+        case LEFT | BOTTOM:  type = CutType::BOTTOM_LEFT; break;
+        case BOTTOM | RIGHT: type = CutType::BOTTOM_RIGHT; break;
+        case RIGHT | TOP:    type = CutType::TOP_RIGHT; break;
+        case TOP | LEFT:     type = CutType::TOP_LEFT; break;
+        case LEFT | RIGHT:   type = CutType::MIDDLE_HORI; break;
+        case BOTTOM | TOP:   type = CutType::MIDDLE_VERT; break;
         default:
           Igor::Panic("Invalid combination cut1_loc = {} and cut2_loc = {}",
                       static_cast<std::underlying_type_t<Side>>(cut1_loc),
@@ -747,8 +759,38 @@ class Grid {
             }
           });
     } else {
-      Igor::Todo("Not implemented for DIM={}", DIM);
-      return 0;
+      assert(m_cells.size() > 0);
+      return std::transform_reduce(
+          std::cbegin(m_cells),
+          std::cend(m_cells),
+          Float{0},
+          [](const auto& a, const auto& b) { return std::max(a, b); },
+          [](const m_Cell& cell) {
+            if (cell.is_cartesian()) {
+              return std::transform_reduce(
+                  std::cbegin(cell.get_cartesian().value),
+                  std::cend(cell.get_cartesian().value),
+                  Float{0},
+                  [](const auto& a, const auto& b) { return std::max(a, b); },
+                  [](const auto& a) { return std::abs(a); });
+            } else if (cell.is_cut()) {
+              return std::max(std::transform_reduce(
+                                  std::cbegin(cell.get_cut().left_value),
+                                  std::cend(cell.get_cut().left_value),
+                                  Float{0},
+                                  [](const auto& a, const auto& b) { return std::max(a, b); },
+                                  [](const auto& a) { return std::abs(a); }),
+                              std::transform_reduce(
+                                  std::cbegin(cell.get_cut().right_value),
+                                  std::cend(cell.get_cut().right_value),
+                                  Float{0},
+                                  [](const auto& a, const auto& b) { return std::max(a, b); },
+                                  [](const auto& a) { return std::abs(a); }));
+            } else {
+              Igor::Panic("Unknown variant entry with index {}", cell.value.index());
+              std::unreachable();
+            }
+          });
     }
   }
 
@@ -813,6 +855,18 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto is_left(size_t idx) const noexcept -> bool {
+    const auto [xi, yi] = to_mat_idx(idx);
+    return xi == 0;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto is_bottom(size_t idx) const noexcept -> bool {
+    const auto [xi, yi] = to_mat_idx(idx);
+    return yi == 0;
+  }
+
+  // -----------------------------------------------------------------------------------------------
   constexpr void dump_cells(std::ostream& out) const noexcept {
     for (size_t i = 0; i < m_cells.size(); ++i) {
       const auto& cell = m_cells[i];
@@ -826,7 +880,10 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename F, typename G>
+  // template <typename, typename>
+  // friend class Solver;
+
+  template <typename, typename, typename, typename>
   friend class Solver;
 
   template <Zap::IO::VTKFormat F>

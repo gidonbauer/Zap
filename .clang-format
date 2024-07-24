@@ -25,6 +25,9 @@ AlignConsecutiveShortCaseStatements:
   AcrossComments: true
   AlignCaseColons: false
 
+AllowShortBlocksOnASingleLine: Always
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+
 PackConstructorInitializers: Never
 BreakConstructorInitializers: BeforeColon
 
