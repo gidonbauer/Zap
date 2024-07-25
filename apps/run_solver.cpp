@@ -2,7 +2,7 @@
 #include "Scalar/BoundaryConditions.hpp"
 #include "Scalar/Solver.hpp"
 
-#define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR)
+#define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "mat_based/"
 
 auto main(int argc, char** argv) -> int {
   if (argc < 3) {
@@ -22,9 +22,7 @@ auto main(int argc, char** argv) -> int {
     if (end != cstr + std::strlen(cstr)) {  // NOLINT
       Igor::Panic("String `{}` contains non-digits.", cstr);
     }
-    if (val == 0UL) {
-      Igor::Panic("Could not parse string `{}` to size_t.", cstr);
-    }
+    if (val == 0UL) { Igor::Panic("Could not parse string `{}` to size_t.", cstr); }
     if (val == std::numeric_limits<unsigned long>::max()) {
       Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
     }
