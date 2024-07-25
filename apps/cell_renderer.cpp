@@ -292,10 +292,10 @@ template <typename Float, size_t DIM>
         if (args.same_range) {
           const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
           const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-          c = Rd::float_to_rgb(cell.get_cartesian().value(solution_idx), *total_min, *total_max);
+          c = Rd::float_to_rgb(cell.get_cut().left_value(solution_idx), *total_min, *total_max);
         } else {
           c = Rd::float_to_rgb(
-              cell.get_cartesian().value(solution_idx), min(solution_idx), max(solution_idx));
+              cell.get_cut().left_value(solution_idx), min(solution_idx), max(solution_idx));
         }
 
         if (!canvas.draw_polygon(canvas_points, graph_box, c, true)) {
@@ -323,10 +323,10 @@ template <typename Float, size_t DIM>
         if (args.same_range) {
           const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
           const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-          c = Rd::float_to_rgb(cell.get_cartesian().value(solution_idx), *total_min, *total_max);
+          c = Rd::float_to_rgb(cell.get_cut().right_value(solution_idx), *total_min, *total_max);
         } else {
           c = Rd::float_to_rgb(
-              cell.get_cartesian().value(solution_idx), min(solution_idx), max(solution_idx));
+              cell.get_cut().right_value(solution_idx), min(solution_idx), max(solution_idx));
         }
 
         if (!canvas.draw_polygon(canvas_points, graph_box, c, true)) {

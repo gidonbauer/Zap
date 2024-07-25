@@ -62,10 +62,10 @@ class FFmpeg {
         "-s", resolution.c_str(),
         "-r", FPS.c_str(),
         "-blocksize", blocksize.c_str(),
-        "-probesize", "10M",
+        "-probesize", "50M",
         "-i", "-",
         "-c:v", "libx264",
-        "-b:v", "3500k",
+        "-b:v", "5500k",
         "-pix_fmt", "yuv420p",
         output_file.c_str(),
         static_cast<const char*>(nullptr));
