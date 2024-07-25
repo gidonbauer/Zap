@@ -31,7 +31,12 @@ class Solver {
   solve(Grid<Float, DIM> grid,
         Float tend,
         GridWriter& grid_writer,
-        TimeWriter& time_writer) noexcept -> std::optional<Grid<Float, DIM>> {
+        TimeWriter& time_writer,
+        Float CFL_safety_factor = 0.5) noexcept -> std::optional<Grid<Float, DIM>> {
+    using VecOrScalar = std::conditional_t<DIM == 1, Float, Eigen::Vector<Float, DIM>>;
+    using MatOrScalar = std::conditional_t<DIM == 1, Float, Eigen::Matrix<Float, DIM, DIM>>;
+
+    assert(CFL_safety_factor > 0 && CFL_safety_factor <= 1);  // Must be in (0, 1]
     auto& grid_curr = grid;
     auto grid_next  = grid;
 
@@ -45,7 +50,6 @@ class Solver {
         Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
         return std::nullopt;
       }
-      constexpr Float CFL_safety_factor = 0.25;  // Must be in (0, 1]
       const Float dt = std::min(CFL_safety_factor * grid_curr.min_delta() / CFL_factor, tend - t);
 
       // TODO: Move shock in next grid
@@ -55,241 +59,377 @@ class Solver {
       for (size_t i = 0; i < grid_curr.m_cells.size(); ++i) {
         const auto& curr_cell = grid_curr.m_cells[i];
         auto& next_cell       = grid_next.m_cells[i];
-        assert(curr_cell.is_cartesian());
-        assert(next_cell.is_cartesian());
 
-        using FluxType       = std::conditional_t<DIM == 1, Float, Eigen::Vector<Float, DIM>>;
-        using EigType        = std::conditional_t<DIM == 1, Float, Eigen::Matrix<Float, DIM, DIM>>;
-        auto linearized_flux = [](const Cell<Float, DIM>& curr_cell,
-                                  const Cell<Float, DIM>& other_cell,
-                                  auto get_eig_vals,
-                                  auto get_eig_vecs,
-                                  bool from_left_or_bottom) -> FluxType {
-          assert(curr_cell.is_cartesian());
-          assert(other_cell.is_cartesian());
+        auto get_u_mid = [](const Eigen::Vector<Float, DIM>& lhs_value,
+                            const Eigen::Vector<Float, DIM>& rhs_value) -> VecOrScalar {
+          if constexpr (DIM == 1) {
+            return (lhs_value(0) + rhs_value(0)) / 2;
+          } else {
+            return (lhs_value + rhs_value) / 2;
+          }
+        };
 
-          const auto u_mid = [&] -> FluxType {
-            if constexpr (DIM == 1) {
-              return (curr_cell.get_cartesian().value(0) + other_cell.get_cartesian().value(0)) / 2;
-            } else {
-              return (curr_cell.get_cartesian().value + other_cell.get_cartesian().value) / 2;
-            }
-          }();
-          EigType eig_vals = get_eig_vals(u_mid);
-          EigType eig_vecs = get_eig_vecs(u_mid);
+        auto linearized_xy_flux_impl = [this,
+                                        get_u_mid](const Eigen::Vector<Float, DIM>& curr_value,
+                                                   const Eigen::Vector<Float, DIM>& other_value,
+                                                   Float factor,
+                                                   Side from) -> VecOrScalar {
+          const auto u_mid     = get_u_mid(curr_value, other_value);
+          MatOrScalar eig_vals = (from & (LEFT | RIGHT)) > 0 ? m_eig_vals_x(u_mid)  //
+                                                             : m_eig_vals_y(u_mid);
+          MatOrScalar eig_vecs = (from & (LEFT | RIGHT)) > 0 ? m_eig_vecs_x(u_mid)  //
+                                                             : m_eig_vecs_y(u_mid);
 
+          // Scalar case -------------------------------------------------------------------------
           if constexpr (DIM == 1) {
             if (std::abs(eig_vals) < 1e-8) { return Float{0}; }
 
             assert(std::abs(eig_vecs) > 1e-8);
-            if (from_left_or_bottom) {
+            if ((from & (LEFT | BOTTOM)) > 0) {
               const auto A_plus = eig_vals > 0 ? eig_vecs * eig_vals / eig_vecs : 0;
-              return -A_plus *
-                     (curr_cell.get_cartesian().value(0) - other_cell.get_cartesian().value(0));
+              return -A_plus * factor * (curr_value(0) - other_value(0));
             } else {
               const auto A_minus = eig_vals < 0 ? eig_vecs * eig_vals / eig_vecs : 0;
-              return A_minus *
-                     (other_cell.get_cartesian().value(0) - curr_cell.get_cartesian().value(0));
+              return A_minus * factor * (other_value(0) - curr_value(0));
             }
-          } else {
+          }
+          // Vector case -------------------------------------------------------------------------
+          else {
             bool all_zero = true;
             for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
               if (std::abs(eig_vals(i, i)) >= 1e-6) { all_zero = false; }
             }
-            if (all_zero) { return FluxType::Zero(); }
+            if (all_zero) { return VecOrScalar::Zero(); }
 
-            if (!(std::abs(eig_vecs.determinant()) >= 1e-8)) {
-              std::cerr << "u_mid = " << u_mid.transpose() << '\n';
-              std::cerr << "eig_vals =\n" << eig_vals << '\n';
-              std::cerr << "eig_vecs =\n" << eig_vecs << '\n';
-              std::cerr << "det(eig_vecs) = " << eig_vecs.determinant() << '\n';
-            }
             assert(std::abs(eig_vecs.determinant()) >= 1e-8);
-            if (from_left_or_bottom) {
+            if ((from & (LEFT | BOTTOM)) > 0) {
               for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
                 eig_vals(i, i) = eig_vals(i, i) > 0 ? eig_vals(i, i) : 0;
               }
-
-              // const auto A_plus = (eigvecs * eigvals * eigvecs.transpose()).eval();
               const auto A_plus = (eig_vecs * eig_vals * eig_vecs.inverse()).eval();
-              return (-A_plus *
-                      (curr_cell.get_cartesian().value - other_cell.get_cartesian().value))
-                  .eval();
+              return -A_plus * factor * (curr_value - other_value);
             } else {
               for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
                 eig_vals(i, i) = eig_vals(i, i) < 0 ? eig_vals(i, i) : 0;
               }
-
-              // const auto A_minus = (eigvecs * eigvals * eigvecs.transpose()).eval();
               const auto A_minus = (eig_vecs * eig_vals * eig_vecs.inverse()).eval();
-              return (A_minus *
-                      (other_cell.get_cartesian().value - curr_cell.get_cartesian().value))
-                  .eval();
+              return A_minus * factor * (other_value - curr_value);
             }
           }
         };
 
-        // Left side: U_(i, j-1) -> U_(i, j)
-        assert(grid_curr.is_cell(curr_cell.left_idx));
-        const auto F_minus = linearized_flux(
-            curr_cell, grid_curr.m_cells[curr_cell.left_idx], m_eig_vals_x, m_eig_vecs_x, true);
+        // curr_cell must be cartesian, cut cells are handled differently
+        auto linearized_xy_flux = [dt, linearized_xy_flux_impl](const Cell<Float, DIM>& curr_cell,
+                                                                const Cell<Float, DIM>& other_cell,
+                                                                Side from) -> VecOrScalar {
+          assert(from == LEFT || from == BOTTOM || from == RIGHT || from == TOP);
+          assert(curr_cell.is_cartesian());
+          assert(other_cell.is_cartesian() || other_cell.is_cut());
 
-        // Right side: U_(i, j) -> U_(i, j+1)
-        assert(grid_curr.is_cell(curr_cell.right_idx));
-        const auto F_plus = linearized_flux(
-            curr_cell, grid_curr.m_cells[curr_cell.right_idx], m_eig_vals_x, m_eig_vecs_x, false);
+          if (other_cell.is_cartesian()) {
+            const auto factor = (from & (LEFT | RIGHT)) > 0 ? (dt / curr_cell.dx)  //
+                                                            : (dt / curr_cell.dy);
+            return linearized_xy_flux_impl(
+                curr_cell.get_cartesian().value, other_cell.get_cartesian().value, factor, from);
+          } else {
+            {
+              std::stringstream s{};
+              s << curr_cell;
+              Igor::Debug("curr_cell = {}", s.str());
+            }
+            {
+              std::stringstream s{};
+              s << other_cell;
+              Igor::Debug("other_cell = {}", s.str());
+            }
 
-        // Bottom side: U_(i-1, j) -> U_(i, j)
-        assert(grid_curr.is_cell(curr_cell.bottom_idx));
-        const auto G_minus = linearized_flux(
-            curr_cell, grid_curr.m_cells[curr_cell.bottom_idx], m_eig_vals_y, m_eig_vecs_y, true);
+            switch (other_cell.get_cut().type) {
+              // - BOTTOM_LEFT ---------------------------------------------------------------------
+              case CutType::BOTTOM_LEFT:
+                {
+                  switch (from) {
+                    case LEFT:
+                      {
+                        const auto factor = dt / curr_cell.dx;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().right_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case RIGHT:
+                      {
+                        Igor::Todo("Cut type BOTTOM_LEFT not implemented for RIGHT yet.");
+                      }
+                      break;
+                    case BOTTOM:
+                      {
+                        const auto factor = dt / curr_cell.dy;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().right_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case TOP:
+                      {
+                        Igor::Todo("Cut type BOTTOM_LEFT not implemented for TOP yet.");
+                      }
+                      break;
+                    case ALL: std::unreachable();  // To silence warning
+                  }
+                }
+                break;
 
-        // Top side: U_(i, j) -> U_(i+1, j)
-        assert(grid_curr.is_cell(curr_cell.top_idx));
-        const auto G_plus = linearized_flux(
-            curr_cell, grid_curr.m_cells[curr_cell.top_idx], m_eig_vals_y, m_eig_vecs_y, false);
+              // - BOTTOM_RIGHT --------------------------------------------------------------------
+              case CutType::BOTTOM_RIGHT:
+                {
+                  switch (from) {
+                    case LEFT:
+                      {
+                        Igor::Todo("Cut type BOTTOM_RIGHT not implemented for LEFT yet.");
+                      }
+                      break;
+                    case RIGHT:
+                      {
+                        Igor::Todo("Cut type BOTTOM_RIGHT not implemented for RIGHT yet.");
+                      }
+                      break;
+                    case BOTTOM:
+                      {
+                        Igor::Todo("Cut type BOTTOM_RIGHT not implemented for BOTTOM yet.");
+                      }
+                      break;
+                    case TOP:
+                      {
+                        Igor::Todo("Cut type BOTTOM_RIGHT not implemented for TOP yet.");
+                      }
+                      break;
+                    case ALL: std::unreachable();  // To silence warning
+                  }
+                }
+                break;
 
-        // Left side: U_(i, j-1) -> U_(i, j)
-        // const auto F_minus = [&] -> FluxType {
-        //   assert(grid_curr.is_cell(curr_cell.left_idx));
-        //   const auto& left_cell = grid_curr.m_cells[curr_cell.left_idx];
-        //   assert(left_cell.is_cartesian());
-        //   const auto u_mid = [&] -> FluxType {
-        //     if constexpr (DIM == 1) {
-        //       return (curr_cell.get_cartesian().value(0) + left_cell.get_cartesian().value(0)) /
-        //       2;
-        //     } else {
-        //       return (curr_cell.get_cartesian().value + left_cell.get_cartesian().value) / 2;
-        //     }
-        //   }();
+              // - TOP_RIGHT -----------------------------------------------------------------------
+              case CutType::TOP_RIGHT:
+                {
+                  switch (from) {
+                    case LEFT:
+                      {
+                        Igor::Todo("Cut type TOP_RIGHT not implemented for LEFT yet.");
+                      }
+                      break;
+                    case RIGHT:
+                      {
+                        const auto factor = dt / curr_cell.dx;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().left_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case BOTTOM:
+                      {
+                        Igor::Todo("Cut type TOP_RIGHT not implemented for BOTTOM yet.");
+                      }
+                      break;
+                    case TOP:
+                      {
+                        const auto factor = dt / curr_cell.dy;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().left_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case ALL: std::unreachable();  // To silence warning
+                  }
+                }
+                break;
 
-        //   auto eigvals = m_eig_vals_x(u_mid);
-        //   auto eigvecs = m_eig_vecs_x(u_mid);
+              // - TOP_LEFT ------------------------------------------------------------------------
+              case CutType::TOP_LEFT:
+                {
+                  switch (from) {
+                    case LEFT:
+                      {
+                        Igor::Todo("Cut type TOP_LEFT not implemented for LEFT yet.");
+                      }
+                      break;
+                    case RIGHT:
+                      {
+                        Igor::Todo("Cut type TOP_LEFT not implemented for RIGHT yet.");
+                      }
+                      break;
+                    case BOTTOM:
+                      {
+                        Igor::Todo("Cut type TOP_LEFT not implemented for BOTTOM yet.");
+                      }
+                      break;
+                    case TOP:
+                      {
+                        Igor::Todo("Cut type TOP_LEFT not implemented for TOP yet.");
+                      }
+                      break;
+                    case ALL: std::unreachable();  // To silence warning
+                  }
+                }
+                break;
 
-        //   if constexpr (DIM == 1) {
-        //     const auto A_plus = eigvals > 0 ? eigvecs * eigvals / eigvecs : 0;
-        //     return -A_plus *
-        //            (curr_cell.get_cartesian().value(0) - left_cell.get_cartesian().value(0));
-        //   } else {
-        //     for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        //       eigvals(i, i) = eigvals(i, i) > 0 ? eigvals(i, i) : 0;
-        //     }
-        //     // const auto A_plus = (eigvecs * eigvals * eigvecs.transpose()).eval();
-        //     const auto A_plus = (eigvecs * eigvals * eigvecs.inverse()).eval();
-        //     return (-A_plus * (curr_cell.get_cartesian().value -
-        //     left_cell.get_cartesian().value))
-        //         .eval();
-        //   }
-        // }();
+              // - MIDDLE_HORI ---------------------------------------------------------------------
+              case CutType::MIDDLE_HORI:
+                {
+                  switch (from) {
+                    case LEFT:
+                      {
+                        Igor::Todo("Cut type MIDDLE_HORI not implemented for LEFT yet.");
+                      }
+                      break;
+                    case RIGHT:
+                      {
+                        const auto dy_lower_half = other_cell.get_cut().y2_cut - other_cell.y_min;
+                        const auto factor_lower_half =
+                            (dy_lower_half / other_cell.dy) * dt / other_cell.dx;
+                        const auto factor_upper_half =
+                            (1 - (dy_lower_half / other_cell.dy)) * dt / other_cell.dx;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().left_value,
+                                                       factor_lower_half,
+                                                       from) +
+                               linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().right_value,
+                                                       factor_upper_half,
+                                                       from);
+                      }
+                      break;
+                    case BOTTOM:
+                      {
+                        const auto factor = dt / curr_cell.dy;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().right_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case TOP:
+                      {
+                        const auto factor = dt / curr_cell.dy;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().left_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case ALL: std::unreachable();  // To silence warning
+                  }
+                }
+                break;
 
-        // Left side: U_(i, j) -> U_(i, j+1)
-        // const auto F_plus = [&] -> FluxType {
-        //   assert(grid_curr.is_cell(curr_cell.right_idx));
-        //   const auto& right_cell = grid_curr.m_cells[curr_cell.right_idx];
-        //   assert(right_cell.is_cartesian());
-        //   const auto u_mid = [&] -> FluxType {
-        //     if constexpr (DIM == 1) {
-        //       return (curr_cell.get_cartesian().value(0) + right_cell.get_cartesian().value(0)) /
-        //       2;
-        //     } else {
-        //       return (curr_cell.get_cartesian().value + right_cell.get_cartesian().value) / 2;
-        //     }
-        //   }();
+              // - MIDDLE_VERT ---------------------------------------------------------------------
+              case CutType::MIDDLE_VERT:
+                {
+                  switch (from) {
+                    case LEFT:
+                      {
+                        const auto factor = dt / curr_cell.dx;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().right_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case RIGHT:
+                      {
+                        const auto factor = dt / curr_cell.dx;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().left_value,
+                                                       factor,
+                                                       from);
+                      }
+                      break;
+                    case BOTTOM:
+                      {
+                        Igor::Todo("Cut type MIDDLE_VERT not implemented for BOTTOM yet.");
+                      }
+                      break;
+                    case TOP:
+                      {
+                        const auto dx_left_half = other_cell.get_cut().x1_cut - other_cell.x_min;
+                        const auto factor_left_half =
+                            (dx_left_half / other_cell.dx) * dt / other_cell.dy;
+                        const auto factor_right_half =
+                            (1 - (dx_left_half / other_cell.dx)) * dt / other_cell.dy;
+                        return linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().left_value,
+                                                       factor_left_half,
+                                                       from) +
+                               linearized_xy_flux_impl(curr_cell.get_cartesian().value,
+                                                       other_cell.get_cut().right_value,
+                                                       factor_right_half,
+                                                       from);
+                      }
+                      break;
+                    case ALL: std::unreachable();  // To silence warning
+                  }
+                }
+                break;
 
-        //   auto eigvals = m_eig_vals_x(u_mid);
-        //   auto eigvecs = m_eig_vecs_x(u_mid);
+              // -----------------------------------------------------------------------------------
+              default:
+                Igor::Panic(
+                    "Unknown cut type with value {}",
+                    static_cast<std::underlying_type_t<CutType>>(other_cell.get_cut().type));
+                std::unreachable();
+            }
 
-        //   if constexpr (DIM == 1) {
-        //     const auto A_minus = eigvals < 0 ? eigvecs * eigvals / eigvecs : 0;
-        //     return A_minus *
-        //            (right_cell.get_cartesian().value(0) - curr_cell.get_cartesian().value(0));
-        //   } else {
-        //     for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        //       eigvals(i, i) = eigvals(i, i) < 0 ? eigvals(i, i) : 0;
-        //     }
-        //     // const auto A_minus = (eigvecs * eigvals * eigvecs.transpose()).eval();
-        //     const auto A_minus = (eigvecs * eigvals * eigvecs.inverse()).eval();
-        //     return (A_minus * (right_cell.get_cartesian().value -
-        //     curr_cell.get_cartesian().value))
-        //         .eval();
-        //   }
-        // }();
+            Igor::Panic("Unreachable.");
+            std::unreachable();
+          }
+        };
 
-        // Left side: U_(i-1, j) -> U_(i, j)
-        // const auto G_minus = [&] -> FluxType {
-        //   assert(grid_curr.is_cell(curr_cell.bottom_idx));
-        //   const auto& bottom_cell = grid_curr.m_cells[curr_cell.bottom_idx];
-        //   assert(bottom_cell.is_cartesian());
-        //   const auto u_mid = [&] -> FluxType {
-        //     if constexpr (DIM == 1) {
-        //       return (curr_cell.get_cartesian().value(0) + bottom_cell.get_cartesian().value(0))
-        //       /
-        //               2;
-        //     } else {
-        //       return (curr_cell.get_cartesian().value + bottom_cell.get_cartesian().value) / 2;
-        //     }
-        //   }();
+        if (curr_cell.is_cartesian()) {
+          // Left side: U_(i, j-1) -> U_(i, j)
+          assert(grid_curr.is_cell(curr_cell.left_idx));
+          const auto F_minus = linearized_xy_flux(curr_cell,  //
+                                                  grid_curr.m_cells[curr_cell.left_idx],
+                                                  LEFT);
 
-        //   auto eigvals = m_eig_vals_y(u_mid);
-        //   auto eigvecs = m_eig_vecs_y(u_mid);
+          // Right side: U_(i, j) -> U_(i, j+1)
+          assert(grid_curr.is_cell(curr_cell.right_idx));
+          const auto F_plus = linearized_xy_flux(curr_cell,  //
+                                                 grid_curr.m_cells[curr_cell.right_idx],
+                                                 RIGHT);
 
-        //   if constexpr (DIM == 1) {
-        //     const auto A_plus = eigvals > 0 ? eigvecs * eigvals / eigvecs : 0;
-        //     return -A_plus *
-        //             (curr_cell.get_cartesian().value(0) - bottom_cell.get_cartesian().value(0));
-        //   } else {
-        //     for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        //       eigvals(i, i) = eigvals(i, i) > 0 ? eigvals(i, i) : 0;
-        //     }
-        //     // const auto A_plus = (eigvecs * eigvals * eigvecs.transpose()).eval();
-        //     const auto A_plus = (eigvecs * eigvals * eigvecs.inverse()).eval();
-        //     return (-A_plus * (curr_cell.get_cartesian().value -
-        //     bottom_cell.get_cartesian().value))
-        //         .eval();
-        //   }
-        // }();
+          // Bottom side: U_(i-1, j) -> U_(i, j)
+          assert(grid_curr.is_cell(curr_cell.bottom_idx));
+          const auto G_minus = linearized_xy_flux(curr_cell,  //
+                                                  grid_curr.m_cells[curr_cell.bottom_idx],
+                                                  BOTTOM);
 
-        // Left side: U_(i, j) -> U_(i+1, j)
-        // const auto G_plus = [&] -> FluxType {
-        //   assert(grid_curr.is_cell(curr_cell.top_idx));
-        //   const auto& top_cell = grid_curr.m_cells[curr_cell.top_idx];
-        //   assert(top_cell.is_cartesian());
-        //   const auto u_mid = [&] -> FluxType {
-        //     if constexpr (DIM == 1) {
-        //       return (curr_cell.get_cartesian().value(0) + top_cell.get_cartesian().value(0)) /
-        //       2;
-        //     } else {
-        //       return (curr_cell.get_cartesian().value + top_cell.get_cartesian().value) / 2;
-        //     }
-        //   }();
+          // Top side: U_(i, j) -> U_(i+1, j)
+          assert(grid_curr.is_cell(curr_cell.top_idx));
+          const auto G_plus = linearized_xy_flux(curr_cell,  //
+                                                 grid_curr.m_cells[curr_cell.top_idx],
+                                                 TOP);
 
-        //   auto eigvals = m_eig_vals_y(u_mid);
-        //   auto eigvecs = m_eig_vecs_y(u_mid);
-
-        //   if constexpr (DIM == 1) {
-        //     const auto A_minus = eigvals < 0 ? eigvecs * eigvals / eigvecs : 0;
-        //     return A_minus *
-        //             (top_cell.get_cartesian().value(0) - curr_cell.get_cartesian().value(0));
-        //   } else {
-        //     for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        //       eigvals(i, i) = eigvals(i, i) < 0 ? eigvals(i, i) : 0;
-        //     }
-        //     // const auto A_minus = (eigvecs * eigvals * eigvecs.transpose()).eval();
-        //     const auto A_minus = (eigvecs * eigvals * eigvecs.inverse()).eval();
-        //     return (A_minus * (top_cell.get_cartesian().value - curr_cell.get_cartesian().value))
-        //         .eval();
-        //   }
-        // }();
-
-        assert(curr_cell.is_cartesian() && next_cell.is_cartesian());
-        if constexpr (DIM == 1) {
-          next_cell.get_cartesian().value(0) = curr_cell.get_cartesian().value(0) -
-                                               (dt / curr_cell.dx) * (F_plus - F_minus) -
-                                               (dt / curr_cell.dy) * (G_plus - G_minus);
+          if (next_cell.is_cartesian()) {
+            if constexpr (DIM == 1) {
+              next_cell.get_cartesian().value(0) = curr_cell.get_cartesian().value(0) -  //
+                                                   (F_plus - F_minus) -                  //
+                                                   (G_plus - G_minus);
+            } else {
+              next_cell.get_cartesian().value = curr_cell.get_cartesian().value -  //
+                                                (F_plus - F_minus) -               //
+                                                (G_plus - G_minus);
+            }
+          } else {
+            Igor::Todo("next_cell non-cartesian is not implemented yet.");
+          }
+        } else if (curr_cell.is_cut()) {
+          // Igor::Todo("Cut cells are not implemented yet.");
         } else {
-          next_cell.get_cartesian().value = curr_cell.get_cartesian().value -
-                                            (dt / curr_cell.dx) * (F_plus - F_minus) -
-                                            (dt / curr_cell.dy) * (G_plus - G_minus);
+          Igor::Warn("Unknown cell type with variant index {}", curr_cell.value.index());
+          return std::nullopt;
         }
       }
 

@@ -79,8 +79,8 @@ auto main(int argc, char** argv) -> int {
   // grid.same_value_boundary();
   grid.periodic_boundary();
 
-#define RAMP_X
-// #define QUARTER_CIRCLE
+// #define RAMP_X
+#define QUARTER_CIRCLE
 // #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
   auto u0 = [=](Float x, Float y) -> Eigen::Vector<Float, DIM> {
@@ -98,7 +98,7 @@ auto main(int argc, char** argv) -> int {
     };
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 4;
     return Eigen::Vector<T, 2>{
@@ -117,7 +117,7 @@ auto main(int argc, char** argv) -> int {
                               std::pow((x_min + x_max + y_min + y_max) / 8, 2));
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 8;
     return Eigen::Vector<T, 2>{
@@ -143,7 +143,7 @@ auto main(int argc, char** argv) -> int {
   //   };
   // };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     assert(t >= 0 && t <= 1);
     return Eigen::Vector<T, 2>{
         (x_max - x_min) / 2,
@@ -162,7 +162,7 @@ auto main(int argc, char** argv) -> int {
     }
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     static_assert(false, "Not implemented yet.");
     return Eigen::Vector<T, 2>::Zero();
   };
@@ -175,26 +175,6 @@ auto main(int argc, char** argv) -> int {
   grid.fill_four_point(u0);
 
   // grid.dump_cells(std::cout);
-
-#ifdef OLD_SOLVER
-  constexpr auto flux = [](const auto& u) constexpr noexcept {
-    return static_cast<Float>(0.5) * u * u;
-  };
-
-  // From LeVeque: Numerical Methods for Conservation Laws 2nd edition (13.24)
-  constexpr auto godunov_flux = [flux]<typename T>(const T& u_left,
-                                                   const T& u_right) constexpr noexcept -> T {
-    constexpr auto zero = static_cast<T>(0);
-    if (u_left <= u_right) {
-      // min u in [u_left, u_right] f(u) = 0.5 * u^2
-      if (u_left <= zero && u_right >= zero) { return flux(zero); }
-      return flux(std::min(std::abs(u_left), std::abs(u_right)));
-    }
-    // max u in [u_right, u_left] f(u) = 0.5 * u^2
-    return flux(std::max(std::abs(u_left), std::abs(u_right)));
-  };
-
-#endif  // OLD_SOLVER
 
   // Zap::IO::NoopWriter grid_writer{};
   // Zap::IO::VTKWriter<Zap::IO::VTKFormat::UNSTRUCTURED_GRID> grid_writer{OUTPUT_DIR "u_grid"};
@@ -211,33 +191,22 @@ auto main(int argc, char** argv) -> int {
   if (!grid_writer.write_data(grid)) { return 1; }
   if (!t_writer.write_data(Float{-1.0})) { return 1; }
 #else
-#ifdef OLD_SOLVER
   IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(godunov_flux, godunov_flux);
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
-      Igor::Warn("Solver failed.");
-      return 1;
-    }
-  }
-  Igor::Info("Solver finished successfully.");
-#else
-  IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(Zap::CellBased::DefaultSystem::eig_vals_x,
-                                  Zap::CellBased::DefaultSystem::eig_vecs_x,
-                                  Zap::CellBased::DefaultSystem::eig_vals_y,
-                                  Zap::CellBased::DefaultSystem::eig_vecs_y);
+    // Zap::CellBased::Solver solver(Zap::CellBased::DefaultSystem::eig_vals_x,
+    //                               Zap::CellBased::DefaultSystem::eig_vecs_x,
+    //                               Zap::CellBased::DefaultSystem::eig_vals_y,
+    //                               Zap::CellBased::DefaultSystem::eig_vecs_y);
 
-    // Zap::CellBased::Solver solver(Zap::CellBased::ExtendedSystem::eig_vals_x,
-    //                               Zap::CellBased::ExtendedSystem::eig_vecs_x,
-    //                               Zap::CellBased::ExtendedSystem::eig_vals_y,
-    //                               Zap::CellBased::ExtendedSystem::eig_vecs_y);
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
+    Zap::CellBased::Solver solver(Zap::CellBased::ExtendedSystem::eig_vals_x,
+                                  Zap::CellBased::ExtendedSystem::eig_vecs_x,
+                                  Zap::CellBased::ExtendedSystem::eig_vals_y,
+                                  Zap::CellBased::ExtendedSystem::eig_vecs_y);
+    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.25).has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
     }
   }
   Igor::Info("Solver finished successfully.");
-#endif  // OLD_SOLVER
 #endif
   Igor::Info("Saved grid to {}.", u_file);
   Igor::Info("Saved time steps to {}.", t_file);

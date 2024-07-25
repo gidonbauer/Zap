@@ -90,7 +90,7 @@ auto main(int argc, char** argv) -> int {
                               std::pow((x_min + x_max + y_min + y_max) / 4, 2));
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 4;
     return Eigen::Vector<T, 2>{
@@ -108,7 +108,7 @@ auto main(int argc, char** argv) -> int {
                               std::pow((x_min + x_max + y_min + y_max) / 8, 2));
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 8;
     return Eigen::Vector<T, 2>{
@@ -122,7 +122,7 @@ auto main(int argc, char** argv) -> int {
     return (x - x_min) * static_cast<Float>((x - x_min) < 0.5 * (x_max - x_min));
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     assert(t >= 0 && t <= 1);
     return Eigen::Vector<T, 2>{
         (x_max - x_min) / 2,
@@ -140,7 +140,7 @@ auto main(int argc, char** argv) -> int {
     }
   };
 
-  auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
     static_assert(false, "Not implemented yet.");
     return Eigen::Vector<T, 2>::Zero();
   };
@@ -204,7 +204,7 @@ auto main(int argc, char** argv) -> int {
                                   Zap::CellBased::SingleEq::eig_vecs_x,
                                   Zap::CellBased::SingleEq::eig_vals_y,
                                   Zap::CellBased::SingleEq::eig_vecs_y);
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
+    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5).has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
     }
