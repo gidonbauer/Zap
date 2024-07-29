@@ -91,10 +91,11 @@ class Polygon {
   }
 };
 
-// -------------------------------------------------------------------------------------------------
+// - Calculate intersection polygon using Sutherland-Hodgman algorithm -----------------------------
 template <typename Float>
-[[nodiscard]] constexpr auto intersection(const Polygon<Float>& p1,
-                                          const Polygon<Float>& p2) noexcept -> Polygon<Float> {
+[[nodiscard]] constexpr auto
+intersection(const Polygon<Float>& polygon1,
+             const Polygon<Float>& polygon2) noexcept -> Polygon<Float> {
   enum { X, Y, DIM };
   // Utility function to check if point is inside a polygon edge
   const auto point_on_line = [](const Eigen::Vector<Float, DIM>& p,
@@ -121,16 +122,16 @@ template <typename Float>
     return {(b2 * c1 - b1 * c2) / determinant, (a1 * c2 - a2 * c1) / determinant};
   };
 
-  if (p1.empty() || p2.empty()) { return Polygon<Float>{}; }
+  if (polygon1.empty() || polygon2.empty()) { return Polygon<Float>{}; }
 
-  Polygon output_list = p1;
+  Polygon output_list = polygon1;
 
-  for (size_t i = 0; i < p2.size(); i++) {
+  for (size_t i = 0; i < polygon2.size(); i++) {
     Polygon input_list = output_list;
     output_list.clear();
 
-    const auto A = p2[i];
-    const auto B = p2[(i + 1) % p2.size()];
+    const auto A = polygon2[i];
+    const auto B = polygon2[(i + 1) % polygon2.size()];
 
     for (size_t j = 0; j < input_list.size(); j++) {
       const auto P = input_list[j];
