@@ -60,3 +60,33 @@ endif()
 option(ZAP_BUILD_RENDERER "Build renderer for the solution; adds dependencies on FFmpeg and FreeType" ON)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/apps/)
+
+option(ZAP_BUILD_TESTS "Builds unit test" ON)
+if (ZAP_BUILD_TESTS)
+    enable_testing()
+
+    # Disable interprocedural optimizations for google test library
+    if (ipo_available)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
+    endif()
+
+    set(BUILD_GMOCK OFF)
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG        main
+    )
+    # For Windows: Prevent overriding the parent project's compiler/linker settings
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    # Re-enable interprocedural optimizations if available
+    if (ipo_available)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+    endif()
+
+    message(STATUS "Build tests")
+    
+    add_subdirectory(${CMAKE_SOURCE_DIR}/test/)
+endif()

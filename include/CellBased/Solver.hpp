@@ -1,29 +1,24 @@
 #ifndef ZAP_CELL_BASED_SOLVER_HPP_
 #define ZAP_CELL_BASED_SOLVER_HPP_
 
+#include <numbers>
+
 #include "CellBased/Grid.hpp"
 
 #ifndef OLD_SOLVER
 
 namespace Zap::CellBased {
 
-template <typename EigValsX, typename EigVecsX, typename EigValsY, typename EigVecsY>
+template <typename A, typename B>
 class Solver {
-  EigValsX m_eig_vals_x;
-  EigVecsX m_eig_vecs_x;
-  EigValsY m_eig_vals_y;
-  EigVecsY m_eig_vecs_y;
+  A m_A;
+  B m_B;
 
  public:
   // -----------------------------------------------------------------------------------------------
-  constexpr Solver(EigValsX eig_vals_x,
-                   EigVecsX eig_vecs_x,
-                   EigValsY eig_vals_y,
-                   EigVecsY eig_vecs_y)
-      : m_eig_vals_x(std::move(eig_vals_x)),
-        m_eig_vecs_x(std::move(eig_vecs_x)),
-        m_eig_vals_y(std::move(eig_vals_y)),
-        m_eig_vecs_y(std::move(eig_vecs_y)) {}
+  constexpr Solver(A a, B b)
+      : m_A(std::move(a)),
+        m_B(std::move(b)) {}
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM, typename GridWriter, typename TimeWriter>
@@ -75,10 +70,10 @@ class Solver {
                                                    Float factor,
                                                    Side from) -> VecOrScalar {
           const auto u_mid     = get_u_mid(curr_value, other_value);
-          MatOrScalar eig_vals = (from & (LEFT | RIGHT)) > 0 ? m_eig_vals_x(u_mid)  //
-                                                             : m_eig_vals_y(u_mid);
-          MatOrScalar eig_vecs = (from & (LEFT | RIGHT)) > 0 ? m_eig_vecs_x(u_mid)  //
-                                                             : m_eig_vecs_y(u_mid);
+          MatOrScalar eig_vals = (from & (LEFT | RIGHT)) > 0 ? m_A.eig_vals(u_mid)  //
+                                                             : m_B.eig_vals(u_mid);
+          MatOrScalar eig_vecs = (from & (LEFT | RIGHT)) > 0 ? m_A.eig_vecs(u_mid)  //
+                                                             : m_B.eig_vecs(u_mid);
 
           // Scalar case -------------------------------------------------------------------------
           if constexpr (DIM == 1) {
@@ -132,17 +127,6 @@ class Solver {
             return linearized_xy_flux_impl(
                 curr_cell.get_cartesian().value, other_cell.get_cartesian().value, factor, from);
           } else {
-            {
-              std::stringstream s{};
-              s << curr_cell;
-              Igor::Debug("curr_cell = {}", s.str());
-            }
-            {
-              std::stringstream s{};
-              s << other_cell;
-              Igor::Debug("other_cell = {}", s.str());
-            }
-
             switch (other_cell.get_cut().type) {
               // - BOTTOM_LEFT ---------------------------------------------------------------------
               case CutType::BOTTOM_LEFT:
@@ -426,6 +410,76 @@ class Solver {
             Igor::Todo("next_cell non-cartesian is not implemented yet.");
           }
         } else if (curr_cell.is_cut()) {
+          // - Handle internal interface -----------------------------------------------------------
+          const Eigen::Vector<Float, 2> cut_vector{
+              curr_cell.get_cut().x2_cut - curr_cell.get_cut().x1_cut,
+              curr_cell.get_cut().y2_cut - curr_cell.get_cut().y1_cut};
+          const auto cut_angle = std::acos(cut_vector(1) / cut_vector.norm());
+          Igor::Debug("cut_angle = {:.6f} rad ({:.6f}°)",
+                      cut_angle,
+                      cut_angle * 180 / std::numbers::pi_v<Float>);
+          Igor::Debug("cos(cut_angle) = {}", std::cos(cut_angle));
+          Igor::Debug("-sin(cut_angle) = {}", -std::sin(cut_angle));
+
+          const Eigen::Vector<Float, 2> norm_vector{std::cos(cut_angle), std::sin(cut_angle)};
+
+          const auto u_mid =
+              get_u_mid(curr_cell.get_cut().left_value, curr_cell.get_cut().right_value);
+
+          const MatOrScalar eta_mat =
+              std::cos(cut_angle) * m_A.mat(u_mid) - std::sin(cut_angle) * m_B.mat(u_mid);
+
+          if constexpr (DIM == 1) {
+            IGOR_DEBUG_PRINT(eta_mat);
+
+            const auto eig_vals = eta_mat;
+            const auto eig_vecs = MatOrScalar{1};
+            const auto alpha =
+                curr_cell.get_cut().left_value(0) - curr_cell.get_cut().right_value(0);
+            const auto wave_length = eig_vals * dt;
+
+            IGOR_DEBUG_PRINT(eig_vals);
+            IGOR_DEBUG_PRINT(eig_vecs);
+            IGOR_DEBUG_PRINT(alpha);
+            Igor::Debug("Wave length = {}", wave_length);
+
+            const Eigen::Vector<Float, 2> start_point_1 =
+                Eigen::Vector<Float, 2>{curr_cell.get_cut().x1_cut, curr_cell.get_cut().y1_cut};
+            const Eigen::Vector<Float, 2> end_point_1 = start_point_1 + norm_vector * wave_length;
+
+            const Eigen::Vector<Float, 2> start_point_2 =
+                Eigen::Vector<Float, 2>{curr_cell.get_cut().x2_cut, curr_cell.get_cut().y2_cut};
+            const Eigen::Vector<Float, 2> end_point_2 = start_point_2 + norm_vector * wave_length;
+
+            IGOR_DEBUG_PRINT(start_point_1);
+            IGOR_DEBUG_PRINT(end_point_1);
+            IGOR_DEBUG_PRINT(start_point_2);
+            IGOR_DEBUG_PRINT(end_point_2);
+
+            {
+              std::stringstream s{};
+              s << curr_cell;
+              Igor::Debug("curr_cell = {}", s.str());
+            }
+            {
+              std::stringstream s{};
+              s << grid_curr.m_cells.at(curr_cell.right_idx);
+              Igor::Debug("right_cell = {}", s.str());
+            }
+            {
+              std::stringstream s{};
+              s << grid_curr.m_cells.at(curr_cell.top_idx);
+              Igor::Debug("top_cell = {}", s.str());
+            }
+            {
+              std::stringstream s{};
+              s << grid_curr.m_cells.at(grid_curr.m_cells.at(curr_cell.top_idx).right_idx);
+              Igor::Debug("diag_cell = {}", s.str());
+            }
+          } else {
+            Igor::Todo("DIM = {} is not implemented yet.", DIM);
+          }
+          return std::nullopt;
           // Igor::Todo("Cut cells are not implemented yet.");
         } else {
           Igor::Warn("Unknown cell type with variant index {}", curr_cell.value.index());

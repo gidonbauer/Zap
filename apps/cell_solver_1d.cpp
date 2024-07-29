@@ -147,7 +147,7 @@ auto main(int argc, char** argv) -> int {
 #else
   static_assert(false, "No initial condition defined.");
 #endif
-  // if (!grid.cut_init_shock(init_shock)) { return 1; }
+  if (!grid.cut_init_shock(init_shock)) { return 1; }
 
   // grid.fill_center(u0);
   grid.fill_four_point(u0);
@@ -200,10 +200,7 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("Solver finished successfully.");
 #else
   IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::eig_vals_x,
-                                  Zap::CellBased::SingleEq::eig_vecs_x,
-                                  Zap::CellBased::SingleEq::eig_vals_y,
-                                  Zap::CellBased::SingleEq::eig_vecs_y);
+    Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
     if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5).has_value()) {
       Igor::Warn("Solver failed.");
       return 1;

@@ -880,10 +880,7 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  // template <typename, typename>
-  // friend class Solver;
-
-  template <typename, typename, typename, typename>
+  template <typename, typename>
   friend class Solver;
 
   template <Zap::IO::VTKFormat F>

@@ -192,15 +192,11 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(Float{-1.0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    // Zap::CellBased::Solver solver(Zap::CellBased::DefaultSystem::eig_vals_x,
-    //                               Zap::CellBased::DefaultSystem::eig_vecs_x,
-    //                               Zap::CellBased::DefaultSystem::eig_vals_y,
-    //                               Zap::CellBased::DefaultSystem::eig_vecs_y);
+    Zap::CellBased::Solver solver(Zap::CellBased::DefaultSystem::A{},
+                                  Zap::CellBased::DefaultSystem::B{});
 
-    Zap::CellBased::Solver solver(Zap::CellBased::ExtendedSystem::eig_vals_x,
-                                  Zap::CellBased::ExtendedSystem::eig_vecs_x,
-                                  Zap::CellBased::ExtendedSystem::eig_vals_y,
-                                  Zap::CellBased::ExtendedSystem::eig_vecs_y);
+    // Zap::CellBased::Solver solver(Zap::CellBased::ExtendedSystem::A{},
+    //                               Zap::CellBased::ExtendedSystem::B{});
     if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.25).has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
