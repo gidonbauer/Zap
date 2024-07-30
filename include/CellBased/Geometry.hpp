@@ -2,10 +2,10 @@
 #define ZAP_CELL_BASED_GEOMETRY_HPP_
 
 #include <algorithm>
-#include <vector>
 
 #include <Eigen/Dense>
 
+#include "CellBased/SmallVector.hpp"
 #include "Igor.hpp"
 
 namespace Zap::CellBased::Geometry {
@@ -14,13 +14,13 @@ template <typename Float>
 class Polygon {
   enum { X, Y, DIM };
   using Point = Eigen::Vector<Float, DIM>;
-  std::vector<Point> m_points{};
+  SmallVector<Point> m_points{};
 
  public:
   // -----------------------------------------------------------------------------------------------
   constexpr Polygon() noexcept = default;
 
-  constexpr Polygon(std::vector<Point> points) noexcept
+  constexpr Polygon(SmallVector<Point> points) noexcept
       : m_points(std::move(points)) {
     remove_duplicate_points();
     sort_points_counter_clockwise();
@@ -85,8 +85,8 @@ class Polygon {
     assert(idx < size());
     return m_points[idx];
   }
-  [[nodiscard]] constexpr auto points() noexcept -> std::vector<Point>& { return m_points; }
-  [[nodiscard]] constexpr auto points() const noexcept -> const std::vector<Point>& {
+  [[nodiscard]] constexpr auto points() noexcept -> SmallVector<Point>& { return m_points; }
+  [[nodiscard]] constexpr auto points() const noexcept -> const SmallVector<Point>& {
     return m_points;
   }
 };

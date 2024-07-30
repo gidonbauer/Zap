@@ -74,12 +74,8 @@ auto main() -> int {
     }
     // - Setup canvas ------------------------------------------------------------------------------
 
-    if (!t_reader.read_next()) {
-      return 1;
-    }
-    if (!u_reader.read_next()) {
-      return 1;
-    }
+    if (!t_reader.read_next()) { return 1; }
+    if (!u_reader.read_next()) { return 1; }
 
     canvas.clear(BLACK);
 
@@ -156,8 +152,7 @@ auto main() -> int {
       } else {
         const auto& cut_value = cell.get_cut();
 
-        std::vector<Eigen::Vector<Float, 2>> left_points =
-            Zap::CellBased::get_left_points<decltype(cell), Float>(cell);
+        const auto left_points = Zap::CellBased::get_left_points<decltype(cell), Float>(cell);
         std::vector<Rd::Point> left_canvas_points(left_points.size());
         for (size_t i = 0; i < left_points.size(); ++i) {
           left_canvas_points[i] = Rd::Point{
@@ -179,8 +174,7 @@ auto main() -> int {
           failed_drawing_rects = true;
         }
 
-        std::vector<Eigen::Vector<Float, 2>> right_points =
-            Zap::CellBased::get_right_points<decltype(cell), Float>(cell);
+        const auto right_points = Zap::CellBased::get_right_points<decltype(cell), Float>(cell);
         std::vector<Rd::Point> right_canvas_points(right_points.size());
         for (size_t i = 0; i < right_points.size(); ++i) {
           right_canvas_points[i] = Rd::Point{
@@ -230,9 +224,7 @@ auto main() -> int {
         }
       }
     }
-    if (failed_drawing_rects) {
-      return 1;
-    }
+    if (failed_drawing_rects) { return 1; }
 
     if (!canvas.to_ppm(output_file)) {
       Igor::Warn("Could not write canvas to file.");

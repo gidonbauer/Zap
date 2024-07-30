@@ -2,6 +2,7 @@
 
 #include "CellBased/Geometry.hpp"
 namespace Geo = Zap::CellBased::Geometry;
+using Zap::CellBased::SmallVector;
 
 TEST(GeometryPolygon, AddPoint) {
   using Float = double;
@@ -34,7 +35,7 @@ TEST(GeometryPolygon, AddPoint) {
 TEST(GeometryPolygon, Area) {
   {
     using Float = float;
-    const std::vector<Eigen::Vector<Float, 2>> points{
+    const SmallVector<Eigen::Vector<Float, 2>> points{
         {0.0, 0.0},
         {0.0, 1.0},
         {1.0, 0.0},
@@ -50,7 +51,7 @@ TEST(GeometryPolygon, Area) {
 
   {
     using Float = double;
-    const std::vector<Eigen::Vector<Float, 2>> points{
+    const SmallVector<Eigen::Vector<Float, 2>> points{
         {0.0, 0.0},
         {0.0, 1.0},
         {1.0, 0.0},
@@ -66,7 +67,7 @@ TEST(GeometryPolygon, Area) {
 
   {
     using Float = double;
-    const std::vector<Eigen::Vector<Float, 2>> points{
+    const SmallVector<Eigen::Vector<Float, 2>> points{
         {0.0, 0.0},
         {0.0, 1.0},
         {1.0, 1.0},
@@ -79,7 +80,7 @@ TEST(GeometryPolygon, Area) {
 
   {
     using Float = double;
-    const std::vector<Eigen::Vector<Float, 2>> points{
+    const SmallVector<Eigen::Vector<Float, 2>> points{
         {0.0, 0.0},
         {0.0, 1.0},
         {1.0, 0.0},
@@ -93,7 +94,7 @@ TEST(GeometryPolygon, Area) {
   }
 }
 
-TEST(TestGeometryPolygon, Intersect) {
+TEST(GeometryPolygon, Intersect) {
   {
     const Geo::Polygon<double> poly1{{
         {0.0, 0.0},

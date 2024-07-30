@@ -9,6 +9,7 @@
 
 #include <Eigen/Dense>
 
+#include "CellBased/SmallVector.hpp"
 #include "Igor.hpp"
 
 namespace Zap::CellBased {
@@ -100,7 +101,7 @@ struct Cell {
 // -------------------------------------------------------------------------------------------------
 template <typename CellType, typename Float>
 [[nodiscard]] constexpr auto
-get_left_points(const CellType& cell) noexcept -> std::vector<Eigen::Vector<Float, 2>> {
+get_left_points(const CellType& cell) noexcept -> SmallVector<Eigen::Vector<Float, 2>> {
   const auto& cell_value = cell.get_cut();
   switch (cell_value.type) {
     case CutType::BOTTOM_LEFT:
@@ -156,7 +157,7 @@ get_left_points(const CellType& cell) noexcept -> std::vector<Eigen::Vector<Floa
 // -------------------------------------------------------------------------------------------------
 template <typename CellType, typename Float>
 [[nodiscard]] constexpr auto
-get_right_points(const CellType& cell) noexcept -> std::vector<Eigen::Vector<Float, 2>> {
+get_right_points(const CellType& cell) noexcept -> SmallVector<Eigen::Vector<Float, 2>> {
   const auto& cell_value = cell.get_cut();
   switch (cell_value.type) {
     case CutType::BOTTOM_LEFT:
