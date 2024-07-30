@@ -35,15 +35,20 @@ class SmallVector {
 
   constexpr SmallVector(size_t size) noexcept {
     if (size > SMALL_VECTOR_CAPACITY) {
-      Igor::Panic("size {} is larger than maximal capacity {}.", size, SMALL_VECTOR_CAPACITY);
+      Igor::Panic("Size {} is larger than maximal capacity {}. Consider increasing the capacity "
+                  "with the `ZAP_SMALL_VECTOR_CAPACITY` macro.",
+                  size,
+                  SMALL_VECTOR_CAPACITY);
     }
     m_size = size;
   }
 
   constexpr SmallVector(std::initializer_list<Element> init) noexcept {
     if (init.size() > SMALL_VECTOR_CAPACITY) {
-      Igor::Panic(
-          "size {} is larger than maximal capacity {}.", init.size(), SMALL_VECTOR_CAPACITY);
+      Igor::Panic("Size {} is larger than maximal capacity {}. Consider increasing the capacity "
+                  "with the `ZAP_SMALL_VECTOR_CAPACITY` macro.",
+                  init.size(),
+                  SMALL_VECTOR_CAPACITY);
     }
     m_size = init.size();
     std::move(std::begin(init), std::end(init), std::begin(m_data));
@@ -71,7 +76,8 @@ class SmallVector {
   // -----------------------------------------------------------------------------------------------
   constexpr void push_back(const Element& e) noexcept {
     if (m_size + 1 > SMALL_VECTOR_CAPACITY) {
-      Igor::Panic("Try to push an element into a full SmallVector (size={}, capacity={})",
+      Igor::Panic("Try to push an element into a full SmallVector (size={}, capacity={}). Consider "
+                  "increasing the capacity with the `ZAP_SMALL_VECTOR_CAPACITY` macro.",
                   m_size,
                   SMALL_VECTOR_CAPACITY);
     }
@@ -89,15 +95,10 @@ class SmallVector {
   // -----------------------------------------------------------------------------------------------
   constexpr auto erase(iterator pos) noexcept -> iterator { return erase(pos, std::next(pos)); }
   constexpr auto erase(iterator first, iterator last) noexcept -> iterator {
+    std::move(last, end(), first);
+
     const auto num_elems_removed = std::distance(first, last);
     assert(num_elems_removed >= 0 && m_size >= static_cast<size_t>(num_elems_removed));
-
-    auto local_first = first;
-    for (; last != end(); ++last) {
-      *local_first = std::move(*last);
-      local_first += 1;
-    }
-
     m_size -= static_cast<size_t>(num_elems_removed);
 
     return first;
@@ -107,15 +108,11 @@ class SmallVector {
     return erase(pos, std::next(pos));
   }
   constexpr auto erase(const_iterator first, const_iterator last) noexcept -> const_iterator {
+    iterator non_const_first = std::next(begin(), std::distance(cbegin(), first));
+    std::move(last, cend(), non_const_first);
+
     const auto num_elems_removed = std::distance(first, last);
     assert(num_elems_removed >= 0 && m_size >= static_cast<size_t>(num_elems_removed));
-
-    iterator non_const_first = std::next(begin(), std::distance(cbegin(), first));
-    for (; last != cend(); ++last) {
-      *non_const_first = std::move(*last);
-      non_const_first += 1;
-    }
-
     m_size -= static_cast<size_t>(num_elems_removed);
 
     return first;
