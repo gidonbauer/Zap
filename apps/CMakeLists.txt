@@ -32,40 +32,23 @@ if (ZAP_BUILD_RENDERER)
     
     # --------------------------------------------
     find_package(Freetype REQUIRED)
-    
-    # - Renderer that uses freetype --------
-    add_executable(renderer renderer.cpp)
-    
-    # - Define include path ----------------
-    target_include_directories(renderer        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
-    target_include_directories(renderer SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
-    target_include_directories(renderer SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-    
-    # - Link libraries ---------------------
-    target_link_libraries(renderer PRIVATE ${FREETYPE_LIBRARIES})
-    # target_link_libraries(renderer PRIVATE OpenMP::OpenMP_CXX)
-    
-    # - Cell renderer ----------------------
-    add_executable(cell_renderer cell_renderer.cpp)
-    
-    # - Define include path ----------------
-    target_include_directories(cell_renderer        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
-    target_include_directories(cell_renderer SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
-    target_include_directories(cell_renderer SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-    
-    # - Link libraries ---------------------
-    target_link_libraries(cell_renderer PRIVATE ${FREETYPE_LIBRARIES})
-    target_link_libraries(cell_renderer PRIVATE OpenMP::OpenMP_CXX)
-    
-    # - Show initial shock -----------------
-    add_executable(show_initial_shock show_initial_shock.cpp)
-    
-    # - Define include path ----------------
-    target_include_directories(show_initial_shock        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
-    target_include_directories(show_initial_shock SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
-    target_include_directories(show_initial_shock SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-    
-    # - Link libraries ---------------------
-    target_link_libraries(show_initial_shock PRIVATE ${FREETYPE_LIBRARIES})
-    # target_link_libraries(show_initial_shock PRIVATE OpenMP::OpenMP_CXX)
+   
+    set(freetype_executable
+      renderer
+      cell_renderer
+      show_initial_shock
+    )
+    foreach(exec ${freetype_executable})
+        # - Renderer that uses freetype --------
+        add_executable(${exec} ${exec}.cpp)
+        
+        # - Define include path ----------------
+        target_include_directories(${exec}        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
+        target_include_directories(${exec} SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
+        target_include_directories(${exec} SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+        
+        # - Link libraries ---------------------
+        target_link_libraries(${exec} PRIVATE ${FREETYPE_LIBRARIES})
+        target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
+    endforeach()
 endif()

@@ -63,12 +63,15 @@ auto main(int argc, char** argv) -> int {
       return 1;
     }
 
-    const auto& data      = u_reader.data();
-    const auto [min, max] = std::minmax_element(std::cbegin(data), std::cend(data));
+    const auto& data   = u_reader.data();
+    const auto min_max = std::minmax_element(std::cbegin(data), std::cend(data));
     if (!canvas.draw_buffer(
             data,
             graph_box,
-            [&](Float v) { return Rd::float_to_rgb<Rd::Float2RGB::COLORMAP>(v, *min, *max); },
+            [&](Float v) {
+              return Rd::float_to_rgb<Rd::Float2RGB::COLORMAP>(
+                  v, *(min_max.first), *(min_max.second));
+            },
             u_reader.is_row_major(),
             true)) {
       Igor::Warn("Could not draw graph to canvas.");

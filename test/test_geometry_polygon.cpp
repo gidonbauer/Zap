@@ -223,3 +223,65 @@ TEST(GeometryPolygon, Intersect) {
     EXPECT_DOUBLE_EQ(intersect1.area(), poly2.area());
   }
 }
+
+TEST(GeometryPolygon, IntersectBug) {
+  {
+    const Geo::Polygon<float> p1{{
+        {1.8633899774085183f, 1.6666666709613775f},
+        {1.6666666709613778f, 1.8633899774085183f},
+        {1.6666666666666665f, 1.6666666666666665f},
+    }};
+
+    const Geo::Polygon<float> p2{{
+        {1.8251895692700746f, 1.6666666666666665f},
+        {1.8251895692700746f, 1.8633899774085183f},
+        {1.6666666666666665f, 1.8633899774085183f},
+        {1.6666666666666665f, 1.6666666666666665f},
+    }};
+
+    const auto intersect_12 = Geo::intersection(p1, p2);
+    const auto intersect_21 = Geo::intersection(p2, p1);
+
+#define EXPECT_EPS_EQ(a, b) EXPECT_NEAR(a, b, 1e-6f)  // NOLINT
+
+    EXPECT_EPS_EQ(intersect_12.area(), intersect_21.area());
+
+    ASSERT_EQ(intersect_12.size(), intersect_21.size());
+    for (size_t i = 0; i < intersect_12.size(); ++i) {
+      EXPECT_EPS_EQ(intersect_12[i](0), intersect_21[i](0));
+      EXPECT_EPS_EQ(intersect_12[i](1), intersect_21[i](1));
+    }
+
+#undef EXPECT_EPS_EQ
+  }
+
+  {
+    const Geo::Polygon<double> p1{{
+        {1.8633899774085183, 1.6666666709613775},
+        {1.6666666709613778, 1.8633899774085183},
+        {1.6666666666666665, 1.6666666666666665},
+    }};
+
+    const Geo::Polygon<double> p2{{
+        {1.8251895692700746, 1.6666666666666665},
+        {1.8251895692700746, 1.8633899774085183},
+        {1.6666666666666665, 1.8633899774085183},
+        {1.6666666666666665, 1.6666666666666665},
+    }};
+
+    const auto intersect_12 = Geo::intersection(p1, p2);
+    const auto intersect_21 = Geo::intersection(p2, p1);
+
+#define EXPECT_EPS_EQ(a, b) EXPECT_NEAR(a, b, 1e-8)  // NOLINT
+
+    EXPECT_EPS_EQ(intersect_12.area(), intersect_21.area());
+
+    ASSERT_EQ(intersect_12.size(), intersect_21.size());
+    for (size_t i = 0; i < intersect_12.size(); ++i) {
+      EXPECT_EPS_EQ(intersect_12[i](0), intersect_21[i](0));
+      EXPECT_EPS_EQ(intersect_12[i](1), intersect_21[i](1));
+    }
+
+#undef EXPECT_EPS_EQ
+  }
+}

@@ -92,17 +92,25 @@ class Polygon {
 };
 
 // - Calculate intersection polygon using Sutherland-Hodgman algorithm -----------------------------
-template <typename Float>
+template <std::floating_point Float>
 [[nodiscard]] constexpr auto
 intersection(const Polygon<Float>& polygon1,
              const Polygon<Float>& polygon2) noexcept -> Polygon<Float> {
   enum { X, Y, DIM };
+  constexpr Float eps = [] {
+    if constexpr (std::is_same_v<std::remove_cvref_t<Float>, float>) {
+      return 1e-6f;
+    } else {
+      return 1e-8;
+    }
+  }();
+
   // Utility function to check if point is inside a polygon edge
   const auto point_on_line = [](const Eigen::Vector<Float, DIM>& p,
                                 const Eigen::Vector<Float, DIM>& a,
                                 const Eigen::Vector<Float, DIM>& b) -> bool {
     // Check if point p is to the left of line segment ab
-    return (b(X) - a(X)) * (p(Y) - a(Y)) >= (b(Y) - a(Y)) * (p(X) - a(X));
+    return (b(X) - a(X)) * (p(Y) - a(Y)) >= (b(Y) - a(Y)) * (p(X) - a(X)) - eps;
   };
 
   // Utility function to compute intersection point of line segment ab with cd
@@ -119,6 +127,8 @@ intersection(const Polygon<Float>& polygon1,
     double c2 = a2 * c(X) + b2 * c(Y);
 
     double determinant = a1 * b2 - a2 * b1;
+    assert(std::abs(determinant) >= eps);
+
     return {(b2 * c1 - b1 * c2) / determinant, (a1 * c2 - a2 * c1) / determinant};
   };
 

@@ -279,7 +279,7 @@ class Canvas {
     }
 
     if (length > box.width) {
-      Igor::Warn("Text is too long ({}) for box with width {}", length, box.width);
+      Igor::Warn("Text `{}` is too long ({}) for box with width {}", str, length, box.width);
       return false;
     }
 
