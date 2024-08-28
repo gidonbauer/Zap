@@ -1,6 +1,8 @@
 #include <filesystem>
 #include <numbers>
 
+// #define USE_FLUX_FOR_CARTESIAN
+
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
@@ -76,8 +78,8 @@ auto main(int argc, char** argv) -> int {
   const Float y_max = 5.0;
 
   auto grid = Zap::CellBased::Grid<Float, DIM>::Uniform(x_min, x_max, nx, y_min, y_max, ny);
-  // grid.same_value_boundary();
-  grid.periodic_boundary();
+  grid.same_value_boundary();
+  // grid.periodic_boundary();
 
 // #define RAMP_X
 #define QUARTER_CIRCLE

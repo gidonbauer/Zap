@@ -14,18 +14,27 @@ struct A {
   static constexpr size_t DIM = 1;
 
   template <std::floating_point Float>
-  [[nodiscard]] constexpr auto mat(Float u) const noexcept -> Float {
-    return u;
+  [[nodiscard]] constexpr auto
+  mat(const Eigen::Vector<Float, DIM>& u) const noexcept -> Eigen::Matrix<Float, DIM, DIM> {
+    return Eigen::Matrix<Float, DIM, DIM>{u(0)};
   }
 
   template <std::floating_point Float>
-  [[nodiscard]] constexpr auto eig_vals(Float u) const noexcept -> Float {
-    return u;
+  [[nodiscard]] constexpr auto
+  eig_vals(const Eigen::Vector<Float, DIM>& u) const noexcept -> Eigen::Matrix<Float, DIM, DIM> {
+    return Eigen::Matrix<Float, DIM, DIM>{u(0)};
   }
 
   template <std::floating_point Float>
-  [[nodiscard]] constexpr auto eig_vecs(Float /*u*/) const noexcept -> Float {
-    return 1;
+  [[nodiscard]] constexpr auto eig_vecs(const Eigen::Vector<Float, DIM>& /*u*/) const noexcept
+      -> Eigen::Matrix<Float, DIM, DIM> {
+    return Eigen::Matrix<Float, DIM, DIM>::Identity();
+  }
+
+  template <std::floating_point Float>
+  [[nodiscard]] constexpr auto
+  max_abs_eig_val(const Eigen::Vector<Float, DIM>& u) const noexcept -> Float {
+    return std::abs(u(0));
   }
 };
 
@@ -56,6 +65,12 @@ struct A {
       -> Eigen::Matrix<Float, DIM, DIM> {
     return Eigen::Matrix<Float, DIM, DIM>::Identity();
   }
+
+  template <std::floating_point Float>
+  [[nodiscard]] constexpr auto
+  max_abs_eig_val(const Eigen::Vector<Float, DIM>& u) const noexcept -> Float {
+    return std::abs(u(0));
+  }
 };
 
 struct B {
@@ -77,6 +92,12 @@ struct B {
   [[nodiscard]] constexpr auto eig_vecs(const Eigen::Vector<Float, DIM>& /*u*/) const noexcept
       -> Eigen::Matrix<Float, DIM, DIM> {
     return Eigen::Matrix<Float, DIM, DIM>::Identity();
+  }
+
+  template <std::floating_point Float>
+  [[nodiscard]] constexpr auto
+  max_abs_eig_val(const Eigen::Vector<Float, DIM>& u) const noexcept -> Float {
+    return std::abs(u(1));
   }
 };
 
@@ -124,6 +145,12 @@ class A {
 
     return V;
   }
+
+  template <std::floating_point Float>
+  [[nodiscard]] constexpr auto
+  max_abs_eig_val(const Eigen::Vector<Float, DIM>& u) const noexcept -> Float {
+    return std::abs(2 * u(0));
+  }
 };
 
 struct B {
@@ -164,6 +191,12 @@ struct B {
     V(1, 1) = 0;
 
     return V;
+  }
+
+  template <std::floating_point Float>
+  [[nodiscard]] constexpr auto
+  max_abs_eig_val(const Eigen::Vector<Float, DIM>& u) const noexcept -> Float {
+    return std::abs(2 * u(1));
   }
 };
 

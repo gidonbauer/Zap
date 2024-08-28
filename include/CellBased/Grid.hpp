@@ -33,11 +33,11 @@ class Grid {
   size_t m_nx;
   size_t m_ny;
 
-  mutable std::optional<Float> m_min_delta = std::nullopt;
-  mutable std::optional<Float> m_x_min     = std::nullopt;
-  mutable std::optional<Float> m_x_max     = std::nullopt;
-  mutable std::optional<Float> m_y_min     = std::nullopt;
-  mutable std::optional<Float> m_y_max     = std::nullopt;
+  Float m_min_delta;
+  Float m_x_min;
+  Float m_x_max;
+  Float m_y_min;
+  Float m_y_max;
 
   // -----------------------------------------------------------------------------------------------
   constexpr Grid(size_t nx, size_t ny)
@@ -797,54 +797,23 @@ class Grid {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto nx() const noexcept -> size_t { return m_nx; }
   [[nodiscard]] constexpr auto ny() const noexcept -> size_t { return m_ny; }
+  [[nodiscard]] constexpr auto min_delta() const noexcept -> Float { return m_min_delta; }
+  [[nodiscard]] constexpr auto x_min() const noexcept -> Float { return m_x_min; }
+  [[nodiscard]] constexpr auto x_max() const noexcept -> Float { return m_x_max; }
+  [[nodiscard]] constexpr auto y_min() const noexcept -> Float { return m_y_min; }
+  [[nodiscard]] constexpr auto y_max() const noexcept -> Float { return m_y_max; }
 
-  [[nodiscard]] constexpr auto min_delta() const noexcept -> Float {
-    if (!m_min_delta.has_value()) {
-      assert(m_cells.size() > 0);
-      m_min_delta = std::transform_reduce(
-          std::cbegin(m_cells),
-          std::cend(m_cells),
-          std::min(m_cells[0].dx, m_cells[0].dy),
-          [](const auto& a, const auto& b) { return std::min(a, b); },
-          [](const m_Cell& cell) { return std::min(cell.dx, cell.dy); });
-    }
-    return *m_min_delta;
-  }
-
-  [[nodiscard]] constexpr auto x_min() const noexcept -> Float {
-    if (!m_x_min.has_value()) {
-      Igor::Todo("Implement finding x_min.");
-      m_x_min = 0;
-    }
-    return *m_x_min;
-  }
-
-  [[nodiscard]] constexpr auto x_max() const noexcept -> Float {
-    if (!m_x_max.has_value()) {
-      Igor::Todo("Implement finding x_max.");
-      m_x_max = 0;
-    }
-    return *m_x_max;
-  }
-
-  [[nodiscard]] constexpr auto y_min() const noexcept -> Float {
-    if (!m_y_min.has_value()) {
-      Igor::Todo("Implement finding y_min.");
-      m_y_min = 0;
-    }
-    return *m_y_min;
-  }
-
-  [[nodiscard]] constexpr auto y_max() const noexcept -> Float {
-    if (!m_y_max.has_value()) {
-      Igor::Todo("Implement finding y_max.");
-      m_y_max = 0;
-    }
-    return *m_y_max;
-  }
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto size() const noexcept -> size_t { return m_cells.size(); }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept -> const m_Cell& {
+    assert(idx < m_nx * m_ny);
+    return m_cells[idx];
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto operator[](size_t idx) noexcept -> m_Cell& {
     assert(idx < m_nx * m_ny);
     return m_cells[idx];
   }

@@ -20,24 +20,16 @@ add_compile_definitions(AD_STD_COMPATIBILITY AD_INTEROP_EIGEN AD_AUTO_SUPPORT)
 
 # - Build type options -----------------------------------------------------------------------------
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3") # Disable -DNDEBUG flag because I want to keep assertions
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")            # Disable -DNDEBUG flag because I want to keep assertions
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")  # Disable -DNDEBUG flag because I want to keep assertions
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-fsanitize=address,undefined,leak -O0)
     add_link_options(-fsanitize=address,undefined,leak)
     add_compile_definitions(AD_DEBUG)
-endif()
-
-# - Check if interprocedural optimizations are available ------------------------------------------
-include(CheckIPOSupported)
-check_ipo_supported(RESULT ipo_available OUTPUT ipo_available_output)
-if(ipo_available)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-else()
-    message(WARNING "Could not enable interprocedural optimization")
 endif()
 
 # - Check if `-march=native` is available ---------------------------------------------------------
@@ -65,11 +57,6 @@ option(ZAP_BUILD_TESTS "Builds unit test" ON)
 if (ZAP_BUILD_TESTS)
     enable_testing()
 
-    # Disable interprocedural optimizations for google test library
-    if (ipo_available)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
-    endif()
-
     set(BUILD_GMOCK OFF)
     include(FetchContent)
     FetchContent_Declare(
@@ -80,11 +67,6 @@ if (ZAP_BUILD_TESTS)
     # For Windows: Prevent overriding the parent project's compiler/linker settings
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googletest)
-
-    # Re-enable interprocedural optimizations if available
-    if (ipo_available)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-    endif()
 
     message(STATUS "Build tests")
     

@@ -9,6 +9,7 @@
 
 #include <Eigen/Dense>
 
+#include "CellBased/Geometry.hpp"
 #include "CellBased/SmallVector.hpp"
 #include "Igor.hpp"
 
@@ -95,6 +96,22 @@ struct Cell {
   [[nodiscard]] constexpr auto get_cut() const noexcept -> const CutValue<Float, DIM>& {
     assert(is_cut());
     return std::get<CutValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept -> Geometry::Polygon<Float> {
+    return Geometry::Polygon<Float>{{
+        Eigen::Vector<Float, 2>{x_min, y_min},
+        Eigen::Vector<Float, 2>{x_min + dx, y_min},
+        Eigen::Vector<Float, 2>{x_min, y_min + dy},
+        Eigen::Vector<Float, 2>{x_min + dx, y_min + dy},
+    }};
+  }
+  [[nodiscard]] constexpr auto get_cut_left_polygon() const noexcept -> Geometry::Polygon<Float> {
+    assert(is_cut());
+    return Geometry::Polygon<Float>{get_left_points<Cell<Float, DIM>, Float>(*this)};
+  }
+  [[nodiscard]] constexpr auto get_cut_right_polygon() const noexcept -> Geometry::Polygon<Float> {
+    assert(is_cut());
+    return Geometry::Polygon<Float>{get_right_points<Cell<Float, DIM>, Float>(*this)};
   }
 };
 
