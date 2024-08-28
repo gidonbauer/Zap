@@ -224,7 +224,7 @@ TEST(GeometryPolygon, Intersect) {
   }
 }
 
-TEST(GeometryPolygon, IntersectBug) {
+TEST(GeometryPolygon, IntersectRoundingBug) {
   {
     const Geo::Polygon<float> p1{{
         {1.8633899774085183f, 1.6666666709613775f},
