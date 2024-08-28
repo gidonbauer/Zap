@@ -4,7 +4,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
-#include <string_view>
+#include <string>
 
 #include <csignal>
 #include <sys/wait.h>
@@ -24,7 +24,8 @@ class FFmpeg {
   [[nodiscard]] FFmpeg(size_t width,
                        size_t height,
                        const std::string& output_file,
-                       size_t fps = 60) noexcept {
+                       size_t fps                        = 60,
+                       const std::string& output_bitrate = "100000k") noexcept {
     std::array<int, 2> pipefd{};
     if (pipe(pipefd.data()) == -1) { Igor::Panic("Opening pipe failed: {}", std::strerror(errno)); }
 
@@ -65,7 +66,7 @@ class FFmpeg {
         "-probesize", "50M",
         "-i", "-",
         "-c:v", "libx264",
-        "-b:v", "5500k",
+        "-b:v", output_bitrate.c_str(),
         "-pix_fmt", "yuv420p",
         output_file.c_str(),
         static_cast<const char*>(nullptr));
