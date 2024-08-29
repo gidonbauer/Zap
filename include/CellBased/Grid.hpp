@@ -32,6 +32,7 @@ class Grid {
   std::vector<m_Cell> m_cells;
   size_t m_nx;
   size_t m_ny;
+  std::vector<size_t> m_cut_cell_idxs;
 
   Float m_min_delta;
   Float m_x_min;
@@ -297,8 +298,6 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
-#ifndef CUT_NEWTON_VARIANT
-
   template <typename ParamShock>
   [[nodiscard]] constexpr auto cut_init_shock(ParamShock init_shock) noexcept -> bool {
     enum { X, Y, POS_SIZE };
@@ -345,8 +344,8 @@ class Grid {
     assert(std::distance(std::cbegin(m_cells), cell_it) >= 0);
     auto cell_idx = static_cast<size_t>(std::distance(std::cbegin(m_cells), cell_it));
 
-    std::vector<size_t> cut_cell_idxs{};
-    cut_cell_idxs.push_back(static_cast<size_t>(cell_idx));
+    m_cut_cell_idxs.clear();
+    m_cut_cell_idxs.push_back(static_cast<size_t>(cell_idx));
     std::vector<Eigen::Vector<Float, POS_SIZE>> entry_points{};
     entry_points.push_back(init_pos);
 
@@ -415,7 +414,7 @@ class Grid {
           assert(is_cell(cell.bottom_idx));
           assert(is_cell(m_cells[cell.bottom_idx].left_idx));
 
-          cut_cell_idxs.push_back(m_cells[cell.bottom_idx].left_idx);
+          m_cut_cell_idxs.push_back(m_cells[cell.bottom_idx].left_idx);
           cell_idx = m_cells[cell.bottom_idx].left_idx;
 
           // TODO: This check might lead to problems
@@ -426,7 +425,7 @@ class Grid {
           assert(is_cell(cell.top_idx));
           assert(is_cell(m_cells[cell.top_idx].left_idx));
 
-          cut_cell_idxs.push_back(m_cells[cell.top_idx].left_idx);
+          m_cut_cell_idxs.push_back(m_cells[cell.top_idx].left_idx);
           cell_idx = m_cells[cell.top_idx].left_idx;
 
           // TODO: This check might lead to problems
@@ -437,7 +436,7 @@ class Grid {
           assert(is_cell(cell.bottom_idx));
           assert(is_cell(m_cells[cell.bottom_idx].right_idx));
 
-          cut_cell_idxs.push_back(m_cells[cell.bottom_idx].right_idx);
+          m_cut_cell_idxs.push_back(m_cells[cell.bottom_idx].right_idx);
           cell_idx = m_cells[cell.bottom_idx].right_idx;
 
           // TODO: This check might lead to problems
@@ -448,7 +447,7 @@ class Grid {
           assert(is_cell(cell.top_idx));
           assert(is_cell(m_cells[cell.top_idx].right_idx));
 
-          cut_cell_idxs.push_back(m_cells[cell.top_idx].right_idx);
+          m_cut_cell_idxs.push_back(m_cells[cell.top_idx].right_idx);
           cell_idx = m_cells[cell.top_idx].right_idx;
 
           // TODO: This check might lead to problems
@@ -458,33 +457,33 @@ class Grid {
         // Left side
         if (on_x == ON_MIN) {
           assert(is_cell(cell.left_idx));
-          cut_cell_idxs.push_back(cell.left_idx);
+          m_cut_cell_idxs.push_back(cell.left_idx);
           cell_idx = cell.left_idx;
         }
         // Right side
         else if (on_x == ON_MAX) {
           assert(is_cell(cell.right_idx));
-          cut_cell_idxs.push_back(cell.right_idx);
+          m_cut_cell_idxs.push_back(cell.right_idx);
           cell_idx = cell.right_idx;
         }
         // Bottom side
         else if (on_y == ON_MIN) {
           assert(is_cell(cell.bottom_idx));
-          cut_cell_idxs.push_back(cell.bottom_idx);
+          m_cut_cell_idxs.push_back(cell.bottom_idx);
           cell_idx = cell.bottom_idx;
         }
         // Top side
         else {
           assert(is_cell(cell.top_idx));
-          cut_cell_idxs.push_back(cell.top_idx);
+          m_cut_cell_idxs.push_back(cell.top_idx);
           cell_idx = cell.top_idx;
         }
       }
     }
 
-    assert(cut_cell_idxs.size() + 1 == entry_points.size());
-    for (size_t i = 0; i < cut_cell_idxs.size(); ++i) {
-      auto& cell_to_cut = m_cells[cut_cell_idxs[i]];
+    assert(m_cut_cell_idxs.size() + 1 == entry_points.size());
+    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
+      auto& cell_to_cut = m_cells[m_cut_cell_idxs[i]];
       auto cut1_point   = entry_points[i];
       auto cut2_point   = entry_points[i + 1];
 
@@ -548,195 +547,6 @@ class Grid {
 
     return true;
   }
-
-#else
-  template <typename ParamShock>
-  [[nodiscard]] constexpr auto cut_init_shock(ParamShock init_shock) noexcept -> bool {
-    using ad_t          = ad::gt1s<Float>::type;
-    constexpr Float eps = 1e-8;
-    enum { ON_MIN = -1, NOT_ON = 0, ON_MAX = 1 };
-    enum { X, Y, POS_SIZE };
-
-    auto approx_eq       = [](Float a, Float b) -> bool { return std::abs(a - b) <= eps; };
-    auto pos_on_boundary = [approx_eq](const Eigen::Vector<Float, POS_SIZE>& pos,
-                                       const m_Cell& cell) -> bool {
-      return ((approx_eq(pos(X), cell.x_min) || approx_eq(pos(X), cell.x_min + cell.dx)) &&
-              (pos(Y) >= cell.y_min && pos(Y) <= cell.y_min + cell.dy)) ||
-             ((approx_eq(pos(Y), cell.y_min) || approx_eq(pos(Y), cell.y_min + cell.dy)) &&
-              (pos(X) >= cell.x_min && pos(X) <= cell.x_min + cell.dx));
-    };
-    auto pos_in_cell = [pos_on_boundary](const Eigen::Vector<Float, POS_SIZE>& pos,
-                                         const m_Cell& cell) -> bool {
-      return ((pos(X) >= cell.x_min) && (pos(X) <= cell.x_min + cell.dx) &&  //
-              (pos(Y) >= cell.y_min) && (pos(Y) <= cell.y_min + cell.dy)) ||
-             pos_on_boundary(pos, cell);
-      // (pos(X) - cell.x_min) <= cell.dx && (pos(1) - cell.y_min) <= cell.dy;
-    };
-    auto finished_iteration = [approx_eq](Float t) {
-      return t > Float{1} || approx_eq(t, Float{1});
-    };
-
-    const auto init_pos = init_shock(Float{0});
-    const auto cell_it =
-        std::find_if(std::cbegin(m_cells), std::cend(m_cells), [&](const auto& cell) {
-          return pos_in_cell(init_pos, cell);
-        });
-    if (cell_it == std::cend(m_cells)) {
-      Igor::Warn("Point {} on parametrized initial shock is not in the grid.", init_pos);
-      return false;
-    }
-    assert(std::distance(std::cbegin(m_cells), cell_it) >= 0);
-    auto cell_idx = static_cast<size_t>(std::distance(std::cbegin(m_cells), cell_it));
-
-    ad_t t_ad            = 0.0;
-    ad::derivative(t_ad) = 1.0;
-
-    std::vector<size_t> cut_cells{};
-    cut_cells.push_back(static_cast<size_t>(cell_idx));
-    std::vector<Eigen::Vector<Float, POS_SIZE>> entry_points{};
-    entry_points.push_back(init_pos);
-
-    for ([[maybe_unused]] size_t iter = 0; true; ++iter) {
-      const auto& cell = m_cells.at(cell_idx);
-
-      auto pos_ad = init_shock(t_ad);
-
-      const Eigen::Vector<Float, POS_SIZE> pos{ad::value(pos_ad(X)), ad::value(pos_ad(Y))};
-      const Eigen::Vector<Float, POS_SIZE> der{ad::derivative(pos_ad(X)),
-                                               ad::derivative(pos_ad(Y))};
-
-      const auto in_cell     = pos_in_cell(pos, cell);
-      const auto r_condition = [approx_eq, in_cell](Float r) {
-        return !approx_eq(r, Float{0}) &&       // Not 0
-               ((in_cell && (r > Float{0})) ||  // If in cell, then r > 0
-                (!in_cell && (r < Float{0})));  // If not in cell, then r < 0
-      };
-      const auto update_r = [r_condition](Float& r, Float prop_r) {
-        if (r_condition(prop_r) && std::abs(r) > std::abs(prop_r)) { r = prop_r; }
-      };
-      Float r = std::numeric_limits<Float>::infinity();
-      if (der(X) != Float{0}) {
-        update_r(r, (cell.x_min - pos(X)) / der(X));
-        update_r(r, (cell.x_min + cell.dx - pos(X)) / der(X));
-      }
-      if (der(Y) != Float{0}) {
-        update_r(r, (cell.y_min - pos(Y)) / der(Y));
-        update_r(r, (cell.y_min + cell.dy - pos(Y)) / der(Y));
-      }
-      if (std::isinf(r)) {
-        std::stringstream s{};
-        s << cell;
-        Igor::Debug("t = {}", ad::value(t_ad));
-        Igor::Debug("pos = {}", pos);
-        Igor::Debug("der = {}", der);
-        Igor::Warn("Did not find exit point for cell {}.", s.str());
-        return false;
-      }
-
-      ad::value(t_ad) += r;
-
-      const auto next_pos_ad = init_shock(t_ad);
-      Eigen::Vector<Float, POS_SIZE> next_pos{ad::value(next_pos_ad(X)), ad::value(next_pos_ad(Y))};
-      const Eigen::Vector<Float, POS_SIZE> next_der{ad::derivative(next_pos_ad(X)),
-                                                    ad::derivative(next_pos_ad(Y))};
-      if (pos_on_boundary(next_pos, cell)) {
-        entry_points.push_back(next_pos);
-
-        if (finished_iteration(ad::value(t_ad))) { break; }
-
-        const int on_x = approx_eq(cell.x_min, next_pos(X)) * ON_MIN +
-                         approx_eq(cell.x_min + cell.dx, next_pos(X)) * ON_MAX;
-        const int on_y = approx_eq(cell.y_min, next_pos(Y)) * ON_MIN +
-                         approx_eq(cell.y_min + cell.dy, next_pos(Y)) * ON_MAX;
-        assert(on_x != NOT_ON || on_y != NOT_ON);
-
-        if (on_x != NOT_ON && on_y != NOT_ON) {
-          Igor::Todo("Handle exit on corner, e.g. using `next_der`.");
-        }
-
-        if (on_x == ON_MIN) {
-          assert(is_cell(cell.left_idx));
-          cut_cells.push_back(cell.left_idx);
-          cell_idx = cell.left_idx;
-        } else if (on_x == ON_MAX) {
-          assert(is_cell(cell.right_idx));
-          cut_cells.push_back(cell.right_idx);
-          cell_idx = cell.right_idx;
-        } else if (on_y == ON_MIN) {
-          assert(is_cell(cell.bottom_idx));
-          cut_cells.push_back(cell.bottom_idx);
-          cell_idx = cell.bottom_idx;
-        } else if (on_y == ON_MAX) {
-          assert(is_cell(cell.top_idx));
-          cut_cells.push_back(cell.top_idx);
-          cell_idx = cell.top_idx;
-        }
-      }
-    }
-
-    assert(cut_cells.size() + 1 == entry_points.size());
-    for (size_t i = 0; i < cut_cells.size(); ++i) {
-      auto& cell_to_cut = m_cells[cut_cells[i]];
-      auto cut1_point   = entry_points[i];
-      auto cut2_point   = entry_points[i + 1];
-
-      const int cut1_on_x = approx_eq(cell_to_cut.x_min, cut1_point(X)) * ON_MIN +
-                            approx_eq(cell_to_cut.x_min + cell_to_cut.dx, cut1_point(X)) * ON_MAX;
-      const int cut1_on_y = approx_eq(cell_to_cut.y_min, cut1_point(Y)) * ON_MIN +
-                            approx_eq(cell_to_cut.y_min + cell_to_cut.dy, cut1_point(Y)) * ON_MAX;
-      assert(cut1_on_x != NOT_ON || cut1_on_y != NOT_ON);
-      Side cut1_loc = cut1_on_x == ON_MIN   ? LEFT
-                      : cut1_on_y == ON_MIN ? BOTTOM
-                      : cut1_on_x == ON_MAX ? RIGHT
-                                            : TOP;
-
-      const int cut2_on_x = approx_eq(cell_to_cut.x_min, cut2_point(X)) * ON_MIN +
-                            approx_eq(cell_to_cut.x_min + cell_to_cut.dx, cut2_point(X)) * ON_MAX;
-      const int cut2_on_y = approx_eq(cell_to_cut.y_min, cut2_point(Y)) * ON_MIN +
-                            approx_eq(cell_to_cut.y_min + cell_to_cut.dy, cut2_point(Y)) * ON_MAX;
-      assert(cut2_on_x != NOT_ON || cut2_on_y != NOT_ON);
-      Side cut2_loc = cut2_on_x == ON_MIN   ? LEFT
-                      : cut2_on_y == ON_MIN ? BOTTOM
-                      : cut2_on_x == ON_MAX ? RIGHT
-                                            : TOP;
-
-      if (cut1_loc == cut2_loc) {
-        Igor::Todo("Cut only on one side. I think we can just ignore then.");
-      }
-      if (cut1_loc > cut2_loc) {
-        std::swap(cut1_loc, cut2_loc);
-        std::swap(cut1_point, cut2_point);
-      }
-
-      CutType type;
-      switch (cut1_loc | cut2_loc) {
-        case LEFT | BOTTOM:  type = CutType::BOTTOM_LEFT; break;
-        case BOTTOM | RIGHT: type = CutType::BOTTOM_RIGHT; break;
-        case RIGHT | TOP:    type = CutType::TOP_RIGHT; break;
-        case TOP | LEFT:     type = CutType::TOP_LEFT; break;
-        case LEFT | RIGHT:   type = CutType::MIDDLE_HORI; break;
-        case BOTTOM | TOP:   type = CutType::MIDDLE_VERT; break;
-        default:
-          Igor::Panic("Invalid combination cut1_loc = {} and cut2_loc = {}",
-                      static_cast<std::underlying_type_t<Side>>(cut1_loc),
-                      static_cast<std::underlying_type_t<Side>>(cut2_loc));
-          std::unreachable();
-      }
-
-      cell_to_cut.value = CutValue<Float, DIM>{
-          .left_value  = Eigen::Vector<Float, DIM>::Zero(),
-          .right_value = Eigen::Vector<Float, DIM>::Zero(),
-          .type        = type,
-          .x1_cut      = cut1_point(X),
-          .y1_cut      = cut1_point(Y),
-          .x2_cut      = cut2_point(X),
-          .y2_cut      = cut2_point(Y),
-      };
-    }
-
-    return true;
-  }
-#endif  // CUT_NEWTON_VARIANT
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto abs_max_value() const noexcept -> Float {
@@ -819,6 +629,14 @@ class Grid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto begin() noexcept { return m_cells.begin(); }
+  [[nodiscard]] constexpr auto begin() const noexcept { return m_cells.begin(); }
+  [[nodiscard]] constexpr auto cbegin() const noexcept { return m_cells.cbegin(); }
+  [[nodiscard]] constexpr auto end() noexcept { return m_cells.end(); }
+  [[nodiscard]] constexpr auto end() const noexcept { return m_cells.end(); }
+  [[nodiscard]] constexpr auto cend() const noexcept { return m_cells.cend(); }
+
+  // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto is_cell(size_t idx) const noexcept -> bool {
     return idx < m_cells.size();
   }
@@ -833,6 +651,56 @@ class Grid {
   [[nodiscard]] constexpr auto is_bottom(size_t idx) const noexcept -> bool {
     const auto [xi, yi] = to_mat_idx(idx);
     return yi == 0;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto
+  get_existing_neighbours(size_t idx) const noexcept -> SmallVector<size_t> {
+    if (!is_cell(idx)) { return {}; }
+
+    const auto& center_cell = m_cells[idx];
+    SmallVector<size_t> neighbours{};
+
+    // Left cell
+    if (is_cell(center_cell.left_idx)) { neighbours.push_back(center_cell.left_idx); }
+    // Bottom cell
+    if (is_cell(center_cell.bottom_idx)) { neighbours.push_back(center_cell.bottom_idx); }
+    // Right cell
+    if (is_cell(center_cell.right_idx)) { neighbours.push_back(center_cell.right_idx); }
+    // Top cell
+    if (is_cell(center_cell.top_idx)) { neighbours.push_back(center_cell.top_idx); }
+
+    // Bottom left diagonal cell
+    if (is_cell(center_cell.left_idx) && is_cell(center_cell.bottom_idx)) {
+      assert(m_cells[center_cell.left_idx].bottom_idx == m_cells[center_cell.bottom_idx].left_idx);
+      if (is_cell(m_cells[center_cell.left_idx].bottom_idx)) {
+        neighbours.push_back(m_cells[center_cell.left_idx].bottom_idx);
+      }
+    }
+    // Bottom right diagonal cell
+    if (is_cell(center_cell.right_idx) && is_cell(center_cell.bottom_idx)) {
+      assert(m_cells[center_cell.right_idx].bottom_idx ==
+             m_cells[center_cell.bottom_idx].right_idx);
+      if (is_cell(m_cells[center_cell.right_idx].bottom_idx)) {
+        neighbours.push_back(m_cells[center_cell.right_idx].bottom_idx);
+      }
+    }
+    // Top left diagonal cell
+    if (is_cell(center_cell.left_idx) && is_cell(center_cell.top_idx)) {
+      assert(m_cells[center_cell.left_idx].top_idx == m_cells[center_cell.top_idx].left_idx);
+      if (is_cell(m_cells[center_cell.left_idx].top_idx)) {
+        neighbours.push_back(m_cells[center_cell.left_idx].top_idx);
+      }
+    }
+    // Top right diagonal cell
+    if (is_cell(center_cell.right_idx) && is_cell(center_cell.top_idx)) {
+      assert(m_cells[center_cell.right_idx].top_idx == m_cells[center_cell.top_idx].right_idx);
+      if (is_cell(m_cells[center_cell.right_idx].top_idx)) {
+        neighbours.push_back(m_cells[center_cell.right_idx].top_idx);
+      }
+    }
+
+    return neighbours;
   }
 
   // -----------------------------------------------------------------------------------------------

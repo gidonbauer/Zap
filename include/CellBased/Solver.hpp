@@ -1,8 +1,6 @@
 #ifndef ZAP_CELL_BASED_SOLVER_HPP_
 #define ZAP_CELL_BASED_SOLVER_HPP_
 
-#include <numbers>
-
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Interface.hpp"
@@ -96,7 +94,7 @@ class Solver {
     get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
     const Eigen::Matrix<Float, DIM, DIM> wave_lengths = eig_vals * dt;
 
-    // Eigen expansion of jump
+    // Eigen expansion of jump; wave strength
     const Eigen::Vector<Float, DIM> alpha =
         eig_vecs.inverse() * (interface.right_value - interface.left_value);
 
@@ -146,6 +144,53 @@ class Solver {
     }
   }
 
+  // -----------------------------------------------------------------------------------------------
+  template <typename Float, size_t DIM>
+  constexpr void apply_side_interfaces(const Grid<Float, DIM>& curr_grid,
+                                       Cell<Float, DIM>& next_cell,
+                                       const Cell<Float, DIM>& curr_cell,
+                                       size_t idx,
+                                       Side side,
+                                       Float dt) {
+    if (curr_grid.is_cell(idx)) {
+      const auto& other_cell = curr_grid[idx];
+      const auto interfaces  = get_shared_interfaces(curr_cell, other_cell, side);
+      for (const auto& interface : interfaces) {
+        const auto waves = calculate_interface(interface, dt);
+        for (const auto& wave : waves) {
+          update_cell(next_cell, wave);
+        }
+      }
+    } else if (idx == SAME_VALUE_INDEX) {
+      // TODO: Noop?
+    } else if (idx == ZERO_FLUX_INDEX) {
+      // TODO: Noop?
+    } else if (idx == NULL_INDEX) {
+      std::stringstream s;
+      s << curr_cell;
+      Igor::Debug("cell = {}", s.str());
+      Igor::Panic("cell has NULL index.");
+    } else {
+      std::stringstream s;
+      s << curr_cell;
+      Igor::Debug("cell = {}", s.str());
+      Igor::Panic("cell has unknown index with value {}.", idx);
+    }
+  };
+
+  // -----------------------------------------------------------------------------------------------
+  template <typename Float, size_t DIM>
+  [[nodiscard]] constexpr auto
+  get_internal_interface(const Cell<Float, DIM>& cell) const noexcept -> FullInterface<Float, DIM> {
+    assert(cell.is_cut());
+    return FullInterface<Float, DIM>{
+        .left_value  = cell.get_cut().left_value,
+        .right_value = cell.get_cut().right_value,
+        .begin       = {cell.get_cut().x1_cut, cell.get_cut().y1_cut},
+        .end         = {cell.get_cut().x2_cut, cell.get_cut().y2_cut},
+    };
+  }
+
  public:
   // -----------------------------------------------------------------------------------------------
   constexpr Solver(A a, B b)
@@ -154,7 +199,7 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM, typename GridWriter, typename TimeWriter>
-  [[nodiscard]] constexpr auto
+  [[nodiscard]] auto
   solve(Grid<Float, DIM> grid,
         Float tend,
         GridWriter& grid_writer,
@@ -180,19 +225,143 @@ class Solver {
       }
       const Float dt = std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
+      next_grid = curr_grid;
+      // Merge all old cut cells in next grid
+      for (size_t cell_idx : next_grid.m_cut_cell_idxs) {
+        auto& cell = next_grid[cell_idx];
+        assert(cell.is_cut());
+
+        const auto left_value   = cell.get_cut().left_value;
+        const auto left_polygon = cell.get_cut_left_polygon();
+
+        const auto right_value   = cell.get_cut().right_value;
+        const auto right_polygon = cell.get_cut_right_polygon();
+
+        const auto cell_polygon = cell.get_cartesian_polygon();
+
+        cell.value = CartesianValue<Float, DIM>{
+            .value = (left_value * left_polygon.area() + right_value * right_polygon.area()) /
+                     cell_polygon.area()};
+      }
+      next_grid.m_cut_cell_idxs.clear();
+
+      // TODO: Need some ordering of cut cells
+      // Move old cuts according to strongest wave
+      std::vector<std::pair<Eigen::Vector<Float, 2>, Eigen::Vector<Float, 2>>> new_shock_points;
+      for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
+        const auto& curr_cell = curr_grid[cell_idx];
+        assert(curr_cell.is_cut());
+
+        const auto interface = get_internal_interface(curr_cell);
+
+        const Eigen::Vector<Float, 2> tangent_vector = interface.end - interface.begin;
+        const auto interface_angle = std::acos(tangent_vector(1) / tangent_vector.norm());
+        const Eigen::Vector<Float, 2> normal_vector{std::cos(interface_angle),
+                                                    std::sin(interface_angle)};
+        assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
+        assert(std::abs(normal_vector.norm() - 1) <= 1e-8);
+
+        const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
+
+        const Eigen::Matrix<Float, DIM, DIM> eta_mat =
+            std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+
+        Eigen::Matrix<Float, DIM, DIM> eig_vals;
+        Eigen::Matrix<Float, DIM, DIM> eig_vecs;
+        get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
+
+        // Wave strength
+        const Eigen::Vector<Float, DIM> alpha =
+            eig_vecs.inverse() * (interface.right_value - interface.left_value);
+
+        Eigen::Index strong_wave_idx = 0;
+        for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+          // TODO: Abs or not?
+          if (std::abs(alpha(i)) > std::abs(alpha(strong_wave_idx))) { strong_wave_idx = i; }
+        }
+
+        const auto wave_length = eig_vals(strong_wave_idx) * dt;
+
+        new_shock_points.emplace_back(interface.begin + normal_vector * wave_length,
+                                      interface.end + normal_vector * wave_length);
+      }
+
+      for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
+        Igor::Debug("([{}, {}], [{}, {}])",
+                    curr_grid[cell_idx].get_cut().x1_cut,
+                    curr_grid[cell_idx].get_cut().y1_cut,
+                    curr_grid[cell_idx].get_cut().x2_cut,
+                    curr_grid[cell_idx].get_cut().y2_cut);
+      }
+
+      std::cout << "------------------------------------------------------------\n";
+
+      for (const auto& p : new_shock_points) {
+        Igor::Debug("{}", p);
+      }
+
+      std::vector<Eigen::Vector<Float, 2>> avg_new_shock_points(new_shock_points.size() + 1);
+      assert(avg_new_shock_points.size() > 2);
+      avg_new_shock_points[0] = new_shock_points[0].first;
+      for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
+        avg_new_shock_points[i] = (new_shock_points[i - 1].second + new_shock_points[i].first) / 2;
+      }
+      avg_new_shock_points[new_shock_points.size()] = new_shock_points.back().second;
+
+      IGOR_DEBUG_PRINT(avg_new_shock_points);
+
+      Igor::Todo("Calculating new interfaces is not implemented yet.");
+
       // TODO: Move shock in next grid
       // TODO: Remove old shock in next grid
       // TODO: Update values
 
+#ifndef USE_FLUX_FOR_CARTESIAN
+#pragma omp parallel for
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
         const auto& curr_cell = curr_grid[cell_idx];
         auto& next_cell       = next_grid[cell_idx];
 
-        // curr_cell must be cartesian, cut cells are handled differently
-        if (curr_cell.is_cartesian()) {
-#ifndef USE_FLUX_FOR_CARTESIAN
-          goto CALCULATE_ONLY_CARTESION_INTERFACES;
+        // Left interface
+        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
+        // Right interface
+        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
+        // Bottom interface
+        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
+        // Top interface
+        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
+      }
+
+      for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
+        const auto& curr_cell = curr_grid[cell_idx];
+        assert(curr_cell.is_cut());
+        auto& next_cell = next_grid[cell_idx];
+        assert(next_cell.is_cartesian() || next_cell.is_cut());
+
+        // - Handle internal interface -----------------------------------------------------------
+        const auto internal_interface = get_internal_interface(curr_cell);
+        const auto internal_waves     = calculate_interface(internal_interface, dt);
+
+        const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
+        for (const auto& wave : internal_waves) {
+          // Neighbouring cells
+          for (size_t neighbour_idx : cell_neighbours) {
+            update_cell(next_grid[neighbour_idx], wave);
+          }
+          // This cell
+          update_cell(next_cell, wave);
+        }
+        // - Handle internal interface -----------------------------------------------------------
+      }
 #else
+      for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
+        const auto& curr_cell = curr_grid[cell_idx];
+        assert(curr_cell.is_cartesian() || curr_cell.is_cut());
+        auto& next_cell = next_grid[cell_idx];
+        assert(next_cell.is_cartesian() || next_cell.is_cut());
+
+        // curr_cell must be cartesian, cut cells are handled differently
+        if (curr_cell.is_cartesian() && next_cell.is_cartesian()) {
           auto calc_flux = [this, &curr_grid, dt](const Cell<Float, DIM>& cell,
                                                   size_t idx,
                                                   Side from) -> Eigen::Vector<Float, DIM> {
@@ -231,137 +400,38 @@ class Solver {
           // Top side: U_(i, j) -> U_(i+1, j)
           const auto G_plus = calc_flux(curr_cell, curr_cell.top_idx, TOP);
 
-          if (next_cell.is_cartesian()) {
-            next_cell.get_cartesian().value = curr_cell.get_cartesian().value -  //
-                                              (F_plus - F_minus) -               //
-                                              (G_plus - G_minus);
-          } else {
-            Igor::Todo("next_cell non-cartesian is not implemented yet.");
-          }
-#endif  // USE_FLUX_FOR_CARTESIAN
-        } else if (curr_cell.is_cut()) {
+          next_cell.get_cartesian().value = curr_cell.get_cartesian().value -  //
+                                            (F_plus - F_minus) -               //
+                                            (G_plus - G_minus);
+        } else {
           // - Handle internal interface -----------------------------------------------------------
           {
-            const FullInterface<Float, DIM> internal_interface{
-                .left_value  = curr_cell.get_cut().left_value,
-                .right_value = curr_cell.get_cut().right_value,
-                .begin       = {curr_cell.get_cut().x1_cut, curr_cell.get_cut().y1_cut},
-                .end         = {curr_cell.get_cut().x2_cut, curr_cell.get_cut().y2_cut},
-            };
-            const auto internal_waves = calculate_interface(internal_interface, dt);
+            const auto internal_interface = get_internal_interface(curr_cell);
+            const auto internal_waves     = calculate_interface(internal_interface, dt);
 
+            const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
             for (const auto& wave : internal_waves) {
-              // Left cell
-              if (next_grid.is_cell(curr_cell.left_idx)) {
-                update_cell(next_grid[curr_cell.left_idx], wave);
+              // Neighbouring cells
+              for (size_t neighbour_idx : cell_neighbours) {
+                update_cell(next_grid[neighbour_idx], wave);
               }
-
-              // Bottom cell
-              if (next_grid.is_cell(curr_cell.bottom_idx)) {
-                update_cell(next_grid[curr_cell.bottom_idx], wave);
-              }
-
-              // Right cell
-              if (next_grid.is_cell(curr_cell.right_idx)) {
-                update_cell(next_grid[curr_cell.right_idx], wave);
-              }
-
-              // Top cell
-              if (next_grid.is_cell(curr_cell.top_idx)) {
-                update_cell(next_grid[curr_cell.top_idx], wave);
-              }
-
-              // Bottom left diagonal cell
-              if (next_grid.is_cell(curr_cell.left_idx) &&
-                  next_grid.is_cell(curr_cell.bottom_idx)) {
-                assert(next_grid[curr_cell.left_idx].bottom_idx ==
-                       next_grid[curr_cell.bottom_idx].left_idx);
-                if (next_grid.is_cell(next_grid[curr_cell.left_idx].bottom_idx)) {
-                  update_cell(next_grid[next_grid[curr_cell.left_idx].bottom_idx], wave);
-                }
-              }
-
-              // Bottom right diagonal cell
-              if (next_grid.is_cell(curr_cell.right_idx) &&
-                  next_grid.is_cell(curr_cell.bottom_idx)) {
-                assert(next_grid[curr_cell.right_idx].bottom_idx ==
-                       next_grid[curr_cell.bottom_idx].right_idx);
-                if (next_grid.is_cell(next_grid[curr_cell.right_idx].bottom_idx)) {
-                  update_cell(next_grid[next_grid[curr_cell.right_idx].bottom_idx], wave);
-                }
-              }
-
-              // Top left diagonal cell
-              if (next_grid.is_cell(curr_cell.left_idx) && next_grid.is_cell(curr_cell.top_idx)) {
-                assert(next_grid[curr_cell.left_idx].top_idx ==
-                       next_grid[curr_cell.top_idx].left_idx);
-                if (next_grid.is_cell(next_grid[curr_cell.left_idx].top_idx)) {
-                  update_cell(next_grid[next_grid[curr_cell.left_idx].top_idx], wave);
-                }
-              }
-
-              // Top right diagonal cell
-              if (next_grid.is_cell(curr_cell.right_idx) && next_grid.is_cell(curr_cell.top_idx)) {
-                assert(next_grid[curr_cell.right_idx].top_idx ==
-                       next_grid[curr_cell.top_idx].right_idx);
-                if (next_grid.is_cell(next_grid[curr_cell.right_idx].top_idx)) {
-                  update_cell(next_grid[next_grid[curr_cell.right_idx].top_idx], wave);
-                }
-              }
-
               // This cell
               update_cell(next_cell, wave);
             }
           }
           // - Handle internal interface -----------------------------------------------------------
 
-#ifndef USE_FLUX_FOR_CARTESIAN
-          // TODO: Remove this dirty hack
-        CALCULATE_ONLY_CARTESION_INTERFACES:
-#endif  // USE_FLUX_FOR_CARTESIAN
-          auto apply_side_interfaces = [this, dt, &curr_grid](Cell<Float, DIM>& next_cell,
-                                                              const Cell<Float, DIM>& curr_cell,
-                                                              size_t idx,
-                                                              Side side) {
-            if (curr_grid.is_cell(idx)) {
-              const auto& other_cell = curr_grid[idx];
-              const auto interfaces  = get_shared_interfaces(curr_cell, other_cell, side);
-              for (const auto& interface : interfaces) {
-                const auto waves = calculate_interface(interface, dt);
-                for (const auto& wave : waves) {
-                  update_cell(next_cell, wave);
-                }
-              }
-            } else if (idx == SAME_VALUE_INDEX) {
-              // TODO: Noop?
-            } else if (idx == ZERO_FLUX_INDEX) {
-              // TODO: Noop?
-            } else if (idx == NULL_INDEX) {
-              std::stringstream s;
-              s << curr_cell;
-              Igor::Debug("cell = {}", s.str());
-              Igor::Panic("cell has NULL index.");
-            } else {
-              std::stringstream s;
-              s << curr_cell;
-              Igor::Debug("cell = {}", s.str());
-              Igor::Panic("cell has unknown index with value {}.", idx);
-            }
-          };
-
           // Left interface
-          apply_side_interfaces(next_cell, curr_cell, curr_cell.left_idx, LEFT);
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
           // Right interface
-          apply_side_interfaces(next_cell, curr_cell, curr_cell.right_idx, RIGHT);
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
           // Bottom interface
-          apply_side_interfaces(next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM);
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
           // Top interface
-          apply_side_interfaces(next_cell, curr_cell, curr_cell.top_idx, TOP);
-        } else {
-          Igor::Warn("Unknown cell type with variant index {}", curr_cell.value.index());
-          return std::nullopt;
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
         }
       }
+#endif
 
       // Update time
       t += dt;

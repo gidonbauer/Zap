@@ -149,7 +149,10 @@ auto main(int argc, char** argv) -> int {
 #else
   static_assert(false, "No initial condition defined.");
 #endif
-  if (!grid.cut_init_shock(init_shock)) { return 1; }
+
+  IGOR_TIME_SCOPE("Cutting the grid") {
+    if (!grid.cut_init_shock(init_shock)) { return 1; }
+  }
 
   // grid.fill_center(u0);
   grid.fill_four_point(u0);

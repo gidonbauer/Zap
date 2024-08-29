@@ -40,6 +40,34 @@ struct A {
 
 using B = A;
 
+// struct B {
+//   static constexpr size_t DIM = 1;
+//
+//   template <std::floating_point Float>
+//   [[nodiscard]] constexpr auto
+//   mat(const Eigen::Vector<Float, DIM>& u) const noexcept -> Eigen::Matrix<Float, DIM, DIM> {
+//     return Eigen::Matrix<Float, DIM, DIM>{u(0) / 2};
+//   }
+//
+//   template <std::floating_point Float>
+//   [[nodiscard]] constexpr auto
+//   eig_vals(const Eigen::Vector<Float, DIM>& u) const noexcept -> Eigen::Matrix<Float, DIM, DIM> {
+//     return Eigen::Matrix<Float, DIM, DIM>{u(0) / 2};
+//   }
+//
+//   template <std::floating_point Float>
+//   [[nodiscard]] constexpr auto eig_vecs(const Eigen::Vector<Float, DIM>& /*u*/) const noexcept
+//       -> Eigen::Matrix<Float, DIM, DIM> {
+//     return Eigen::Matrix<Float, DIM, DIM>::Identity();
+//   }
+//
+//   template <std::floating_point Float>
+//   [[nodiscard]] constexpr auto
+//   max_abs_eig_val(const Eigen::Vector<Float, DIM>& u) const noexcept -> Float {
+//     return std::abs(u(0) / 2);
+//   }
+// };
+
 }  // namespace SingleEq
 
 // -------------------------------------------------------------------------------------------------
