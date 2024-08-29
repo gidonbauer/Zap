@@ -1,9 +1,7 @@
 #ifndef ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_
 #define ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_
 
-#include <iosfwd>
-
-#include "Matrix.hpp"
+#include "Scalar/Matrix.hpp"
 
 namespace Zap::Scalar {
 

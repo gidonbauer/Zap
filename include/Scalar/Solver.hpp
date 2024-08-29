@@ -6,7 +6,7 @@
 #include <Eigen/Dense>
 
 #include "Igor.hpp"
-#include "Matrix.hpp"
+#include "Scalar/Matrix.hpp"
 
 namespace Zap::Scalar {
 
@@ -54,9 +54,7 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
     constexpr auto zero = static_cast<T>(0);
     if (u_left <= u_right) {
       // min u in [u_left, u_right] f(u) = 0.5 * u^2
-      if (u_left <= zero && u_right >= zero) {
-        return f(zero);
-      }
+      if (u_left <= zero && u_right >= zero) { return f(zero); }
       return f(std::min(std::abs(u_left), std::abs(u_right)));
     }
     // max u in [u_right, u_left] f(u) = 0.5 * u^2
@@ -108,9 +106,7 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
     Zap::swap(u_curr, u_next);
 
     // - Save intermediate results to file to not exceed memory ------------------------------------
-    if (!u_writer.write_data(u_curr) || !t_writer.write_data(t)) {
-      return std::nullopt;
-    }
+    if (!u_writer.write_data(u_curr) || !t_writer.write_data(t)) { return std::nullopt; }
   }
 
   return u_curr;
