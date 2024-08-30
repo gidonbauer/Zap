@@ -45,11 +45,11 @@ class Polygon {
 
   // -----------------------------------------------------------------------------------------------
   constexpr void remove_duplicate_points() noexcept {
-    const auto first_dublicate =
+    const auto first_duplicate =
         std::unique(std::begin(m_points), std::end(m_points), [](const Point& p1, const Point& p2) {
           return (p1 - p2).norm() < 1e-8;
         });
-    m_points.erase(first_dublicate, std::end(m_points));
+    m_points.erase(first_duplicate, std::end(m_points));
   }
 
   // -----------------------------------------------------------------------------------------------
