@@ -118,15 +118,15 @@ intersection(const Polygon<Float>& polygon1,
                                  const Eigen::Vector<Float, DIM>& b,
                                  const Eigen::Vector<Float, DIM>& c,
                                  const Eigen::Vector<Float, DIM>& d) -> Eigen::Vector<Float, DIM> {
-    double a1 = b(Y) - a(Y);
-    double b1 = a(X) - b(X);
-    double c1 = a1 * a(X) + b1 * a(Y);
+    Float a1 = b(Y) - a(Y);
+    Float b1 = a(X) - b(X);
+    Float c1 = a1 * a(X) + b1 * a(Y);
 
-    double a2 = d(Y) - c(Y);
-    double b2 = c(X) - d(X);
-    double c2 = a2 * c(X) + b2 * c(Y);
+    Float a2 = d(Y) - c(Y);
+    Float b2 = c(X) - d(X);
+    Float c2 = a2 * c(X) + b2 * c(Y);
 
-    double determinant = a1 * b2 - a2 * b1;
+    Float determinant = a1 * b2 - a2 * b1;
     assert(std::abs(determinant) >= eps);
 
     return {(b2 * c1 - b1 * c2) / determinant, (a1 * c2 - a2 * c1) / determinant};

@@ -418,22 +418,40 @@ get_shared_interfaces(const Cell<Float, DIM>& center_cell,
       interfaces[i] = FullInterface<Float, DIM>{
           .left_value  = left_side[i].value,
           .right_value = right_side[i].value,
-          .begin       = left_is_center ? left_side[i].begin : right_side[i].begin,
-          .end         = left_is_center ? left_side[i].end : right_side[i].end,
+          // TODO: Is this necessary?
+          .begin = left_is_center ? left_side[i].begin : right_side[i].begin,
+          .end   = left_is_center ? left_side[i].end : right_side[i].end,
       };
     }
     return interfaces;
   } else {
-    // if (left_side.size() == 1) {
-    //   Igor::Todo("left_side.size() == 1");
-    // } else if (right_side.size() == 1) {
-    //   Igor::Todo("right_side.size() == 1");
-    // } else {
-    //   Igor::Panic("Only simple case when either left_side or right side have only one interface
-    //   is "
-    //               "implemented.");
-    //   std::unreachable();
-    // }
+    if (left_side.size() == 1) {
+      SmallVector<FullInterface<Float, DIM>> interfaces(right_side.size());
+      for (size_t i = 0; i < right_side.size(); ++i) {
+        interfaces[i] = FullInterface<Float, DIM>{
+            .left_value  = left_side[0].value,
+            .right_value = right_side[i].value,
+            .begin       = right_side[i].begin,
+            .end         = right_side[i].end,
+        };
+      }
+      return interfaces;
+    } else if (right_side.size() == 1) {
+      SmallVector<FullInterface<Float, DIM>> interfaces(left_side.size());
+      for (size_t i = 0; i < left_side.size(); ++i) {
+        interfaces[i] = FullInterface<Float, DIM>{
+            .left_value  = left_side[i].value,
+            .right_value = right_side[0].value,
+            .begin       = left_side[i].begin,
+            .end         = left_side[i].end,
+        };
+      }
+      return interfaces;
+    } else {
+      Igor::Panic("Only simple case when either left_side or right side have only one interface is "
+                  "implemented.");
+      std::unreachable();
+    }
 
     Igor::Debug("left_side:");
     for (size_t i = 0; i < left_side.size(); ++i) {

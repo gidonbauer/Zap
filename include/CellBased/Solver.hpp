@@ -1,6 +1,8 @@
 #ifndef ZAP_CELL_BASED_SOLVER_HPP_
 #define ZAP_CELL_BASED_SOLVER_HPP_
 
+#include <numbers>
+
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Interface.hpp"
@@ -70,17 +72,20 @@ class Solver {
   calculate_interface(const FullInterface<Float, DIM>& interface,
                       Float dt) const noexcept -> SmallVector<WaveProperties<Float, DIM>> {
     // Vector tangential to interface
-    const Eigen::Vector<Float, 2> interface_vector = interface.end - interface.begin;
+    const Eigen::Vector<Float, 2> tangent_vector = (interface.end - interface.begin).normalized();
 
     // Angle between cut_vector and y-axis (0, 1)
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
     // <=> cut_angle = arccos(cut_vector_1 / ||cut_vector||)
-    const auto interface_angle = std::acos(interface_vector(1) / interface_vector.norm());
+    auto interface_angle = std::acos(tangent_vector(Y));
+    if (tangent_vector(X) > 0) {
+      interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
+    }
 
     // Vector normal to cut
     const Eigen::Vector<Float, 2> normal_vector{std::cos(interface_angle),
                                                 std::sin(interface_angle)};
-    assert(std::abs(interface_vector.dot(normal_vector)) <= 1e-8);
+    assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
 
     const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
 
@@ -191,6 +196,178 @@ class Solver {
     };
   }
 
+  // -----------------------------------------------------------------------------------------------
+  template <typename Float, size_t DIM>
+  [[nodiscard]] constexpr auto move_wave_front(const Grid<Float, DIM>& curr_grid,
+                                               [[maybe_unused]] const Grid<Float, DIM>& next_grid,
+                                               Float dt) const noexcept
+      -> std::optional<std::vector<Eigen::Vector<Float, POINT_SIZE>>> {
+    // Move old cuts according to strongest wave
+    std::vector<std::pair<Eigen::Vector<Float, POINT_SIZE>, Eigen::Vector<Float, POINT_SIZE>>>
+        new_shock_points;
+    for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
+      const auto& curr_cell = curr_grid[cell_idx];
+      assert(curr_cell.is_cut());
+
+      const auto interface = get_internal_interface(curr_cell);
+
+      const Eigen::Vector<Float, POINT_SIZE> tangent_vector =
+          (interface.end - interface.begin).normalized();
+      assert(std::abs(tangent_vector.norm() - 1) <= 1e-8);
+
+      auto interface_angle = std::acos(tangent_vector(Y));
+      if (tangent_vector(X) > 0) {
+        interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
+      }
+      const Eigen::Vector<Float, POINT_SIZE> normal_vector{std::cos(interface_angle),
+                                                           std::sin(interface_angle)};
+      assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
+
+      const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
+
+      const Eigen::Matrix<Float, DIM, DIM> eta_mat =
+          std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+
+      Eigen::Matrix<Float, DIM, DIM> eig_vals;
+      Eigen::Matrix<Float, DIM, DIM> eig_vecs;
+      get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
+
+      // Wave strength
+      const Eigen::Vector<Float, DIM> alpha =
+          eig_vecs.inverse() * (interface.right_value - interface.left_value);
+
+      Eigen::Index strong_wave_idx = 0;
+      for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+        // TODO: Abs or not?
+        if (std::abs(alpha(i)) > std::abs(alpha(strong_wave_idx))) { strong_wave_idx = i; }
+      }
+
+      const auto wave_length = eig_vals(strong_wave_idx) * dt;
+
+      new_shock_points.emplace_back(interface.begin + normal_vector * wave_length,
+                                    interface.end + normal_vector * wave_length);
+    }
+
+    std::vector<Eigen::Vector<Float, POINT_SIZE>> avg_new_shock_points(new_shock_points.size() + 1);
+    assert(avg_new_shock_points.size() > 2);
+    avg_new_shock_points[0] = new_shock_points[0].first;
+    for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
+      avg_new_shock_points[i] = (new_shock_points[i - 1].second + new_shock_points[i].first) / 2;
+    }
+    avg_new_shock_points[new_shock_points.size()] = new_shock_points.back().second;
+
+    // const auto try_value = [](Float& r, Float prop_r) {
+    //   if (prop_r >= 0 && prop_r < r) { r = prop_r; }
+    // };
+    // Move first point to boundary
+    // {
+    //   auto& first_point = avg_new_shock_points.front();
+    //   const auto first_point_cell =
+    //       std::find_if(std::cbegin(next_grid),
+    //                    std::cend(next_grid),
+    //                    [point = first_point](const Cell<Float, DIM>& cell) {
+    //                      return point_in_cell(point, cell);
+    //                    });
+    //   if (first_point_cell == std::cend(next_grid)) {
+    //     const auto second_point_cell =
+    //         std::find_if(std::cbegin(next_grid),
+    //                      std::cend(next_grid),
+    //                      [point = avg_new_shock_points[1]](const Cell<Float, DIM>& cell) {
+    //                        return point_in_cell(point, cell);
+    //                      });
+    //     if (second_point_cell == std::cend(next_grid)) {
+    //       Igor::Warn("First and second point not in grid.");
+    //       return std::nullopt;
+    //     }
+
+    //     Eigen::Vector<Float, POINT_SIZE> slope = avg_new_shock_points[1] - first_point;
+
+    //     Float r = std::numeric_limits<Float>::max();
+    //     try_value(r, (second_point_cell->x_min - first_point(X)) / slope(X));
+    //     try_value(r,
+    //               (second_point_cell->x_min + second_point_cell->dx - first_point(X)) /
+    //               slope(X));
+    //     try_value(r, (second_point_cell->y_min - first_point(Y)) / slope(Y));
+    //     try_value(r,
+    //               (second_point_cell->y_min + second_point_cell->dy - first_point(Y)) /
+    //               slope(Y));
+
+    //     first_point += r * slope;
+    //   } else {
+    //     Eigen::Vector<Float, POINT_SIZE> slope = first_point - avg_new_shock_points[1];
+
+    //     Float r = std::numeric_limits<Float>::max();
+    //     try_value(r, (first_point_cell->x_min - first_point(X)) / slope(X));
+    //     try_value(r, (first_point_cell->x_min + first_point_cell->dx - first_point(X)) /
+    //     slope(X)); try_value(r, (first_point_cell->y_min - first_point(Y)) / slope(Y));
+    //     try_value(r, (first_point_cell->y_min + first_point_cell->dy - first_point(Y)) /
+    //     slope(Y)); first_point += r * slope;
+    //   }
+    // }
+
+    // Move last point to boundary
+    // {
+    //   auto& last_point           = avg_new_shock_points.back();
+    //   const auto last_point_cell = std::find_if(std::cbegin(next_grid),
+    //                                             std::cend(next_grid),
+    //                                             [point = last_point](const Cell<Float, DIM>&
+    //                                             cell) {
+    //                                               return point_in_cell(point, cell);
+    //                                             });
+
+    //   // Last point is outside of grid
+    //   if (last_point_cell == std::cend(next_grid)) {
+    //     const auto second_last_point_cell =
+    //         std::find_if(std::cbegin(next_grid),
+    //                      std::cend(next_grid),
+    //                      [point = avg_new_shock_points[avg_new_shock_points.size() - 2]](
+    //                          const Cell<Float, DIM>& cell) { return point_in_cell(point, cell);
+    //                          });
+    //     // Second to last point also not in grid
+    //     if (second_last_point_cell == std::cend(next_grid)) {
+    //       Igor::Warn("Last (and second to last) point not in grid.");
+    //       return std::nullopt;
+    //     }
+
+    //     Eigen::Vector<Float, POINT_SIZE> slope =
+    //         avg_new_shock_points[avg_new_shock_points.size() - 2] - last_point;
+
+    //     Float r = std::numeric_limits<Float>::max();
+    //     try_value(r, (second_last_point_cell->x_min - last_point(X)) / slope(X));
+    //     try_value(r,
+    //               (second_last_point_cell->x_min + second_last_point_cell->dx - last_point(X)) /
+    //                   slope(X));
+    //     try_value(r, (second_last_point_cell->y_min - last_point(Y)) / slope(Y));
+    //     try_value(r,
+    //               (second_last_point_cell->y_min + second_last_point_cell->dy - last_point(Y)) /
+    //                   slope(Y));
+
+    //     last_point += r * slope;
+    //   } else {
+    //     Eigen::Vector<Float, POINT_SIZE> slope =
+    //         last_point - avg_new_shock_points[avg_new_shock_points.size() - 2];
+
+    //     Float r = std::numeric_limits<Float>::max();
+    //     try_value(r, (last_point_cell->x_min - last_point(X)) / slope(X));
+    //     try_value(r, (last_point_cell->x_min + last_point_cell->dx - last_point(X)) / slope(X));
+    //     try_value(r, (last_point_cell->y_min - last_point(Y)) / slope(Y));
+    //     try_value(r, (last_point_cell->y_min + last_point_cell->dy - last_point(Y)) / slope(Y));
+    //     last_point += r * slope;
+    //   }
+    // }
+
+    if ((avg_new_shock_points[0] - avg_new_shock_points[1]).norm() < 1e-2) {
+      avg_new_shock_points.erase(std::next(std::begin(avg_new_shock_points)));
+    }
+    if ((avg_new_shock_points[avg_new_shock_points.size() - 1] -
+         avg_new_shock_points[avg_new_shock_points.size() - 2])
+            .norm() < 1e-2) {
+      avg_new_shock_points.erase(std::prev(std::end(avg_new_shock_points), 2));
+    }
+
+    return avg_new_shock_points;
+  }
+
  public:
   // -----------------------------------------------------------------------------------------------
   constexpr Solver(A a, B b)
@@ -226,91 +403,68 @@ class Solver {
       const Float dt = std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
       next_grid = curr_grid;
-      // Merge all old cut cells in next grid
-      for (size_t cell_idx : next_grid.m_cut_cell_idxs) {
-        auto& cell = next_grid[cell_idx];
-        assert(cell.is_cut());
+      next_grid.merge_cut_cells();
 
-        const auto left_value   = cell.get_cut().left_value;
-        const auto left_polygon = cell.get_cut_left_polygon();
+      auto avg_new_shock_points = move_wave_front(curr_grid, next_grid, dt);
+      if (!avg_new_shock_points.has_value()) { return std::nullopt; }
 
-        const auto right_value   = cell.get_cut().right_value;
-        const auto right_polygon = cell.get_cut_right_polygon();
-
-        const auto cell_polygon = cell.get_cartesian_polygon();
-
-        cell.value = CartesianValue<Float, DIM>{
-            .value = (left_value * left_polygon.area() + right_value * right_polygon.area()) /
-                     cell_polygon.area()};
+      // if (!next_grid.cut_curve([&avg_new_shock_points](Float t) {
+      //       return piecewise_linear_curve<Float, DIM>(t, *avg_new_shock_points);
+      //     })) {
+      //   Igor::Warn("Could not cut on new shock curve.");
+      //   return std::nullopt;
+      // }
+      if (!next_grid.cut_piecewise_linear(std::move(*avg_new_shock_points))) {
+        Igor::Warn("Could not cut on new shock curve.");
+        return std::nullopt;
       }
-      next_grid.m_cut_cell_idxs.clear();
 
-      // TODO: Need some ordering of cut cells
-      // Move old cuts according to strongest wave
-      std::vector<std::pair<Eigen::Vector<Float, 2>, Eigen::Vector<Float, 2>>> new_shock_points;
-      for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
-        const auto& curr_cell = curr_grid[cell_idx];
-        assert(curr_cell.is_cut());
+      // Re-calculate value for newly cut cells
+      for (size_t new_cut_idx : next_grid.m_cut_cell_idxs) {
+        auto& next_cell       = next_grid[new_cut_idx];
+        const auto& curr_cell = curr_grid[new_cut_idx];
+        assert(next_cell.is_cut());
+        assert(curr_cell.is_cartesian() || curr_cell.is_cut());
 
-        const auto interface = get_internal_interface(curr_cell);
+        if (curr_cell.is_cut()) {
+          const auto curr_cell_left_polygon  = curr_cell.get_cut_left_polygon();
+          const auto curr_cell_right_polygon = curr_cell.get_cut_right_polygon();
 
-        const Eigen::Vector<Float, 2> tangent_vector = interface.end - interface.begin;
-        const auto interface_angle = std::acos(tangent_vector(1) / tangent_vector.norm());
-        const Eigen::Vector<Float, 2> normal_vector{std::cos(interface_angle),
-                                                    std::sin(interface_angle)};
-        assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
-        assert(std::abs(normal_vector.norm() - 1) <= 1e-8);
+          // Left subcell
+          {
+            const auto next_subcell_polygon = next_cell.get_cut_left_polygon();
+            const auto left_intersect_area =
+                Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
+            const auto right_intersect_area =
+                Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
+            assert(std::abs(left_intersect_area + right_intersect_area -
+                            next_subcell_polygon.area()) < 1e-6);
 
-        const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
+            next_cell.get_cut().left_value =
+                (curr_cell.get_cut().left_value * left_intersect_area +
+                 curr_cell.get_cut().right_value * right_intersect_area) /
+                next_subcell_polygon.area();
+          }
 
-        const Eigen::Matrix<Float, DIM, DIM> eta_mat =
-            std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+          // Right subcell
+          {
+            const auto next_subcell_polygon = next_cell.get_cut_right_polygon();
+            const auto left_intersect_area =
+                Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
+            const auto right_intersect_area =
+                Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
+            assert(std::abs(left_intersect_area + right_intersect_area -
+                            next_subcell_polygon.area()) < 1e-6);
 
-        Eigen::Matrix<Float, DIM, DIM> eig_vals;
-        Eigen::Matrix<Float, DIM, DIM> eig_vecs;
-        get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
-
-        // Wave strength
-        const Eigen::Vector<Float, DIM> alpha =
-            eig_vecs.inverse() * (interface.right_value - interface.left_value);
-
-        Eigen::Index strong_wave_idx = 0;
-        for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-          // TODO: Abs or not?
-          if (std::abs(alpha(i)) > std::abs(alpha(strong_wave_idx))) { strong_wave_idx = i; }
+            next_cell.get_cut().right_value =
+                (curr_cell.get_cut().left_value * left_intersect_area +
+                 curr_cell.get_cut().right_value * right_intersect_area) /
+                next_subcell_polygon.area();
+          }
         }
-
-        const auto wave_length = eig_vals(strong_wave_idx) * dt;
-
-        new_shock_points.emplace_back(interface.begin + normal_vector * wave_length,
-                                      interface.end + normal_vector * wave_length);
       }
 
-      for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
-        Igor::Debug("([{}, {}], [{}, {}])",
-                    curr_grid[cell_idx].get_cut().x1_cut,
-                    curr_grid[cell_idx].get_cut().y1_cut,
-                    curr_grid[cell_idx].get_cut().x2_cut,
-                    curr_grid[cell_idx].get_cut().y2_cut);
-      }
-
-      std::cout << "------------------------------------------------------------\n";
-
-      for (const auto& p : new_shock_points) {
-        Igor::Debug("{}", p);
-      }
-
-      std::vector<Eigen::Vector<Float, 2>> avg_new_shock_points(new_shock_points.size() + 1);
-      assert(avg_new_shock_points.size() > 2);
-      avg_new_shock_points[0] = new_shock_points[0].first;
-      for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
-        avg_new_shock_points[i] = (new_shock_points[i - 1].second + new_shock_points[i].first) / 2;
-      }
-      avg_new_shock_points[new_shock_points.size()] = new_shock_points.back().second;
-
-      IGOR_DEBUG_PRINT(avg_new_shock_points);
-
-      Igor::Todo("Calculating new interfaces is not implemented yet.");
+      // Igor::Todo("Calculating new interfaces is not implemented yet.");
 
       // TODO: Move shock in next grid
       // TODO: Remove old shock in next grid
