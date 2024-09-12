@@ -36,7 +36,7 @@ class IncCellWriter {
 
  public:
   // -----------------------------------------------------------------------------------------------
-  IncCellWriter(const std::string& filename, const CellBased::Grid<Float, DIM>& grid)
+  IncCellWriter(const std::string& filename, const CellBased::UniformGrid<Float, DIM>& grid)
       : IncCellWriter(filename) {
     if (!m_out) {
       Igor::Warn("Could not open file `{}` for writing: {}", filename, std::strerror(errno));
@@ -128,7 +128,7 @@ class IncCellWriter {
 
  public:
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] auto write_data(const CellBased::Grid<Float, DIM>& grid) noexcept -> bool {
+  [[nodiscard]] auto write_data(const CellBased::UniformGrid<Float, DIM>& grid) noexcept -> bool {
     for (const auto& cell : grid.m_cells) {
       if (cell.is_cartesian()) {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)

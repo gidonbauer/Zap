@@ -37,7 +37,8 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto cfl_factor(const Grid<Float, DIM>& grid) const noexcept -> Float {
+  [[nodiscard]] constexpr auto
+  cfl_factor(const UniformGrid<Float, DIM>& grid) const noexcept -> Float {
     return std::transform_reduce(
         std::cbegin(grid.m_cells),
         std::cend(grid.m_cells),
@@ -151,7 +152,7 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
-  constexpr void apply_side_interfaces(const Grid<Float, DIM>& curr_grid,
+  constexpr void apply_side_interfaces(const UniformGrid<Float, DIM>& curr_grid,
                                        Cell<Float, DIM>& next_cell,
                                        const Cell<Float, DIM>& curr_cell,
                                        size_t idx,
@@ -198,10 +199,10 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto move_wave_front(const Grid<Float, DIM>& curr_grid,
-                                               [[maybe_unused]] const Grid<Float, DIM>& next_grid,
-                                               Float dt) const noexcept
-      -> std::optional<std::vector<Eigen::Vector<Float, POINT_SIZE>>> {
+  [[nodiscard]] constexpr auto move_wave_front(
+      const UniformGrid<Float, DIM>& curr_grid,
+      [[maybe_unused]] const UniformGrid<Float, DIM>& next_grid,
+      Float dt) const noexcept -> std::optional<std::vector<Eigen::Vector<Float, POINT_SIZE>>> {
     // Move old cuts according to strongest wave
     std::vector<std::pair<Eigen::Vector<Float, POINT_SIZE>, Eigen::Vector<Float, POINT_SIZE>>>
         new_shock_points;
@@ -377,11 +378,11 @@ class Solver {
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM, typename GridWriter, typename TimeWriter>
   [[nodiscard]] auto
-  solve(Grid<Float, DIM> grid,
+  solve(UniformGrid<Float, DIM> grid,
         Float tend,
         GridWriter& grid_writer,
         TimeWriter& time_writer,
-        Float CFL_safety_factor = 0.5) noexcept -> std::optional<Grid<Float, DIM>> {
+        Float CFL_safety_factor = 0.5) noexcept -> std::optional<UniformGrid<Float, DIM>> {
     if (!(CFL_safety_factor > 0 && CFL_safety_factor <= 1)) {
       Igor::Warn("CFL_safety_factor must be in (0, 1], is {}", CFL_safety_factor);
       return std::nullopt;
@@ -949,8 +950,9 @@ class Solver {
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
   requires(DIM == 1)
-  [[nodiscard]] constexpr auto
-  apply_flux(const Grid<Float, DIM>& grid, const auto& cell, Side side) const noexcept -> Float {
+  [[nodiscard]] constexpr auto apply_flux(const UniformGrid<Float, DIM>& grid,
+                                          const auto& cell,
+                                          Side side) const noexcept -> Float {
     size_t idx = NULL_INDEX;
     switch (side) {
       case BOTTOM: idx = cell.bottom_idx; break;
@@ -1024,7 +1026,7 @@ class Solver {
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
   requires(DIM > 1)
-  [[nodiscard]] constexpr auto apply_flux(const Grid<Float, DIM>& grid,
+  [[nodiscard]] constexpr auto apply_flux(const UniformGrid<Float, DIM>& grid,
                                           const auto& cell,
                                           Side side) const noexcept -> Eigen::Vector<Float, DIM> {
     (void)grid;
@@ -1042,10 +1044,10 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, std::size_t DIM, typename GridWriter, typename TimeWriter>
-  auto solve(Grid<Float, DIM> grid,
+  auto solve(UniformGrid<Float, DIM> grid,
              Float tend,
              GridWriter& grid_writer,
-             TimeWriter& time_writer) noexcept -> std::optional<Grid<Float, DIM>> {
+             TimeWriter& time_writer) noexcept -> std::optional<UniformGrid<Float, DIM>> {
     auto& curr_grid = grid;
     auto next_grid  = grid;
 

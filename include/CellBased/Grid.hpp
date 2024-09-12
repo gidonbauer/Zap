@@ -18,7 +18,7 @@ enum Side : int {
 };
 
 template <typename Float, size_t DIM>
-class Grid {
+class UniformGrid {
   enum { ON_MIN = -1, NOT_ON = 0, ON_MAX = 1 };
 
   struct m_CornerIndices {
@@ -34,17 +34,11 @@ class Grid {
   size_t m_ny;
   std::vector<size_t> m_cut_cell_idxs;
 
-  Float m_min_delta;
   Float m_x_min;
   Float m_x_max;
   Float m_y_min;
   Float m_y_max;
-
-  // -----------------------------------------------------------------------------------------------
-  constexpr Grid(size_t nx, size_t ny)
-      : m_cells(nx * ny),
-        m_nx(nx),
-        m_ny(ny) {}
+  Float m_min_delta;
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto to_vec_idx(size_t xi, size_t yi) const noexcept -> size_t {
@@ -74,36 +68,38 @@ class Grid {
 
  public:
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] static constexpr auto
-  Uniform(Float x_min, Float x_max, size_t nx, Float y_min, Float y_max, size_t ny) -> Grid {
+  constexpr UniformGrid(
+      Float x_min, Float x_max, size_t nx, Float y_min, Float y_max, size_t ny) noexcept
+      : m_cells(nx * ny),
+        m_nx(nx),
+        m_ny(ny),
+        m_x_min(x_min),
+        m_x_max(x_max),
+        m_y_min(y_min),
+        m_y_max(y_max) {
     assert(nx > 0);
     assert(ny > 0);
-    Grid grid(nx, ny);
-    const auto dx    = (x_max - x_min) / static_cast<Float>(nx);
-    const auto dy    = (y_max - y_min) / static_cast<Float>(ny);
-    grid.m_min_delta = std::min(dx, dy);
-    grid.m_x_min     = x_min;
-    grid.m_x_max     = x_max;
-    grid.m_y_min     = y_min;
-    grid.m_y_max     = y_max;
+
+    const auto dx = (x_max - x_min) / static_cast<Float>(nx);
+    const auto dy = (y_max - y_min) / static_cast<Float>(ny);
+    m_min_delta   = std::min(dx, dy);
 
     for (size_t yi = 0; yi < ny; ++yi) {
       for (size_t xi = 0; xi < nx; ++xi) {
         // clang-format off
-        grid.m_cells[grid.to_vec_idx(xi, yi)] = m_Cell{
+        m_cells[to_vec_idx(xi, yi)] = m_Cell{
             .x_min      = x_min + static_cast<Float>(xi) * dx,
             .dx         = dx,
             .y_min      = y_min + static_cast<Float>(yi) * dy,
             .dy         = dy,
-            .left_idx   = xi == 0        ? NULL_INDEX : grid.to_vec_idx(xi - 1, yi),
-            .right_idx  = xi == (nx - 1) ? NULL_INDEX : grid.to_vec_idx(xi + 1, yi),
-            .bottom_idx = yi == 0        ? NULL_INDEX : grid.to_vec_idx(xi, yi - 1),
-            .top_idx    = yi == (ny - 1) ? NULL_INDEX : grid.to_vec_idx(xi, yi + 1),
+            .left_idx   = xi == 0        ? NULL_INDEX : to_vec_idx(xi - 1, yi),
+            .right_idx  = xi == (nx - 1) ? NULL_INDEX : to_vec_idx(xi + 1, yi),
+            .bottom_idx = yi == 0        ? NULL_INDEX : to_vec_idx(xi, yi - 1),
+            .top_idx    = yi == (ny - 1) ? NULL_INDEX : to_vec_idx(xi, yi + 1),
         };
         // clang-format on
       }
     }
-    return grid;
   }
 
   // -----------------------------------------------------------------------------------------------

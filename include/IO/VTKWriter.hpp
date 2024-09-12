@@ -1,9 +1,10 @@
 #ifndef ZAP_IO_BASED_VTK_WRITER_HPP_
 #define ZAP_IO_BASED_VTK_WRITER_HPP_
 
+#include <fstream>
 #include <string_view>
 
-#include "CellBased/Cell.hpp"
+#include "CellBased/Grid.hpp"
 
 namespace Zap::IO {
 
@@ -19,7 +20,7 @@ class VTKWriter {
   // -----------------------------------------------------------------------------------------------
   template <typename Float, std::size_t DIM>
   [[nodiscard]] constexpr auto
-  write_data(const CellBased::Grid<Float, DIM>& grid) noexcept -> bool {
+  write_data(const CellBased::UniformGrid<Float, DIM>& grid) noexcept -> bool {
     const std::string filename = std::format("{}_{}.vtk", m_output_prefix, m_counter);
     m_counter += 1;
     return to_vtk(filename, grid);
@@ -29,7 +30,7 @@ class VTKWriter {
   template <typename Float, std::size_t DIM>
   [[nodiscard]] constexpr auto
   to_vtk(const std::string& filename,
-         const CellBased::Grid<Float, DIM>& grid) const noexcept -> bool {
+         const CellBased::UniformGrid<Float, DIM>& grid) const noexcept -> bool {
     static_assert(std::is_floating_point_v<std::remove_cvref_t<Float>>);
     std::string datatype{};
     if constexpr (std::is_same_v<double, std::remove_cvref_t<Float>>) {
