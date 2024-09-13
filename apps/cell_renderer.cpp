@@ -487,7 +487,7 @@ template <typename Float, size_t DIM>
       }
 
       if (!render_graph<Float, DIM>(canvas, 0, u_reader, min, max, graph_box, colorbar_box, args)) {
-        return false;
+        // return false;
       }
 
       if (args.save_frame_images) {
