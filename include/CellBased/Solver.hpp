@@ -130,7 +130,8 @@ class Solver {
     auto update_value = [&](Eigen::Vector<Float, DIM>& value,
                             const Geometry::Polygon<Float>& cell_polygon) {
       const auto cell_area = cell_polygon.area();
-      assert(cell_area > 0);
+      assert(cell_area > 0 || std::abs(cell_area) <= EPS<Float>);
+      if (std::abs(cell_area) <= EPS<Float>) { return; }
 
       const auto intersect      = Geometry::intersection(cell_polygon, wave.polygon);
       const auto intersect_area = intersect.area();
@@ -419,6 +420,10 @@ class Solver {
         Igor::Warn("Could not cut on new shock curve.");
         return std::nullopt;
       }
+      Igor::Debug("t = {}", t);
+      Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
+      Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
+      std::cout << "----------------------------------------\n";
 
       // Re-calculate value for newly cut cells
       for (size_t new_cut_idx : next_grid.m_cut_cell_idxs) {
@@ -434,33 +439,41 @@ class Solver {
           // Left subcell
           {
             const auto next_subcell_polygon = next_cell.get_cut_left_polygon();
-            const auto left_intersect_area =
-                Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
-            const auto right_intersect_area =
-                Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
-            assert(std::abs(left_intersect_area + right_intersect_area -
-                            next_subcell_polygon.area()) < 1e-6);
+            assert(next_subcell_polygon.area() > 0 ||
+                   std::abs(next_subcell_polygon.area()) <= EPS<Float>);
+            if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
+              const auto left_intersect_area =
+                  Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
+              const auto right_intersect_area =
+                  Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
+              assert(std::abs(left_intersect_area + right_intersect_area -
+                              next_subcell_polygon.area()) < 1e-6);
 
-            next_cell.get_cut().left_value =
-                (curr_cell.get_cut().left_value * left_intersect_area +
-                 curr_cell.get_cut().right_value * right_intersect_area) /
-                next_subcell_polygon.area();
+              next_cell.get_cut().left_value =
+                  (curr_cell.get_cut().left_value * left_intersect_area +
+                   curr_cell.get_cut().right_value * right_intersect_area) /
+                  next_subcell_polygon.area();
+            }
           }
 
           // Right subcell
           {
             const auto next_subcell_polygon = next_cell.get_cut_right_polygon();
-            const auto left_intersect_area =
-                Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
-            const auto right_intersect_area =
-                Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
-            assert(std::abs(left_intersect_area + right_intersect_area -
-                            next_subcell_polygon.area()) < 1e-6);
+            assert(next_subcell_polygon.area() > 0 ||
+                   std::abs(next_subcell_polygon.area()) <= EPS<Float>);
+            if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
+              const auto left_intersect_area =
+                  Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
+              const auto right_intersect_area =
+                  Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
+              assert(std::abs(left_intersect_area + right_intersect_area -
+                              next_subcell_polygon.area()) < 1e-6);
 
-            next_cell.get_cut().right_value =
-                (curr_cell.get_cut().left_value * left_intersect_area +
-                 curr_cell.get_cut().right_value * right_intersect_area) /
-                next_subcell_polygon.area();
+              next_cell.get_cut().right_value =
+                  (curr_cell.get_cut().left_value * left_intersect_area +
+                   curr_cell.get_cut().right_value * right_intersect_area) /
+                  next_subcell_polygon.area();
+            }
           }
         }
       }

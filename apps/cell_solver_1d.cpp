@@ -81,8 +81,8 @@ auto main(int argc, char** argv) -> int {
   grid.same_value_boundary();
   // grid.periodic_boundary();
 
-// #define RAMP_X
-#define QUARTER_CIRCLE
+#define RAMP_X
+// #define QUARTER_CIRCLE
 // #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
   auto u0 = [=](Float x, Float y) -> Float {

@@ -6,19 +6,15 @@
 #include <Eigen/Dense>
 
 #include "CellBased/Cell.hpp"
+#include "CellBased/Definitions.hpp"
 
 namespace Zap::CellBased {
-
-enum : size_t { X, Y, POINT_SIZE };
 
 template <typename Float, size_t DIM>
 [[nodiscard]] constexpr auto point_on_boundary(const Eigen::Vector<Float, POINT_SIZE>& p,
                                                const Cell<Float, DIM>& cell) -> bool {
 
-  const auto approx_eq = [](Float a, Float b) -> bool {
-    constexpr Float eps = 1e-8;
-    return std::abs(a - b) <= eps;
-  };
+  const auto approx_eq = [](Float a, Float b) -> bool { return std::abs(a - b) <= EPS<Float>; };
 
   return ((approx_eq(p(X), cell.x_min) || approx_eq(p(X), cell.x_min + cell.dx)) &&
           (p(Y) >= cell.y_min && p(Y) <= cell.y_min + cell.dy)) ||
@@ -29,12 +25,10 @@ template <typename Float, size_t DIM>
 template <typename Float, size_t DIM>
 [[nodiscard]] constexpr auto point_in_cell(const Eigen::Vector<Float, POINT_SIZE>& p,
                                            const Cell<Float, DIM>& cell) {
-  constexpr Float eps = 1e-8;
-
-  return p(X) - cell.x_min >= -eps &&             //
-         p(X) - (cell.x_min + cell.dx) <= eps &&  //
-         p(Y) - cell.y_min >= -eps &&             //
-         p(Y) - (cell.y_min + cell.dy) <= eps;
+  return p(X) - cell.x_min >= -EPS<Float> &&             //
+         p(X) - (cell.x_min + cell.dx) <= EPS<Float> &&  //
+         p(Y) - cell.y_min >= -EPS<Float> &&             //
+         p(Y) - (cell.y_min + cell.dy) <= EPS<Float>;
 };
 
 template <typename Float, size_t DIM>

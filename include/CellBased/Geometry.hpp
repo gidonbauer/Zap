@@ -5,6 +5,7 @@
 
 #include <Eigen/Dense>
 
+#include "CellBased/Definitions.hpp"
 #include "CellBased/SmallVector.hpp"
 #include "Igor.hpp"
 
@@ -12,8 +13,7 @@ namespace Zap::CellBased::Geometry {
 
 template <typename Float>
 class Polygon {
-  enum { X, Y, DIM };
-  using Point = Eigen::Vector<Float, DIM>;
+  using Point = Eigen::Vector<Float, POINT_SIZE>;
   SmallVector<Point> m_points{};
 
  public:
@@ -96,28 +96,20 @@ template <std::floating_point Float>
 [[nodiscard]] constexpr auto
 intersection(const Polygon<Float>& polygon1,
              const Polygon<Float>& polygon2) noexcept -> Polygon<Float> {
-  enum { X, Y, DIM };
-  constexpr Float eps = [] {
-    if constexpr (std::is_same_v<std::remove_cvref_t<Float>, float>) {
-      return 1e-6f;
-    } else {
-      return 1e-8;
-    }
-  }();
-
   // Utility function to check if point is inside a polygon edge
-  const auto point_on_line = [](const Eigen::Vector<Float, DIM>& p,
-                                const Eigen::Vector<Float, DIM>& a,
-                                const Eigen::Vector<Float, DIM>& b) -> bool {
+  const auto point_on_line = [](const Eigen::Vector<Float, POINT_SIZE>& p,
+                                const Eigen::Vector<Float, POINT_SIZE>& a,
+                                const Eigen::Vector<Float, POINT_SIZE>& b) -> bool {
     // Check if point p is to the left of line segment ab
-    return (b(X) - a(X)) * (p(Y) - a(Y)) >= (b(Y) - a(Y)) * (p(X) - a(X)) - eps;
+    return (b(X) - a(X)) * (p(Y) - a(Y)) >= (b(Y) - a(Y)) * (p(X) - a(X)) - EPS<Float>;
   };
 
   // Utility function to compute intersection point of line segment ab with cd
-  const auto line_intersect = [](const Eigen::Vector<Float, DIM>& a,
-                                 const Eigen::Vector<Float, DIM>& b,
-                                 const Eigen::Vector<Float, DIM>& c,
-                                 const Eigen::Vector<Float, DIM>& d) -> Eigen::Vector<Float, DIM> {
+  const auto line_intersect =
+      [](const Eigen::Vector<Float, POINT_SIZE>& a,
+         const Eigen::Vector<Float, POINT_SIZE>& b,
+         const Eigen::Vector<Float, POINT_SIZE>& c,
+         const Eigen::Vector<Float, POINT_SIZE>& d) -> Eigen::Vector<Float, POINT_SIZE> {
     Float a1 = b(Y) - a(Y);
     Float b1 = a(X) - b(X);
     Float c1 = a1 * a(X) + b1 * a(Y);
@@ -127,7 +119,7 @@ intersection(const Polygon<Float>& polygon1,
     Float c2 = a2 * c(X) + b2 * c(Y);
 
     Float determinant = a1 * b2 - a2 * b1;
-    assert(std::abs(determinant) >= eps);
+    assert(std::abs(determinant) >= EPS<Float>);
 
     return {(b2 * c1 - b1 * c2) / determinant, (a1 * c2 - a2 * c1) / determinant};
   };

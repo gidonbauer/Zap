@@ -4,18 +4,11 @@
 #include <numeric>
 
 #include "CellBased/Cell.hpp"
+#include "CellBased/Definitions.hpp"
 #include "CellBased/GridHelper.hpp"
 #include "IO/Fwd.hpp"
 
 namespace Zap::CellBased {
-
-enum Side : int {
-  BOTTOM = 0b0001,
-  RIGHT  = 0b0010,
-  TOP    = 0b0100,
-  LEFT   = 0b1000,
-  ALL    = LEFT | RIGHT | BOTTOM | TOP,
-};
 
 template <typename Float, size_t DIM>
 class UniformGrid {
@@ -296,8 +289,7 @@ class UniformGrid {
  private:
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto approx_eq(Float a, Float b) const noexcept -> bool {
-    constexpr Float eps = 1e-8;
-    return std::abs(a - b) <= eps;
+    return std::abs(a - b) <= EPS<Float>;
   };
 
   // -----------------------------------------------------------------------------------------------
@@ -403,23 +395,28 @@ class UniformGrid {
         assert(is_cell(m_cells[cell.top_idx].right_idx));
 
         // TODO: Add check that this is actually the correct next cell
-        Igor::Todo("Exit on top right corner.");
-        return m_cells[cell.top_idx].right_idx;
+        // Igor::Todo("Exit on top right corner.");
+        // return m_cells[cell.top_idx].right_idx;
+
+        return cell.top_idx;
       }
     } else {
       // Left side
       if (on_x == ON_MIN) {
         assert(is_cell(cell.left_idx));
+        Igor::Panic("Expected to exit on top, not on left.");
         return cell.left_idx;
       }
       // Right side
       else if (on_x == ON_MAX) {
         assert(is_cell(cell.right_idx));
+        Igor::Panic("Expected to exit on top, not on right.");
         return cell.right_idx;
       }
       // Bottom side
       else if (on_y == ON_MIN) {
         assert(is_cell(cell.bottom_idx));
+        Igor::Panic("Expected to exit on top, not on bottom.");
         return cell.bottom_idx;
       }
       // Top side
@@ -553,9 +550,8 @@ class UniformGrid {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto
   point_in_grid(const Eigen::Vector<Float, POINT_SIZE>& point) const noexcept -> bool {
-    constexpr Float eps = 1e-8;
-    return point(X) - m_x_min >= -eps && m_x_max - point(X) >= -eps &&  //
-           point(Y) - m_y_min >= -eps && m_y_max - point(Y) >= -eps;
+    return point(X) - m_x_min >= -EPS<Float> && m_x_max - point(X) >= -EPS<Float> &&  //
+           point(Y) - m_y_min >= -EPS<Float> && m_y_max - point(Y) >= -EPS<Float>;
   }
 
   [[nodiscard]] constexpr auto
@@ -596,7 +592,14 @@ class UniformGrid {
 
       Float r_entry = -std::numeric_limits<Float>::max();
       for (Float r : rs) {
-        if (r < 0 && r > r_entry) { r_entry = r; }
+        if (r < EPS<Float> && r > r_entry) { r_entry = r; }
+      }
+      if (!(r_entry != -std::numeric_limits<Float>::max())) {
+        IGOR_DEBUG_PRINT(s);
+        IGOR_DEBUG_PRINT(r_entry);
+        IGOR_DEBUG_PRINT(rs);
+        IGOR_DEBUG_PRINT(p0);
+        IGOR_DEBUG_PRINT(p1);
       }
       assert(r_entry != -std::numeric_limits<Float>::max());
 
@@ -628,7 +631,14 @@ class UniformGrid {
         };
         Float r_exit = std::numeric_limits<Float>::max();
         for (Float r : rs) {
-          if (r > 0 && r < r_exit) { r_exit = r; }
+          if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
+        }
+        if (!(r_exit < std::numeric_limits<Float>::max())) {
+          IGOR_DEBUG_PRINT(s);
+          IGOR_DEBUG_PRINT(r_exit);
+          IGOR_DEBUG_PRINT(rs);
+          IGOR_DEBUG_PRINT(p0);
+          IGOR_DEBUG_PRINT(p1);
         }
         assert(r_exit < std::numeric_limits<Float>::max());
 
@@ -642,6 +652,8 @@ class UniformGrid {
           IGOR_DEBUG_PRINT(r_exit);
           IGOR_DEBUG_PRINT(entry_points);
           IGOR_DEBUG_PRINT(m_cut_cell_idxs);
+          IGOR_DEBUG_PRINT(point_idx);
+          IGOR_DEBUG_PRINT(points.size());
         }
 
         p0 = p0_next;
@@ -667,7 +679,7 @@ class UniformGrid {
 
       Float r_exit = std::numeric_limits<Float>::max();
       for (Float r : rs) {
-        if (r > 0 && r < r_exit) { r_exit = r; }
+        if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
       }
       assert(r_exit != std::numeric_limits<Float>::max());
 

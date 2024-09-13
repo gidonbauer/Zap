@@ -9,6 +9,8 @@
 
 #define ZAP_PARALLEL_RENDERING
 
+// TODO: Fix rendering of cut cells, sometimes cell goes out of bounds
+
 namespace Rd = Zap::Renderer;
 
 [[maybe_unused]] constexpr Rd::RGB BLACK  = {.r = 0x00, .g = 0x00, .b = 0x00};
