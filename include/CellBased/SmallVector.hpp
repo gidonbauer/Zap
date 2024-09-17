@@ -1,6 +1,8 @@
 #ifndef ZAP_CELL_BASED_SMALL_VECTOR_HPP__
 #define ZAP_CELL_BASED_SMALL_VECTOR_HPP__
 
+// TODO: Replace by Igor::StaticVector
+
 #include <array>
 #include <initializer_list>
 #ifdef ZAP_SMALL_VECTOR_CAPACITY

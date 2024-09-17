@@ -4,9 +4,14 @@
 #include <concepts>
 #include <cstddef>
 
+#include <Eigen/Core>
+
 namespace Zap::CellBased {
 
 enum : size_t { X, Y, POINT_SIZE };
+
+template <typename T>
+using Point = Eigen::Vector<T, POINT_SIZE>;
 
 enum Side : int {
   BOTTOM = 0b0001,

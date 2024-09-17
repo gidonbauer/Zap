@@ -200,29 +200,26 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto move_wave_front(
-      const UniformGrid<Float, DIM>& curr_grid,
-      [[maybe_unused]] const UniformGrid<Float, DIM>& next_grid,
-      Float dt) const noexcept -> std::optional<std::vector<Eigen::Vector<Float, POINT_SIZE>>> {
+  [[nodiscard]] constexpr auto
+  move_wave_front(const UniformGrid<Float, DIM>& curr_grid,
+                  [[maybe_unused]] const UniformGrid<Float, DIM>& next_grid,
+                  Float dt) const noexcept -> std::optional<std::vector<Point<Float>>> {
     // Move old cuts according to strongest wave
-    std::vector<std::pair<Eigen::Vector<Float, POINT_SIZE>, Eigen::Vector<Float, POINT_SIZE>>>
-        new_shock_points;
+    std::vector<std::pair<Point<Float>, Point<Float>>> new_shock_points;
     for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
       const auto& curr_cell = curr_grid[cell_idx];
       assert(curr_cell.is_cut());
 
       const auto interface = get_internal_interface(curr_cell);
 
-      const Eigen::Vector<Float, POINT_SIZE> tangent_vector =
-          (interface.end - interface.begin).normalized();
+      const Point<Float> tangent_vector = (interface.end - interface.begin).normalized();
       assert(std::abs(tangent_vector.norm() - 1) <= 1e-8);
 
       auto interface_angle = std::acos(tangent_vector(Y));
       if (tangent_vector(X) > 0) {
         interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
       }
-      const Eigen::Vector<Float, POINT_SIZE> normal_vector{std::cos(interface_angle),
-                                                           std::sin(interface_angle)};
+      const Point<Float> normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
       assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
 
       const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
@@ -250,7 +247,7 @@ class Solver {
                                     interface.end + normal_vector * wave_length);
     }
 
-    std::vector<Eigen::Vector<Float, POINT_SIZE>> avg_new_shock_points(new_shock_points.size() + 1);
+    std::vector<Point<Float>> avg_new_shock_points(new_shock_points.size() + 1);
     assert(avg_new_shock_points.size() > 2);
     avg_new_shock_points[0] = new_shock_points[0].first;
     for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
@@ -282,7 +279,7 @@ class Solver {
     //       return std::nullopt;
     //     }
 
-    //     Eigen::Vector<Float, POINT_SIZE> slope = avg_new_shock_points[1] - first_point;
+    //     Point<Float> slope = avg_new_shock_points[1] - first_point;
 
     //     Float r = std::numeric_limits<Float>::max();
     //     try_value(r, (second_point_cell->x_min - first_point(X)) / slope(X));
@@ -296,7 +293,7 @@ class Solver {
 
     //     first_point += r * slope;
     //   } else {
-    //     Eigen::Vector<Float, POINT_SIZE> slope = first_point - avg_new_shock_points[1];
+    //     Point<Float> slope = first_point - avg_new_shock_points[1];
 
     //     Float r = std::numeric_limits<Float>::max();
     //     try_value(r, (first_point_cell->x_min - first_point(X)) / slope(X));
@@ -331,7 +328,7 @@ class Solver {
     //       return std::nullopt;
     //     }
 
-    //     Eigen::Vector<Float, POINT_SIZE> slope =
+    //     Point<Float> slope =
     //         avg_new_shock_points[avg_new_shock_points.size() - 2] - last_point;
 
     //     Float r = std::numeric_limits<Float>::max();
@@ -346,7 +343,7 @@ class Solver {
 
     //     last_point += r * slope;
     //   } else {
-    //     Eigen::Vector<Float, POINT_SIZE> slope =
+    //     Point<Float> slope =
     //         last_point - avg_new_shock_points[avg_new_shock_points.size() - 2];
 
     //     Float r = std::numeric_limits<Float>::max();
@@ -420,10 +417,10 @@ class Solver {
         Igor::Warn("Could not cut on new shock curve.");
         return std::nullopt;
       }
-      Igor::Debug("t = {}", t);
-      Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
-      Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
-      std::cout << "----------------------------------------\n";
+      // Igor::Debug("t = {}", t);
+      // Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
+      // Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
+      // std::cout << "----------------------------------------\n";
 
       // Re-calculate value for newly cut cells
       for (size_t new_cut_idx : next_grid.m_cut_cell_idxs) {
@@ -478,11 +475,8 @@ class Solver {
         }
       }
 
-      // Igor::Todo("Calculating new interfaces is not implemented yet.");
-
-      // TODO: Move shock in next grid
-      // TODO: Remove old shock in next grid
-      // TODO: Update values
+      // TODO: What happens when a subcell has area 0?
+      //   -> cannot "uncut" the cell because that would loose shock position information
 
 #ifndef USE_FLUX_FOR_CARTESIAN
 #pragma omp parallel for

@@ -73,9 +73,9 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("tend = {}", tend);
 
   const Float x_min = 0.0;
-  const Float x_max = 5.0;
+  const Float x_max = 2.0;
   const Float y_min = 0.0;
-  const Float y_max = 5.0;
+  const Float y_max = 2.0;
 
   Zap::CellBased::UniformGrid<Float, DIM> grid(x_min, x_max, nx, y_min, y_max, ny);
   grid.same_value_boundary();
@@ -121,12 +121,12 @@ auto main(int argc, char** argv) -> int {
 #elif defined(RAMP_X)
   auto u0 = [=](Float x, Float /*y*/) -> Float {
     static_assert(DIM == 1);
-    return (x - x_min) * static_cast<Float>((x - x_min) < 0.5 * (x_max - x_min));
+    return (x - x_min) * static_cast<Float>((x - x_min) < (x_max - x_min) / 2);
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::Point<T> {
     assert(t >= 0 && t <= 1);
-    return Eigen::Vector<T, 2>{
+    return Zap::CellBased::Point<T>{
         (x_max - x_min) / 2,
         t * (y_max - y_min) + y_min,
     };
@@ -206,10 +206,35 @@ auto main(int argc, char** argv) -> int {
 #else
   IGOR_TIME_SCOPE("Solver") {
     Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5).has_value()) {
+    const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5);
+    if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
     }
+
+    const auto final_shock = res->get_shock_curve();
+    // Igor::Info("Final shock curve: {}", final_shock);
+    const auto mean_shock_x = std::transform_reduce(std::cbegin(final_shock),
+                                                    std::cend(final_shock),
+                                                    Float{0},
+                                                    std::plus<>{},
+                                                    [](const Zap::CellBased::Point<Float>& p) {
+                                                      return p(Zap::CellBased::X);
+                                                    }) /
+                              static_cast<Float>(final_shock.size());
+
+    const auto std_dev_shock_x =
+        std::sqrt(std::transform_reduce(std::cbegin(final_shock),
+                                        std::cend(final_shock),
+                                        Float{0},
+                                        std::plus<>{},
+                                        [=](const Zap::CellBased::Point<Float>& p) {
+                                          return std::pow(p(Zap::CellBased::X) - mean_shock_x, 2);
+                                        }) /
+                  static_cast<Float>(final_shock.size()));
+
+    Igor::Info("mean_shock_x = {}", mean_shock_x);
+    Igor::Info("std_dev_shock_x = {}", std_dev_shock_x);
   }
   Igor::Info("Solver finished successfully.");
 #endif  // OLD_SOLVER

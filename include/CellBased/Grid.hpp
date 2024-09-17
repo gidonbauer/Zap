@@ -293,10 +293,9 @@ class UniformGrid {
   };
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto
-  classify_cut(const m_Cell& cell,
-               Eigen::Vector<Float, POINT_SIZE>& cut1_point,
-               Eigen::Vector<Float, POINT_SIZE>& cut2_point) const noexcept -> CutType {
+  [[nodiscard]] constexpr auto classify_cut(const m_Cell& cell,
+                                            Point<Float>& cut1_point,
+                                            Point<Float>& cut2_point) const noexcept -> CutType {
     const int cut1_on_x = approx_eq(cell.x_min, cut1_point(X)) * ON_MIN +
                           approx_eq(cell.x_min + cell.dx, cut1_point(X)) * ON_MAX;
     const int cut1_on_y = approx_eq(cell.y_min, cut1_point(Y)) * ON_MIN +
@@ -350,9 +349,9 @@ class UniformGrid {
     return type;
   }
 
-  [[nodiscard]] constexpr auto find_next_cell_to_cut(
-      const m_Cell& cell,
-      const Eigen::Vector<Float, POINT_SIZE>& exit_point) const noexcept -> size_t {
+  [[nodiscard]] constexpr auto
+  find_next_cell_to_cut(const m_Cell& cell,
+                        const Point<Float>& exit_point) const noexcept -> size_t {
     assert(point_in_cell(exit_point, cell));
 
     const int on_x = approx_eq(cell.x_min, exit_point(X)) * ON_MIN +
@@ -462,7 +461,7 @@ class UniformGrid {
     }
 
     m_cut_cell_idxs.push_back(static_cast<size_t>(cell_idx));
-    std::vector<Eigen::Vector<Float, POINT_SIZE>> entry_points{};
+    std::vector<Point<Float>> entry_points{};
     entry_points.push_back(init_pos);
 
     while (t < 1) {
@@ -548,17 +547,15 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto
-  point_in_grid(const Eigen::Vector<Float, POINT_SIZE>& point) const noexcept -> bool {
+  [[nodiscard]] constexpr auto point_in_grid(const Point<Float>& point) const noexcept -> bool {
     return point(X) - m_x_min >= -EPS<Float> && m_x_max - point(X) >= -EPS<Float> &&  //
            point(Y) - m_y_min >= -EPS<Float> && m_y_max - point(Y) >= -EPS<Float>;
   }
 
   [[nodiscard]] constexpr auto
-  cut_piecewise_linear(std::vector<Eigen::Vector<Float, POINT_SIZE>> points) noexcept -> bool {
+  cut_piecewise_linear(std::vector<Point<Float>> points) noexcept -> bool {
     // Remove points outside of grid
-    std::erase_if(points,
-                  [this](const Eigen::Vector<Float, POINT_SIZE>& p) { return !point_in_grid(p); });
+    std::erase_if(points, [this](const Point<Float>& p) { return !point_in_grid(p); });
     assert(points.size() >= 2);
 
     const auto cell_it =
@@ -574,7 +571,7 @@ class UniformGrid {
       Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
       return false;
     }
-    std::vector<Eigen::Vector<Float, POINT_SIZE>> entry_points{};
+    std::vector<Point<Float>> entry_points{};
 
     // Handle first point; extend curve backwards to cut cell containing the first point
     {
@@ -582,7 +579,7 @@ class UniformGrid {
       const auto& p0   = points[0];
       const auto& p1   = points[1];
 
-      const Eigen::Vector<Float, POINT_SIZE> s = p1 - p0;
+      const Point<Float> s = p1 - p0;
       const std::array<Float, 4> rs{
           (cell.x_min - p0(X)) / s(X),
           (cell.x_min + cell.dx - p0(X)) / s(X),
@@ -612,7 +609,7 @@ class UniformGrid {
       auto p0        = points[point_idx];
       const auto& p1 = points[point_idx + 1];
 
-      const Eigen::Vector<Float, POINT_SIZE> s = (p1 - p0).normalized();
+      const Point<Float> s = (p1 - p0).normalized();
 
       while (!point_in_cell(p1, m_cells[cell_idx])) {
         const auto& cell = m_cells[cell_idx];
@@ -642,7 +639,7 @@ class UniformGrid {
         }
         assert(r_exit < std::numeric_limits<Float>::max());
 
-        const Eigen::Vector<Float, POINT_SIZE> p0_next = p0 + r_exit * s;
+        const Point<Float> p0_next = p0 + r_exit * s;
         if (!point_in_cell(p0_next, cell)) {
           std::cout << "cell = " << cell << '\n';
           IGOR_DEBUG_PRINT(p0);
@@ -669,7 +666,7 @@ class UniformGrid {
       const auto& p0   = points[points.size() - 2];
       const auto& p1   = points[points.size() - 1];
 
-      const Eigen::Vector<Float, POINT_SIZE> s = p1 - p0;
+      const Point<Float> s = p1 - p0;
       const std::array<Float, 4> rs{
           (cell.x_min - p1(X)) / s(X),
           (cell.x_min + cell.dx - p1(X)) / s(X),
@@ -787,6 +784,25 @@ class UniformGrid {
             }
           });
     }
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto get_shock_curve() const noexcept -> std::vector<Point<Float>> {
+    if (m_cut_cell_idxs.empty()) { return {}; }
+
+    std::vector<Point<Float>> curve_points(m_cut_cell_idxs.size() + 1);
+
+    {
+      const auto& cell = m_cells[m_cut_cell_idxs.front()];
+      curve_points[0]  = {cell.get_cut().x1_cut, cell.get_cut().y1_cut};
+    }
+
+    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
+      const auto& cell    = m_cells[m_cut_cell_idxs[i]];
+      curve_points[i + 1] = {cell.get_cut().x2_cut, cell.get_cut().y2_cut};
+    }
+
+    return curve_points;
   }
 
   // -----------------------------------------------------------------------------------------------
