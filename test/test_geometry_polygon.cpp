@@ -285,3 +285,22 @@ TEST(GeometryPolygon, IntersectRoundingBug) {
 #undef EXPECT_EPS_EQ
   }
 }
+
+TEST(GeometryPolygon, PointInPolygon) {
+  Geo::Polygon<double> polygon({
+      {0.0, 0.0},
+      {1.0, 0.0},
+      {0.0, 1.0},
+      {1.0, 1.0},
+  });
+
+  EXPECT_TRUE(polygon.point_in_polygon(Zap::CellBased::Point<double>{0.5, 0.5}));
+  EXPECT_FALSE(polygon.point_in_polygon(Zap::CellBased::Point<double>{1.5, 0.5}));
+  EXPECT_FALSE(polygon.point_in_polygon(Zap::CellBased::Point<double>{0.5, 1.5}));
+  EXPECT_FALSE(polygon.point_in_polygon(Zap::CellBased::Point<double>{1.5, 1.5}));
+
+  EXPECT_TRUE(polygon.point_in_polygon(Zap::CellBased::Point<double>{0.0, 0.0}));
+  EXPECT_TRUE(polygon.point_in_polygon(Zap::CellBased::Point<double>{0.1, 0.0}));
+  EXPECT_TRUE(polygon.point_in_polygon(Zap::CellBased::Point<double>{0.0, 0.1}));
+  EXPECT_TRUE(polygon.point_in_polygon(Zap::CellBased::Point<double>{0.1, 0.1}));
+}

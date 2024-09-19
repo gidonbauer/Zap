@@ -830,6 +830,35 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto
+  eval(const Point<Float>& point) const noexcept -> Eigen::Vector<Float, DIM> {
+    assert(point_in_grid(point));
+
+    const auto cell_it = std::find_if(std::cbegin(m_cells),
+                                      std::cend(m_cells),
+                                      [&](const auto& cell) { return point_in_cell(point, cell); });
+    assert(cell_it != std::cend(m_cells));
+    if (cell_it->is_cartesian()) {
+      return cell_it->get_cartesian().value;
+    } else if (cell_it->is_cut()) {
+      const auto point_in_left  = cell_it->get_cut_left_polygon().point_in_polygon(point);
+      const auto point_in_right = cell_it->get_cut_right_polygon().point_in_polygon(point);
+
+      assert(point_in_left || point_in_right && "Point should be in one of the subcells");
+      assert(!(point_in_left && point_in_right) && "Point should not be in both subcells");
+
+      if (point_in_left) {
+        return cell_it->get_cut().left_value;
+      } else {
+        return cell_it->get_cut().right_value;
+      }
+    } else {
+      Igor::Panic("Unknown cell type with variant index {}", cell_it->value.index());
+      std::unreachable();
+    }
+  }
+
+  // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto begin() noexcept { return m_cells.begin(); }
   [[nodiscard]] constexpr auto begin() const noexcept { return m_cells.begin(); }
   [[nodiscard]] constexpr auto cbegin() const noexcept { return m_cells.cbegin(); }

@@ -45,10 +45,11 @@ class Polygon {
 
   // -----------------------------------------------------------------------------------------------
   constexpr void remove_duplicate_points() noexcept {
-    const auto first_duplicate = std::unique(
-        std::begin(m_points),
-        std::end(m_points),
-        [](const Point<Float>& p1, const Point<Float>& p2) { return (p1 - p2).norm() < 1e-8; });
+    const auto first_duplicate = std::unique(std::begin(m_points),
+                                             std::end(m_points),
+                                             [](const Point<Float>& p1, const Point<Float>& p2) {
+                                               return (p1 - p2).norm() < EPS<Float>;
+                                             });
     m_points.erase(first_duplicate, std::end(m_points));
   }
 
@@ -88,6 +89,20 @@ class Polygon {
   [[nodiscard]] constexpr auto points() noexcept -> SmallVector<Point<Float>>& { return m_points; }
   [[nodiscard]] constexpr auto points() const noexcept -> const SmallVector<Point<Float>>& {
     return m_points;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto point_in_polygon(const Point<Float>& p) const noexcept -> bool {
+    if (size() < 2) { return false; }
+
+    for (size_t i = 0; i < size(); ++i) {
+      const auto& p1 = m_points[i];
+      const auto& p2 = m_points[(i + 1) % size()];
+      const auto n   = Point<Float>{p1(Y) - p2(Y), -(p1(X) - p2(X))};
+      const auto v   = n(X) * (p(X) - p1(X)) + n(Y) * (p(Y) - p1(Y));
+      if (v < 0) { return false; }
+    }
+    return true;
   }
 };
 

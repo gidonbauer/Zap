@@ -6,6 +6,7 @@ set(executables
   run_solver
   cell_solver_1d
   cell_solver_2d
+  example_x_ramp
 )
 
 foreach(exec ${executables})
