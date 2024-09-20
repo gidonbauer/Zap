@@ -1,8 +1,6 @@
 #ifndef ZAP_CELL_BASED_GRID_HELPER_HPP_
 #define ZAP_CELL_BASED_GRID_HELPER_HPP_
 
-#include <vector>
-
 #include <Eigen/Dense>
 
 #include "CellBased/Cell.hpp"
@@ -10,11 +8,14 @@
 
 namespace Zap::CellBased {
 
+template <typename Float>
+[[nodiscard]] constexpr auto approx_eq(Float a, Float b, Float tol = EPS<Float>) noexcept -> bool {
+  return std::abs(a - b) <= tol;
+};
+
 template <typename Float, size_t DIM>
 [[nodiscard]] constexpr auto point_on_boundary(const Point<Float>& p,
                                                const Cell<Float, DIM>& cell) -> bool {
-
-  const auto approx_eq = [](Float a, Float b) -> bool { return std::abs(a - b) <= EPS<Float>; };
 
   return ((approx_eq(p(X), cell.x_min) || approx_eq(p(X), cell.x_min + cell.dx)) &&
           (p(Y) >= cell.y_min && p(Y) <= cell.y_min + cell.dy)) ||

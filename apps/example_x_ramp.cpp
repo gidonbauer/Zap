@@ -1,4 +1,5 @@
 #include <filesystem>
+#include <iomanip>
 
 // #define USE_FLUX_FOR_CARTESIAN
 
@@ -44,6 +45,14 @@ constexpr Float Y_MAX = 2.0;
   return val;
 }
 
+[[nodiscard]] auto init_shock(Float t) -> Zap::CellBased::Point<Float> {
+  assert(t >= 0 && t <= 1);
+  return Zap::CellBased::Point<Float>{
+      (X_MAX - X_MIN) / 2,
+      t * (Y_MAX - Y_MIN) + Y_MIN,
+  };
+};
+
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] constexpr auto chi(Float x, Float x_min, Float x_max) noexcept -> Float {
   return static_cast<Float>(x >= x_min && x <= x_max);
@@ -61,7 +70,8 @@ constexpr Float Y_MAX = 2.0;
 
 // -------------------------------------------------------------------------------------------------
 void print_shock_error(const Zap::CellBased::UniformGrid<Float, DIM>& numerical_solution,
-                       Float tend) noexcept {
+                       Float tend,
+                       std::ostream& out) noexcept {
   const auto final_shock = numerical_solution.get_shock_curve();
 
   const auto mean_shock_x = std::transform_reduce(std::cbegin(final_shock),
@@ -83,24 +93,28 @@ void print_shock_error(const Zap::CellBased::UniformGrid<Float, DIM>& numerical_
                                       }) /
                 static_cast<Float>(final_shock.size()));
 
-  Igor::Info("mean_shock_x                                     = {:.8f}", mean_shock_x);
-  Igor::Info("std_dev_shock_x                                  = {:.8f}", std_dev_shock_x);
+  out << "mean_shock_x                                     = " << std::setprecision(8)
+      << mean_shock_x << '\n';
+  out << "std_dev_shock_x                                  = " << std::setprecision(8)
+      << std_dev_shock_x << '\n';
 
   const auto expected_shock_x = expected_shock_location(tend);
   const auto abs_err          = std::abs(mean_shock_x - expected_shock_x);
   const auto rel_err          = abs_err / expected_shock_x;
 
-  Igor::Info("expected_shock_x                                 = {:.8f}", expected_shock_x);
-  Igor::Info("|mean_shock_x - expected_shock_x|                = {:.8f}", abs_err);
-  Igor::Info("|mean_shock_x - expected_shock_x| / mean_shock_x = {:.8f} (≈{:.2f}%)",
-             rel_err,
-             rel_err * 100);
+  out << "expected_shock_x                                 = " << std::setprecision(8)
+      << expected_shock_x << '\n';
+  out << "|mean_shock_x - expected_shock_x|                = " << std::setprecision(8) << abs_err
+      << '\n';
+  out << "|mean_shock_x - expected_shock_x| / mean_shock_x = " << std::setprecision(8) << rel_err
+      << " (≈" << std::setprecision(2) << rel_err * 100 << "%)\n";
 }
 
 // -------------------------------------------------------------------------------------------------
 void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numerical_solution,
                           Float tend,
-                          size_t n) noexcept {
+                          size_t n,
+                          std::ostream& out) noexcept {
   assert(n > 0);
 
   Float L1_error = 0;
@@ -111,13 +125,46 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
                              analytical_quasi_1d(x, tend));
     L1_error += f * dx;
   }
-  Igor::Info("L1 error = {:.8f}", L1_error);
+  out << "L1 error                                         = " << std::setprecision(8) << L1_error
+      << '\n';
+}
+
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto run(size_t nx, size_t ny, Float tend, std::ostream& out) noexcept -> bool {
+  Zap::CellBased::UniformGrid<Float, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  grid.same_value_boundary();
+
+  if (!grid.cut_curve(init_shock)) { return false; }
+
+  constexpr auto u0 = [](Float x, Float /*y*/) { return analytical_quasi_1d(x, Float{0}); };
+  grid.fill_four_point(u0);
+
+  const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "_" + std::to_string(ny) + ".grid";
+  Zap::IO::IncCellWriter<Float, DIM> grid_writer{u_file, grid};
+
+  const auto t_file = OUTPUT_DIR "t_1d_" + std::to_string(nx) + "_" + std::to_string(ny) + ".mat";
+  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
+
+  Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+  const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5);
+  if (!res.has_value()) {
+    Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);
+    return false;
+  }
+
+  out << nx << 'x' << ny << ":\n";
+  print_shock_error(*res, tend, out);
+  print_solution_error(*res, tend, 10'000, out);
+  out << "--------------------------------------------------------------------------------\n";
+
+  Igor::Info("Solver for {}x{}-grid finished successfully.", nx, ny);
+  return true;
 }
 
 // -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  if (argc < 4) {
-    Igor::Warn("Usage: {} <nx> <ny> <tend>", *argv);
+  if (argc < 2) {
+    Igor::Warn("Usage: {} <tend>", *argv);
     return 1;
   }
 
@@ -130,67 +177,32 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  const auto nx   = parse_size_t(argv[1]);  // NOLINT
-  const auto ny   = parse_size_t(argv[2]);  // NOLINT
-  const auto tend = parse_double(argv[3]);  // NOLINT
-  assert(nx < std::numeric_limits<int>::max());
-  assert(ny < std::numeric_limits<int>::max());
+  const auto tend = static_cast<Float>(parse_double(argv[1]));  // NOLINT
 
   if (tend <= 0.0) {
     Igor::Warn("tend must be larger than 0, but is {}.", tend);
     return 1;
   }
 
-  Igor::Info("nx = {}", nx);
-  Igor::Info("ny = {}", ny);
   Igor::Info("tend = {}", tend);
+  Igor::Info("Save results in `" OUTPUT_DIR "`.");
 
-  Zap::CellBased::UniformGrid<Float, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
-  grid.same_value_boundary();
-
-  auto u0 = [=](Float x, Float /*y*/) -> Float {
-    static_assert(DIM == 1);
-    return (x - X_MIN) * static_cast<Float>((x - X_MIN) < (X_MAX - X_MIN) / 2);
-  };
-
-  auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::Point<T> {
-    assert(t >= 0 && t <= 1);
-    return Zap::CellBased::Point<T>{
-        (X_MAX - X_MIN) / 2,
-        t * (Y_MAX - Y_MIN) + Y_MIN,
-    };
-  };
-
-  IGOR_TIME_SCOPE("Cutting the grid") {
-    if (!grid.cut_curve(init_shock)) { return 1; }
+  constexpr auto output_file = "./x_ramp_results.txt";
+  std::ofstream out(output_file);
+  if (!out) {
+    Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
   }
 
-  grid.fill_four_point(u0);
-
-  constexpr auto u_file = OUTPUT_DIR "u_1d.grid";
-  Zap::IO::IncCellWriter<Float, DIM> grid_writer{u_file, grid};
-
-  constexpr auto t_file = OUTPUT_DIR "t_1d.mat";
-  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
-
-  IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
-    const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5);
-    if (!res.has_value()) {
-      Igor::Warn("Solver failed.");
-      return 1;
-    }
-
-    std::cout
-        << "--------------------------------------------------------------------------------\n";
-    print_shock_error(*res, tend);
-    std::cout
-        << "--------------------------------------------------------------------------------\n";
-    print_solution_error(*res, tend, 1000);
-    std::cout
-        << "--------------------------------------------------------------------------------\n";
+  bool all_success        = true;
+  constexpr std::array ns = {
+      3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
+      81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+  };
+  for (size_t n : ns) {
+    const auto success = run(n, n, tend, out);
+    all_success        = all_success && success;
   }
-  Igor::Info("Solver finished successfully.");
-  Igor::Info("Saved grid to {}.", u_file);
-  Igor::Info("Saved time steps to {}.", t_file);
+
+  Igor::Info("Saved errors to `{}`.", output_file);
+  return all_success ? 0 : 1;
 }

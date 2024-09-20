@@ -844,13 +844,18 @@ class UniformGrid {
       const auto point_in_left  = cell_it->get_cut_left_polygon().point_in_polygon(point);
       const auto point_in_right = cell_it->get_cut_right_polygon().point_in_polygon(point);
 
-      assert(point_in_left || point_in_right && "Point should be in one of the subcells");
-      assert(!(point_in_left && point_in_right) && "Point should not be in both subcells");
-
       if (point_in_left) {
         return cell_it->get_cut().left_value;
-      } else {
+      } else if (point_in_right) {
         return cell_it->get_cut().right_value;
+      } else {
+        if (point_in_left && point_in_right) {
+          Igor::Warn("Point {} is in both subcells, take the average.", point);
+        } else if (!(point_in_left || point_in_right)) {
+          Igor::Warn("Point {} is in neither subcell, probably a rounding error, take the average.",
+                     point);
+        }
+        return (cell_it->get_cut().left_value + cell_it->get_cut().right_value) / 2;
       }
     } else {
       Igor::Panic("Unknown cell type with variant index {}", cell_it->value.index());
