@@ -1,6 +1,6 @@
 #include "IO/IncMatrixWriter.hpp"
-#include "Scalar/BoundaryConditions.hpp"
-#include "Scalar/Solver.hpp"
+#include "MatBased/BoundaryConditions.hpp"
+#include "MatBased/Solver.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "mat_based/"
 
@@ -12,9 +12,9 @@ auto main(int argc, char** argv) -> int {
 
   using Float          = double;
   constexpr auto x_min = static_cast<Float>(0.0);
-  constexpr auto x_max = static_cast<Float>(10.0);
+  constexpr auto x_max = static_cast<Float>(5.0);
   constexpr auto y_min = static_cast<Float>(0.0);
-  constexpr auto y_max = static_cast<Float>(10.0);
+  constexpr auto y_max = static_cast<Float>(5.0);
 
   auto parse_size_t = [](const char* cstr) -> size_t {
     char* end        = nullptr;
@@ -40,46 +40,56 @@ auto main(int argc, char** argv) -> int {
   const auto dx = (x_max - x_min) / static_cast<Float>(nx);
   const auto dy = (y_max - y_min) / static_cast<Float>(ny);
 
-  Zap::Vector<Float> x(nx);
+  Zap::MatBased::Vector<Float> x(nx);
   for (int i = 0; i < static_cast<int>(nx); ++i) {
     x(i) = x_min + dx * (static_cast<Float>(i) + static_cast<Float>(0.5));
   }
-  Zap::Vector<Float> y(static_cast<int>(ny));
+  Zap::MatBased::Vector<Float> y(static_cast<int>(ny));
   for (int i = 0; i < static_cast<int>(ny); ++i) {
     y(i) = y_min + dy * (static_cast<Float>(i) + static_cast<Float>(0.5));
   }
 
-  Zap::Matrix<Float> u0(static_cast<int>(ny), static_cast<int>(nx));
+  Zap::MatBased::Matrix<Float> u0(static_cast<int>(ny), static_cast<int>(nx));
   for (int yi = 0; yi < static_cast<int>(ny); ++yi) {
     for (int xi = 0; xi < static_cast<int>(nx); ++xi) {
-      // u0(yi, xi) = static_cast<Float>(x(xi) >= (x_min + x_max) / 2);
+      // = Full circle =============================================================================
       // u0(yi, xi) = static_cast<Float>(std::pow(x(xi) - (x_min + x_max) / 2, 2) +
       //                                     std::pow(y(yi) - (y_min + y_max) / 2, 2) <=
       //                                 1.0 * 1.0);
-      // u0(yi, xi) =
-      //     (x(xi) + y(yi)) * static_cast<Float>((x(xi) * x(xi) + y(yi) * y(yi)) <=
-      //                                          std::pow((x_min + x_max + y_min + y_max) / 4, 2));
+
+      // = Quater circle ===========================================================================
+      u0(yi, xi) =
+          (x(xi) + y(yi)) * static_cast<Float>((x(xi) * x(xi) + y(yi) * y(yi)) <=
+                                               std::pow((x_min + x_max + y_min + y_max) / 4, 2));
+
+      // = X-ramp ==================================================================================
       // u0(yi, xi) = x(xi) * static_cast<Float>(x(xi) <= (x_min + x_max) / 2);
+
+      // = Y-ramp ==================================================================================
       // u0(yi, xi) = y(yi) * static_cast<Float>(y(yi) <= (y_min + y_max) / 2);
+
+      // = X-step ==================================================================================
+      // u0(yi, xi) = static_cast<Float>(x(xi) >= (x_min + x_max) / 2);
+      // u0(yi, xi) = static_cast<Float>(x(xi) <= (x_min + x_max) / 2) + 1;
       // u0(yi, xi) = 2 * static_cast<Float>(x(xi) <= (x_min + x_max) / 2);
       // u0(yi, xi) = 2 * static_cast<Float>(x(xi) >= (x_min + x_max) / 2);
-      u0(yi, xi) = static_cast<Float>(x(xi) <= (x_min + x_max) / 2) + 1;
     }
   }
 
-  constexpr auto tend = static_cast<Float>(4.0);
+  constexpr auto tend = static_cast<Float>(1.0);
 
-  auto boundary = [](Zap::Matrix<Float>& u_next,
-                     const Zap::Matrix<Float>& u_curr,
+  auto boundary = [](Zap::MatBased::Matrix<Float>& u_next,
+                     const Zap::MatBased::Matrix<Float>& u_curr,
                      Float dt,
                      Float local_dx,
                      Float local_dy,
                      auto numerical_flux) {
-    // return Zap::Scalar::zero_flux_boundary(u_next, u_curr, dt, local_dx, local_dy,
+    // return Zap::MatBased::zero_flux_boundary(u_next, u_curr, dt, local_dx, local_dy,
     // numerical_flux);
-    return Zap::Scalar::periodic_boundary(u_next, u_curr, dt, local_dx, local_dy, numerical_flux);
-    // return Zap::Scalar::equal_value_boundary(u_next, u_curr, dt, local_dx, local_dy,
+    // return Zap::MatBased::periodic_boundary(u_next, u_curr, dt, local_dx, local_dy,
     // numerical_flux);
+    return Zap::MatBased::equal_value_boundary(
+        u_next, u_curr, dt, local_dx, local_dy, numerical_flux);
   };
 
   constexpr auto u_filename = OUTPUT_DIR "u.dat";
@@ -88,7 +98,7 @@ auto main(int argc, char** argv) -> int {
   constexpr auto t_filename = OUTPUT_DIR "t.dat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
 
-  const auto u_res = Zap::Scalar::solve_2d_burgers(x, y, u0, tend, boundary, u_writer, t_writer);
+  const auto u_res = Zap::MatBased::solve_2d_burgers(x, y, u0, tend, boundary, u_writer, t_writer);
 
   Igor::Info("Wrote solution to `{}`", u_filename);
   Igor::Info("Wrote time steps to `{}`", t_filename);

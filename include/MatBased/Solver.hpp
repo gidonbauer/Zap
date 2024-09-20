@@ -6,12 +6,12 @@
 #include <Eigen/Dense>
 
 #include "Igor.hpp"
-#include "Scalar/Matrix.hpp"
+#include "MatBased/Matrix.hpp"
 
-namespace Zap::Scalar {
+namespace Zap::MatBased {
 
 template <typename Float>
-[[nodiscard]] constexpr auto abs_max(const Zap::Matrix<Float>& mat) noexcept -> Float {
+[[nodiscard]] constexpr auto abs_max(const Matrix<Float>& mat) noexcept -> Float {
   assert(mat.rows() > 0 && mat.cols() > 0);
   auto abs_max = std::abs(mat(0, 0));
   for (int col = 0; col < mat.cols(); ++col) {
@@ -31,14 +31,14 @@ template <typename Float>
 //  | (0,0) (0,1) (0,2) ... (0,n)
 //  .------ x ---->
 template <typename Float, typename BoundaryCondition, typename UWriter, typename TWriter>
-[[nodiscard]] auto solve_2d_burgers(const Zap::Vector<Float>& x,   // x-grid
-                                    const Zap::Vector<Float>& y,   // y-grid
-                                    const Zap::Matrix<Float>& u0,  // initial value
-                                    Float tend,                    // Final time
-                                    BoundaryCondition boundary,    // Type of boundaries
-                                    UWriter& u_writer,             // Save intermediate u in file
-                                    TWriter& t_writer              // Save intermediate t in file
-                                    ) -> std::optional<Zap::Matrix<Float>> {
+[[nodiscard]] auto solve_2d_burgers(const Vector<Float>& x,      // x-grid
+                                    const Vector<Float>& y,      // y-grid
+                                    const Matrix<Float>& u0,     // initial value
+                                    Float tend,                  // Final time
+                                    BoundaryCondition boundary,  // Type of boundaries
+                                    UWriter& u_writer,           // Save intermediate u in file
+                                    TWriter& t_writer            // Save intermediate t in file
+                                    ) -> std::optional<Matrix<Float>> {
   assert(y.size() == u0.rows());
   assert(x.size() == u0.cols());
   assert(x.size() >= 2);
@@ -103,7 +103,7 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
     // Update time
     t += dt;
 
-    Zap::swap(u_curr, u_next);
+    Zap::MatBased::swap(u_curr, u_next);
 
     // - Save intermediate results to file to not exceed memory ------------------------------------
     if (!u_writer.write_data(u_curr) || !t_writer.write_data(t)) { return std::nullopt; }
@@ -112,6 +112,6 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
   return u_curr;
 }
 
-}  // namespace Zap::Scalar
+}  // namespace Zap::MatBased
 
 #endif  // ZAP_SCALAR_SOLVER_HPP_

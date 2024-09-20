@@ -1,9 +1,9 @@
 #ifndef ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_
 #define ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_
 
-#include "Scalar/Matrix.hpp"
+#include "MatBased/Matrix.hpp"
 
-namespace Zap::Scalar {
+namespace Zap::MatBased {
 
 // - Copy the value next to the boundary -----------------------------------------------------------
 template <typename Float, typename NumericalFlux>
@@ -468,6 +468,6 @@ void equal_value_boundary(Matrix<Float>& u_next,
   }
 }
 
-}  // namespace Zap::Scalar
+}  // namespace Zap::MatBased
 
 #endif  // ZAP_SCALAR_BOUNDARY_CONDITIONS_HPP_

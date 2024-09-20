@@ -3,7 +3,7 @@
 
 #include <Eigen/Core>
 
-namespace Zap {
+namespace Zap::MatBased {
 
 template <typename T>
 using Vector = Eigen::Vector<T, Eigen::Dynamic>;
@@ -15,6 +15,6 @@ constexpr void swap(Matrix<T>& a, Matrix<T>& b) noexcept {
   a.swap(b);
 }
 
-}  // namespace Zap
+}  // namespace Zap::MatBased
 
 #endif  // ZAP_MATRIX_HPP_

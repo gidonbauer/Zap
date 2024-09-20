@@ -3,10 +3,11 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/")
 find_package(OpenMP REQUIRED)
 
 set(executables
-  run_solver
   cell_solver_1d
   cell_solver_2d
   example_x_ramp
+  
+  mat_solver
 )
 
 foreach(exec ${executables})
@@ -24,20 +25,11 @@ endforeach()
 # ================================================
 
 if (ZAP_BUILD_RENDERER)
-    # - Define executables -------------
-    add_executable(legacy_renderer legacy_renderer.cpp)
-
-    # - Define include path ------------
-    target_include_directories(legacy_renderer        PRIVATE ${CMAKE_SOURCE_DIR}/include/)
-    target_include_directories(legacy_renderer SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/ThirdParty/)
-    
-    # --------------------------------------------
     find_package(Freetype REQUIRED)
    
     set(freetype_executable
-      renderer
       cell_renderer
-      show_initial_shock
+      mat_renderer
     )
     foreach(exec ${freetype_executable})
         # - Renderer that uses freetype --------
