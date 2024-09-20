@@ -76,8 +76,8 @@ auto main(int argc, char** argv) -> int {
   const Float y_max = 5.0;
 
   Zap::CellBased::UniformGrid<Float, DIM> grid(x_min, x_max, nx, y_min, y_max, ny);
-  // grid.same_value_boundary();
-  grid.periodic_boundary();
+  grid.same_value_boundary();
+  // grid.periodic_boundary();
 
 // #define RAMP_X
 #define QUARTER_CIRCLE

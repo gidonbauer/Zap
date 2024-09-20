@@ -6,6 +6,7 @@
 #include "IO/IncMatrixReader.hpp"
 #include "Renderer/Canvas.hpp"
 #include "Renderer/FFmpeg.hpp"
+#include "Renderer/Modules.hpp"
 
 #define ZAP_PARALLEL_RENDERING
 
@@ -209,216 +210,48 @@ template <typename Float, size_t DIM>
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float>
-[[nodiscard]] constexpr auto norm_point(Float x, Float min, Float max) noexcept -> Float {
-  return (x - min) / (max - min);
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float>
-[[nodiscard]] constexpr auto norm_length(Float dx, Float min, Float max) noexcept -> Float {
-  return dx / (max - min);
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float>
-[[nodiscard]] constexpr auto
-to_pixel_coord(Float norm_value, size_t num_cells, size_t scale) noexcept -> size_t {
-  return static_cast<size_t>(std::round(std::clamp(norm_value, Float{0}, Float{1}) *
-                                        static_cast<Float>(num_cells * scale)));
-}
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-[[nodiscard]] auto render_graph(Rd::Canvas& canvas,
-                                Eigen::Index solution_idx,
-                                const Zap::IO::IncCellReader<Float, DIM>& u_reader,
-                                const Eigen::Vector<Float, DIM>& min,
-                                const Eigen::Vector<Float, DIM>& max,
-                                Rd::Box graph_box,
-                                Rd::Box colorbar_box,
-                                const Args& args) noexcept -> bool {
-  const auto& cells = u_reader.cells();
-
-  bool failed_rendering = false;
-#ifdef ZAP_PARALLEL_RENDERING
-#pragma omp parallel for
-#endif  // ZAP_PARALLEL_RENDERING
-  for (const auto& cell : cells) {
-    if (cell.is_cartesian()) {
-      const Rd::Box rect{
-          .col   = to_pixel_coord(norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()),
-                                u_reader.nx(),
-                                args.scale),
-          .row   = to_pixel_coord(norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()),
-                                u_reader.ny(),
-                                args.scale),
-          .width = to_pixel_coord(
-              norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), args.scale),
-          .height = to_pixel_coord(
-              norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), args.scale),
-      };
-      Rd::RGB c{};
-      if (args.same_range) {
-        const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-        const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-        c = Rd::float_to_rgb(cell.get_cartesian().value(solution_idx), *total_min, *total_max);
-      } else {
-        c = Rd::float_to_rgb(
-            cell.get_cartesian().value(solution_idx), min(solution_idx), max(solution_idx));
-      }
-
-      if (!canvas.draw_rect(rect, graph_box, c, true)) {
-        Igor::Warn("Could not draw cell");
-        failed_rendering = true;
-      }
-    } else if (cell.is_cut()) {
-      const auto& cut_value = cell.get_cut();
-
-      // Left sub-cell
-      {
-        const auto points = Zap::CellBased::get_left_points<decltype(cell), Float>(cell);
-        std::vector<Rd::Point> canvas_points(points.size());
-        for (size_t i = 0; i < points.size(); ++i) {
-          canvas_points[i] = Rd::Point{
-              .col = to_pixel_coord(norm_point(points[i](0), u_reader.x_min(), u_reader.x_max()),
-                                    u_reader.nx(),
-                                    args.scale),
-              .row = to_pixel_coord(norm_point(points[i](1), u_reader.y_min(), u_reader.y_max()),
-                                    u_reader.ny(),
-                                    args.scale),
-          };
-        }
-
-        Rd::RGB c{};
-        if (args.same_range) {
-          const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-          const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-          c = Rd::float_to_rgb(cell.get_cut().left_value(solution_idx), *total_min, *total_max);
-        } else {
-          c = Rd::float_to_rgb(
-              cell.get_cut().left_value(solution_idx), min(solution_idx), max(solution_idx));
-        }
-
-        if (!canvas.draw_polygon(canvas_points, graph_box, c, true)) {
-          Igor::Warn("Could not draw left polygon.");
-          failed_rendering = true;
-        }
-      }
-
-      // Right sub-cell
-      {
-        const auto points = Zap::CellBased::get_right_points<decltype(cell), Float>(cell);
-        std::vector<Rd::Point> canvas_points(points.size());
-        for (size_t i = 0; i < points.size(); ++i) {
-          canvas_points[i] = Rd::Point{
-              .col = to_pixel_coord(norm_point(points[i](0), u_reader.x_min(), u_reader.x_max()),
-                                    u_reader.nx(),
-                                    args.scale),
-              .row = to_pixel_coord(norm_point(points[i](1), u_reader.y_min(), u_reader.y_max()),
-                                    u_reader.ny(),
-                                    args.scale),
-          };
-        }
-
-        Rd::RGB c{};
-        if (args.same_range) {
-          const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-          const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-          c = Rd::float_to_rgb(cell.get_cut().right_value(solution_idx), *total_min, *total_max);
-        } else {
-          c = Rd::float_to_rgb(
-              cell.get_cut().right_value(solution_idx), min(solution_idx), max(solution_idx));
-        }
-
-        if (!canvas.draw_polygon(canvas_points, graph_box, c, true)) {
-          Igor::Warn("Could not draw right polygon.");
-          failed_rendering = true;
-        }
-      }
-
-      // Draw shock curve
-      const Rd::Point p1{
-          .col = to_pixel_coord(norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()),
-                                u_reader.nx(),
-                                args.scale),
-          .row = to_pixel_coord(norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()),
-                                u_reader.ny(),
-                                args.scale),
-      };
-      const Rd::Point p2{
-          .col = to_pixel_coord(norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()),
-                                u_reader.nx(),
-                                args.scale),
-          .row = to_pixel_coord(norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()),
-                                u_reader.ny(),
-                                args.scale),
-      };
-
-      if (!canvas.draw_line(p1, p2, graph_box, RED, true)) {
-        Igor::Warn("Could not draw line");
-        failed_rendering = true;
-      }
-    } else {
-      Igor::Warn("Unknown cell type with variant index {}", cell.value.index());
-      failed_rendering = true;
-    }
-  }
-
-  if (!canvas.set_font_size(6)) { failed_rendering = true; }
-  constexpr size_t NUM_COLORBAR_BLOCKS = 10;
-  for (size_t i = 0; i < NUM_COLORBAR_BLOCKS; ++i) {
-    const Float frac = static_cast<Float>(i) / static_cast<Float>(NUM_COLORBAR_BLOCKS - 1);
-    Rd::RGB c{};
-    Float value{};
-    if (args.same_range) {
-      const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-      const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-      value                = std::lerp(*total_min, *total_max, frac);
-      c                    = Rd::float_to_rgb(value, *total_min, *total_max);
-    } else {
-      value = std::lerp(min(solution_idx), max(solution_idx), frac);
-      c     = Rd::float_to_rgb(value, min(solution_idx), max(solution_idx));
-    }
-
-    const Rd::Box block = {
-        .col    = 0,
-        .row    = i * colorbar_box.height / NUM_COLORBAR_BLOCKS,
-        .width  = colorbar_box.width / 4,
-        .height = colorbar_box.height / NUM_COLORBAR_BLOCKS,
-    };
-    if (!canvas.draw_rect(block, colorbar_box, c, true)) { failed_rendering = true; }
-
-    const auto str_value     = std::format("{:.6f}", value);
-    const Rd::Box text_block = {
-        .col = colorbar_box.col + block.width,
-        .row = colorbar_box.row +
-               (NUM_COLORBAR_BLOCKS - i - 1) * colorbar_box.height / NUM_COLORBAR_BLOCKS,
-        .width  = colorbar_box.width - block.width,
-        .height = colorbar_box.height / NUM_COLORBAR_BLOCKS,
-    };
-
-    if (!canvas.draw_text(str_value, text_block, true)) { failed_rendering = true; }
-  }
-
-  return !failed_rendering;
-}
-
-// -------------------------------------------------------------------------------------------------
 [[nodiscard]] auto render_1d(const Args& args) noexcept -> bool {
   using Float          = double;
   constexpr size_t DIM = 1;
   const auto scale     = args.scale;
 
   try {
-    Zap::IO::IncMatrixReader<Float> t_reader(args.t_input_file);
-    Zap::IO::IncCellReader<Float, DIM> u_reader(args.u_input_file);
+    using CellReader   = Zap::IO::IncCellReader<Float, DIM>;
+    using MatrixReader = Zap::IO::IncMatrixReader<Float>;
+    using Readers      = std::variant<CellReader, MatrixReader>;
+
+    MatrixReader t_reader(args.t_input_file);
+    auto u_reader = [&args]() -> Readers {
+      if (args.u_input_file.ends_with(".grid")) {
+        return CellReader(args.u_input_file);
+      } else if (args.u_input_file.ends_with(".mat")) {
+        return MatrixReader(args.u_input_file);
+      } else {
+        Igor::Panic("Unknown file format, use file extension `.grid` for cell-based solution or "
+                    "`.mat` for matrix-based solution. Filename is {}",
+                    args.u_input_file);
+        std::unreachable();
+      }
+    }();
 
     constexpr size_t TEXT_HEIGHT    = 100UZ;
     constexpr size_t GRAPH_PADDING  = 25UZ;
     constexpr size_t COLORBAR_WIDTH = 200UZ;
-    const size_t graph_width        = u_reader.nx() * scale;
-    const size_t graph_height       = u_reader.ny() * scale;
+    size_t graph_width              = 0;
+    size_t graph_height             = 0;
+    if (std::holds_alternative<CellReader>(u_reader)) {
+      graph_width  = std::get<CellReader>(u_reader).nx() * scale;
+      graph_height = std::get<CellReader>(u_reader).ny() * scale;
+    } else {
+      const auto n_rows = std::get<MatrixReader>(u_reader).rows();
+      const auto n_cols = std::get<MatrixReader>(u_reader).cols();
+      assert(n_rows > 0);
+      assert(n_cols > 0);
+
+      graph_width  = static_cast<size_t>(n_rows) * scale;
+      graph_height = static_cast<size_t>(n_cols) * scale;
+    }
+
     Rd::Canvas canvas(graph_width + 4 * GRAPH_PADDING + COLORBAR_WIDTH, graph_height + TEXT_HEIGHT);
     const Rd::Box text_box{
         .col    = 0,
@@ -460,7 +293,14 @@ template <typename Float, size_t DIM>
     Eigen::Vector<Float, DIM> max{};
     for (size_t iter = 0; true; ++iter) {
       const auto got_next_t = t_reader.read_next<false>();
-      const auto got_next_u = u_reader.read_next<false>();
+      const auto got_next_u = [&u_reader] {
+        if (std::holds_alternative<CellReader>(u_reader)) {
+          return std::get<CellReader>(u_reader).read_next<false>();
+        } else {
+          return std::get<MatrixReader>(u_reader).read_next<false>();
+        }
+      }();
+
       if (!got_next_u && !got_next_t) {
         break;
       } else if (!got_next_u) {
@@ -480,13 +320,48 @@ template <typename Float, size_t DIM>
         return false;
       }
 
-      const auto& cells = u_reader.cells();
-      assert(cells.size() > 0);
-      if (iter == 0 || !args.keep_range) {
-        std::tie(min, max) = min_max_cell_value<Float, DIM>(cells);
+      if (std::holds_alternative<CellReader>(u_reader)) {
+        const auto& cells = std::get<CellReader>(u_reader).cells();
+        assert(cells.size() > 0);
+        if (iter == 0 || !args.keep_range) {
+          std::tie(min, max) = min_max_cell_value<Float, DIM>(cells);
+        }
+      } else {
+        const auto& data = std::get<MatrixReader>(u_reader).data();
+        if (iter == 0 || !args.keep_range) {
+          const auto min_max = std::minmax_element(std::cbegin(data), std::cend(data));
+          min(0)             = *min_max.first;
+          max(0)             = *min_max.second;
+        }
       }
 
-      if (!render_graph<Float, DIM>(canvas, 0, u_reader, min, max, graph_box, colorbar_box, args)) {
+      if (std::holds_alternative<CellReader>(u_reader)) {
+        if (!Rd::render_graph<Float, DIM>(canvas,
+                                          std::get<CellReader>(u_reader),
+                                          0,
+                                          min,
+                                          max,
+                                          graph_box,
+                                          args.scale,
+                                          args.same_range)) {
+          // return false;
+        }
+      } else {
+        if (!Rd::render_graph<Float, DIM>(canvas,
+                                          std::get<MatrixReader>(u_reader),
+                                          0,
+                                          min,
+                                          max,
+                                          graph_box,
+                                          args.scale,
+                                          args.same_range)) {
+          // return false;
+        }
+      }
+
+      constexpr size_t NUM_COLORBAR_BLOCKS = 10;
+      if (!Rd::render_color_bar<Float, DIM>(
+              canvas, colorbar_box, 0, min, max, args.same_range, NUM_COLORBAR_BLOCKS)) {
         // return false;
       }
 
@@ -599,13 +474,23 @@ template <typename Float, size_t DIM>
         std::tie(min, max) = min_max_cell_value<Float, DIM>(cells);
       }
 
-      if (!render_graph<Float, DIM>(
-              canvas, 0, u_reader, min, max, left_graph_box, left_colorbar_box, args)) {
-        return false;
+      if (!Rd::render_graph<Float, DIM>(
+              canvas, u_reader, 0, min, max, left_graph_box, args.scale, args.same_range)) {
+        // return false;
       }
-      if (!render_graph<Float, DIM>(
-              canvas, 1, u_reader, min, max, right_graph_box, right_colorbar_box, args)) {
-        return false;
+      if (!Rd::render_graph<Float, DIM>(
+              canvas, u_reader, 1, min, max, right_graph_box, args.scale, args.same_range)) {
+        // return false;
+      }
+
+      constexpr size_t NUM_COLORBAR_BLOCKS = 10;
+      if (!Rd::render_color_bar<Float, DIM>(
+              canvas, left_colorbar_box, 0, min, max, args.same_range, NUM_COLORBAR_BLOCKS)) {
+        // return false;
+      }
+      if (!Rd::render_color_bar<Float, DIM>(
+              canvas, right_colorbar_box, 1, min, max, args.same_range, NUM_COLORBAR_BLOCKS)) {
+        // return false;
       }
 
       if (args.save_frame_images) {

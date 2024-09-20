@@ -27,10 +27,7 @@ endforeach()
 if (ZAP_BUILD_RENDERER)
     find_package(Freetype REQUIRED)
    
-    set(freetype_executable
-      cell_renderer
-      mat_renderer
-    )
+    set(freetype_executable renderer)
     foreach(exec ${freetype_executable})
         # - Renderer that uses freetype --------
         add_executable(${exec} ${exec}.cpp)

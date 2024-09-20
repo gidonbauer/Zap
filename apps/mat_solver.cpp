@@ -10,6 +10,15 @@ auto main(int argc, char** argv) -> int {
     return 1;
   }
 
+  {
+    std::error_code ec;
+    std::filesystem::create_directories(OUTPUT_DIR, ec);
+    if (ec) {
+      Igor::Warn("Could not create directory `{}`: {}", OUTPUT_DIR, ec.message());
+      return 1;
+    }
+  }
+
   using Float          = double;
   constexpr auto x_min = static_cast<Float>(0.0);
   constexpr auto x_max = static_cast<Float>(5.0);
@@ -92,10 +101,10 @@ auto main(int argc, char** argv) -> int {
         u_next, u_curr, dt, local_dx, local_dy, numerical_flux);
   };
 
-  constexpr auto u_filename = OUTPUT_DIR "u.dat";
+  constexpr auto u_filename = OUTPUT_DIR "u.mat";
   Zap::IO::IncMatrixWriter u_writer(u_filename, u0);
 
-  constexpr auto t_filename = OUTPUT_DIR "t.dat";
+  constexpr auto t_filename = OUTPUT_DIR "t.mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
 
   const auto u_res = Zap::MatBased::solve_2d_burgers(x, y, u0, tend, boundary, u_writer, t_writer);

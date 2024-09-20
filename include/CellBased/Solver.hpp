@@ -402,25 +402,21 @@ class Solver {
       const Float dt = std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
       next_grid = curr_grid;
-      next_grid.merge_cut_cells();
+      if (!curr_grid.m_cut_cell_idxs.empty()) {
+        next_grid.merge_cut_cells();
 
-      auto avg_new_shock_points = move_wave_front(curr_grid, next_grid, dt);
-      if (!avg_new_shock_points.has_value()) { return std::nullopt; }
+        auto avg_new_shock_points = move_wave_front(curr_grid, next_grid, dt);
+        if (!avg_new_shock_points.has_value()) { return std::nullopt; }
 
-      // if (!next_grid.cut_curve([&avg_new_shock_points](Float t) {
-      //       return piecewise_linear_curve<Float, DIM>(t, *avg_new_shock_points);
-      //     })) {
-      //   Igor::Warn("Could not cut on new shock curve.");
-      //   return std::nullopt;
-      // }
-      if (!next_grid.cut_piecewise_linear(std::move(*avg_new_shock_points))) {
-        Igor::Warn("Could not cut on new shock curve.");
-        return std::nullopt;
+        if (!next_grid.cut_piecewise_linear(std::move(*avg_new_shock_points))) {
+          Igor::Warn("Could not cut on new shock curve.");
+          return std::nullopt;
+        }
+        // Igor::Debug("t = {}", t);
+        // Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
+        // Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
+        // std::cout << "----------------------------------------\n";
       }
-      // Igor::Debug("t = {}", t);
-      // Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
-      // Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
-      // std::cout << "----------------------------------------\n";
 
       // Re-calculate value for newly cut cells
       for (size_t new_cut_idx : next_grid.m_cut_cell_idxs) {
