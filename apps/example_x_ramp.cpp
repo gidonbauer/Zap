@@ -116,15 +116,29 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
                           size_t n,
                           std::ostream& out) noexcept {
   assert(n > 0);
+  if (n % 2 == 1) { n += 1; }
 
+  // Use simpsons rule
   Float L1_error = 0;
-  const Float dx = (X_MAX - X_MIN) / static_cast<Float>(n - 1);
-  for (size_t i = 0; i < n; ++i) {
-    const Float x = static_cast<Float>(i) * dx + X_MIN;
-    const Float f = std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                             analytical_quasi_1d(x, tend));
-    L1_error += f * dx;
+  const Float dx = (X_MAX - X_MIN) / static_cast<Float>(n);
+  for (size_t i = 1; i <= n / 2; ++i) {
+    {
+      const Float x = static_cast<Float>(2 * i - 2) * dx + X_MIN;
+      L1_error += std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
+                           analytical_quasi_1d(x, tend));
+    }
+    {
+      const Float x = static_cast<Float>(2 * i - 1) * dx + X_MIN;
+      L1_error += 4 * std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
+                               analytical_quasi_1d(x, tend));
+    }
+    {
+      const Float x = static_cast<Float>(2 * i) * dx + X_MIN;
+      L1_error += std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
+                           analytical_quasi_1d(x, tend));
+    }
   }
+  L1_error *= dx / 3;
   out << "L1 error                                         = " << std::setprecision(8) << L1_error
       << '\n';
 }
