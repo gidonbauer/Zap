@@ -21,15 +21,17 @@ namespace Rd = Zap::Renderer;
 
 // -------------------------------------------------------------------------------------------------
 struct Args {
+  enum ImageFormat { NO_SAVE, PPM, JPEG };
+
   std::string u_input_file;
   std::string t_input_file;
   std::string output_file;
-  size_t scale           = 1;
-  bool keep_range        = false;
-  bool same_range        = false;
-  bool save_frame_images = false;
-  size_t fps             = 60;
-  bool two_dim           = false;
+  size_t scale                  = 1;
+  bool keep_range               = false;
+  bool same_range               = false;
+  ImageFormat save_frame_images = NO_SAVE;
+  size_t fps                    = 60;
+  bool two_dim                  = false;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -37,17 +39,18 @@ template <Igor::detail::Level level>
 constexpr void usage(std::string_view prog) {
   Args args{};
 
-  std::cerr << Igor::detail::level_repr(level) << "Usage: " << prog
-            << " [--scale s] [--keep-range] [--same-range] [--save-frame-img] [--fps f] [--2d] "
-               "<u input file> <t input file> <output file>\n";
+  std::cerr
+      << Igor::detail::level_repr(level) << "Usage: " << prog
+      << " [--scale s] [--keep-range] [--same-range] [--save-frame-img <format>] [--fps f] [--2d] "
+         "<u input file> <t input file> <output file>\n";
   std::cerr << "\t--scale           Number of pixels for single cell, default is " << args.scale
             << '\n';
   std::cerr << "\t--keep-range      Keep min and max value of first frame for colormap, default is "
             << std::boolalpha << args.keep_range << '\n';
   std::cerr << "\t--same-range      Same min and max value for both plots in 2d, default is "
             << std::boolalpha << args.same_range << '\n';
-  std::cerr << "\t--save-frame-img  Save each individual frame as .ppm image, default is "
-            << std::boolalpha << args.save_frame_images << '\n';
+  std::cerr << "\t--save-frame-img  Save each individual frame as .ppm or .jpeg image, default is "
+               "to not save the frames\n";
   std::cerr << "\t--fps             Frames per second for rendered video, default is " << args.fps
             << '\n';
   std::cerr
@@ -112,13 +115,32 @@ constexpr void usage(std::string_view prog) {
       if (args.fps == 0) {
         std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
                   << "FPS must be larger than zero but is " << args.fps << '\n';
+        return std::nullopt;
       }
     } else if (*argv == "--keep-range"sv) {
       args.keep_range = true;
     } else if (*argv == "--same-range"sv) {
       args.same_range = true;
     } else if (*argv == "--save-frame-img"sv) {
-      args.save_frame_images = true;
+      argc -= 1;
+      argv += 1;  // NOLINT
+      if (argc <= 0) {
+        usage<Igor::detail::Level::WARN>(prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+                  << "Did not provide format to save the frame images.\n";
+        return std::nullopt;
+      }
+      if (*argv == "ppm"sv) {
+        args.save_frame_images = Args::PPM;
+      } else if (*argv == "jpeg"sv || *argv == "jpg"sv) {
+        args.save_frame_images = Args::JPEG;
+      } else {
+        usage<Igor::detail::Level::WARN>(prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN) << "Invalid format `"
+                  << *argv
+                  << "` to save the frames as image. Available formats are `ppm` and `jpeg`\n";
+        return std::nullopt;
+      }
     } else if (*argv == "--2d"sv) {
       args.two_dim = true;
     } else if (args.u_input_file.empty()) {
@@ -365,10 +387,20 @@ template <typename Float, size_t DIM>
         // return false;
       }
 
-      if (args.save_frame_images) {
-        if (std::string filename = std::format("tmp_{:0>4}.ppm", iter); !canvas.to_ppm(filename)) {
-          Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
-        }
+      switch (args.save_frame_images) {
+        case Args::PPM:
+          if (std::string filename = std::format("tmp_{:0>4}.ppm", iter);
+              !canvas.to_ppm(filename)) {
+            Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
+          }
+          break;
+        case Args::JPEG:
+          if (std::string filename = std::format("tmp_{:0>4}.jpeg", iter);
+              !canvas.to_jpeg(filename)) {
+            Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
+          }
+          break;
+        case Args::NO_SAVE:
       }
 
       if (!canvas.to_raw_stream(ffmpeg.stream())) {
@@ -493,10 +525,20 @@ template <typename Float, size_t DIM>
         // return false;
       }
 
-      if (args.save_frame_images) {
-        if (std::string filename = std::format("tmp_{:0>4}.ppm", iter); !canvas.to_ppm(filename)) {
-          Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
-        }
+      switch (args.save_frame_images) {
+        case Args::PPM:
+          if (std::string filename = std::format("tmp_{:0>4}.ppm", iter);
+              !canvas.to_ppm(filename)) {
+            Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
+          }
+          break;
+        case Args::JPEG:
+          if (std::string filename = std::format("tmp_{:0>4}.jpeg", iter);
+              !canvas.to_jpeg(filename)) {
+            Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
+          }
+          break;
+        case Args::NO_SAVE:
       }
 
       if (!canvas.to_raw_stream(ffmpeg.stream())) {

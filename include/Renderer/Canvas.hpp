@@ -13,6 +13,9 @@
 #include FT_FREETYPE_H
 #include <freetype/ftglyph.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <STB/stb_image_write.h>
+
 #include "Color.hpp"
 #include "Igor.hpp"
 
@@ -660,6 +663,29 @@ class Canvas {
     if (!out.write(reinterpret_cast<const char*>(m_data.data()),  // NOLINT
                    static_cast<std::streamsize>(m_width * m_height * sizeof(PixelType)))) {
       Igor::Warn("Could not write data to file `{}`: {}", filename, std::strerror(errno));
+      return false;
+    }
+
+    Igor::Info("Saved canvas to `{}`", filename);
+    return true;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] auto to_jpeg(std::string filename, int quality = 100) const noexcept -> bool {
+    if (!filename.ends_with(".jpeg")) { filename += ".jpeg"; }
+
+    assert(m_width <= std::numeric_limits<int>::max());
+    assert(m_height <= std::numeric_limits<int>::max());
+    static_assert(sizeof(PixelType) == 3, "Expect Pixel type to have 3 8-bit components.");
+    const auto res = stbi_write_jpg(filename.c_str(),
+                                    static_cast<int>(m_width),
+                                    static_cast<int>(m_height),
+                                    3,
+                                    m_data.data(),
+                                    quality);
+
+    if (res == 0) {
+      Igor::Warn("Could not write data to file `{}`", filename);
       return false;
     }
 
