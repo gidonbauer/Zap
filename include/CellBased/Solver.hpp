@@ -402,6 +402,7 @@ class Solver {
       const Float dt = std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
       next_grid = curr_grid;
+#ifndef ZAP_STATIC_CUT
       if (!curr_grid.m_cut_cell_idxs.empty()) {
         next_grid.merge_cut_cells();
 
@@ -470,6 +471,7 @@ class Solver {
           }
         }
       }
+#endif  // ZAP_STATIC_CUT
 
       // TODO: What happens when a subcell has area 0?
       //   -> cannot "uncut" the cell because that would loose shock position information

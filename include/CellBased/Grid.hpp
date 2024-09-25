@@ -403,19 +403,16 @@ class UniformGrid {
       // Left side
       if (on_x == ON_MIN) {
         assert(is_cell(cell.left_idx));
-        Igor::Panic("Expected to exit on top, not on left.");
         return cell.left_idx;
       }
       // Right side
       else if (on_x == ON_MAX) {
         assert(is_cell(cell.right_idx));
-        Igor::Panic("Expected to exit on top, not on right.");
         return cell.right_idx;
       }
       // Bottom side
       else if (on_y == ON_MIN) {
         assert(is_cell(cell.bottom_idx));
-        Igor::Panic("Expected to exit on top, not on bottom.");
         return cell.bottom_idx;
       }
       // Top side
@@ -813,6 +810,7 @@ class UniformGrid {
   [[nodiscard]] constexpr auto x_max() const noexcept -> Float { return m_x_max; }
   [[nodiscard]] constexpr auto y_min() const noexcept -> Float { return m_y_min; }
   [[nodiscard]] constexpr auto y_max() const noexcept -> Float { return m_y_max; }
+  [[nodiscard]] constexpr auto cells() const noexcept -> std::vector<m_Cell> { return m_cells; }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto size() const noexcept -> size_t { return m_cells.size(); }

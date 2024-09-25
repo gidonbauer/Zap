@@ -5,9 +5,11 @@ find_package(OpenMP REQUIRED)
 set(executables
   cell_solver_1d
   cell_solver_2d
-  example_x_ramp
   
   mat_solver
+  
+  example_static_shock
+  example_x_ramp
 )
 
 foreach(exec ${executables})
