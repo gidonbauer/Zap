@@ -38,4 +38,4 @@ Both renderers depend on Unix functions and will only work on Unix compliant ope
 - [FreeType](https://freetype.org/): For rendering text.
 - [stb_image_write](https://github.com/nothings/stb/): For saving the canvas in .jpeg format.
 
-FFmpeg and FreeType must be installed by the user, Eigen and stb\_image\_write are provided in the `ThirdPary` folder.
+FFmpeg and FreeType must be installed by the user, Eigen and stb\_image\_write are provided in the `ThirdParty` folder.
