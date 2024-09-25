@@ -6,6 +6,7 @@ $$\Leftrightarrow{} \partial_t u + u \partial_x u + u \partial_y u = 0$$
 with given initial- and boundary conditions.
 
 ## Quickstart
+TODO: This is very outdated!
 
 Building and running the solver (an appropriate value for nx and ny is 400)
 ```console
@@ -35,5 +36,6 @@ Both renderers depend on Unix functions and will only work on Unix compliant ope
 - [Eigen](https://eigen.tuxfamily.org/): For all matrix operations.
 - [FFmpeg](https://ffmpeg.org/): For rendering the solution.
 - [FreeType](https://freetype.org/): For rendering text.
+- [stb_image_write](https://github.com/nothings/stb/): For saving the canvas in .jpeg format.
 
-FFmpeg and FreeType must be installed by the user, Eigen is provided in the `ThirdPary` folder.
+FFmpeg and FreeType must be installed by the user, Eigen and stb\_image\_write are provided in the `ThirdPary` folder.
