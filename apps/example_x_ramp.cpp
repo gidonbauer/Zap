@@ -45,6 +45,7 @@ constexpr Float Y_MAX = 2.0;
   return val;
 }
 
+// -------------------------------------------------------------------------------------------------
 [[nodiscard]] auto init_shock(Float t) -> Zap::CellBased::Point<Float> {
   assert(t >= 0 && t <= 1);
   return Zap::CellBased::Point<Float>{
@@ -59,13 +60,13 @@ constexpr Float Y_MAX = 2.0;
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] constexpr auto analytical_quasi_1d(Float x, Float t) noexcept -> Float {
-  return x / (1 + t) * chi(x, Float{0}, std::sqrt(1 + t));
+[[nodiscard]] constexpr auto expected_shock_location(Float t, Float eps) noexcept -> Float {
+  return std::sqrt(1 + (1 + eps) * t);
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] constexpr auto expected_shock_location(Float t) noexcept -> Float {
-  return std::sqrt(1 + t);
+[[nodiscard]] constexpr auto analytical_quasi_1d(Float x, Float t, Float eps) noexcept -> Float {
+  return (1 + eps) * x / (1 + (1 + eps) * t) * chi(x, Float{0}, expected_shock_location(t, eps));
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -98,7 +99,7 @@ void print_shock_error(const Zap::CellBased::UniformGrid<Float, DIM>& numerical_
   out << "std_dev_shock_x                                  = " << std::setprecision(8)
       << std_dev_shock_x << '\n';
 
-  const auto expected_shock_x = expected_shock_location(tend);
+  const auto expected_shock_x = expected_shock_location(tend, Float{0});
   const auto abs_err          = std::abs(mean_shock_x - expected_shock_x);
   const auto rel_err          = abs_err / expected_shock_x;
 
@@ -125,17 +126,17 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
     {
       const Float x = static_cast<Float>(2 * i - 2) * dx + X_MIN;
       L1_error += std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                           analytical_quasi_1d(x, tend));
+                           analytical_quasi_1d(x, tend, Float{0}));
     }
     {
       const Float x = static_cast<Float>(2 * i - 1) * dx + X_MIN;
       L1_error += 4 * std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                               analytical_quasi_1d(x, tend));
+                               analytical_quasi_1d(x, tend, Float{0}));
     }
     {
       const Float x = static_cast<Float>(2 * i) * dx + X_MIN;
       L1_error += std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                           analytical_quasi_1d(x, tend));
+                           analytical_quasi_1d(x, tend, Float{0}));
     }
   }
   L1_error *= dx / 3;
@@ -150,7 +151,9 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
 
   if (!grid.cut_curve(init_shock)) { return false; }
 
-  constexpr auto u0 = [](Float x, Float /*y*/) { return analytical_quasi_1d(x, Float{0}); };
+  constexpr auto u0 = [](Float x, Float /*y*/) {
+    return analytical_quasi_1d(x, Float{0}, Float{0});
+  };
   grid.fill_four_point(u0);
 
   const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "_" + std::to_string(ny) + ".grid";
