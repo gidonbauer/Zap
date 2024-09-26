@@ -413,10 +413,10 @@ class Solver {
           Igor::Warn("Could not cut on new shock curve.");
           return std::nullopt;
         }
-        // Igor::Debug("t = {}", t);
-        // Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
-        // Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
-        // std::cout << "----------------------------------------\n";
+        Igor::Debug("t = {}", t);
+        Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
+        Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
+        std::cout << "----------------------------------------\n";
       }
 
       // Re-calculate value for newly cut cells

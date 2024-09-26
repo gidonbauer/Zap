@@ -92,13 +92,14 @@ auto main(int argc, char** argv) -> int {
                      Float dt,
                      Float local_dx,
                      Float local_dy,
-                     auto numerical_flux) {
+                     auto numerical_flux_x,
+                     auto numerical_flux_y) {
     // return Zap::MatBased::zero_flux_boundary(u_next, u_curr, dt, local_dx, local_dy,
-    // numerical_flux);
+    // numerical_flux_x, numerical_flux_y);
     // return Zap::MatBased::periodic_boundary(u_next, u_curr, dt, local_dx, local_dy,
-    // numerical_flux);
+    // numerical_flux_x, numerical_flux_y);
     return Zap::MatBased::equal_value_boundary(
-        u_next, u_curr, dt, local_dx, local_dy, numerical_flux);
+        u_next, u_curr, dt, local_dx, local_dy, numerical_flux_x, numerical_flux_y);
   };
 
   constexpr auto u_filename = OUTPUT_DIR "u.mat";

@@ -44,13 +44,19 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
   assert(x.size() >= 2);
   assert(y.size() >= 2);
 
+  // -----------------------------------------------------------------------------------------------
+
   constexpr auto f = [](const auto& u) constexpr noexcept {
     return static_cast<Float>(0.5) * u * u;
   };
 
+  constexpr auto g = [](const auto& u) constexpr noexcept {
+    return static_cast<Float>(0.5) * u * u;
+  };
+
   // From LeVeque: Numerical Methods for Conservation Laws 2nd edition (13.24)
-  constexpr auto godunov_flux = [f]<typename T>(const T& u_left,
-                                                const T& u_right) constexpr noexcept -> T {
+  constexpr auto godunov_flux_x = [f]<typename T>(const T& u_left,
+                                                  const T& u_right) constexpr noexcept -> T {
     constexpr auto zero = static_cast<T>(0);
     if (u_left <= u_right) {
       // min u in [u_left, u_right] f(u) = 0.5 * u^2
@@ -60,6 +66,21 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
     // max u in [u_right, u_left] f(u) = 0.5 * u^2
     return f(std::max(std::abs(u_left), std::abs(u_right)));
   };
+
+  // From LeVeque: Numerical Methods for Conservation Laws 2nd edition (13.24)
+  constexpr auto godunov_flux_y = [g]<typename T>(const T& u_left,
+                                                  const T& u_right) constexpr noexcept -> T {
+    constexpr auto zero = static_cast<T>(0);
+    if (u_left <= u_right) {
+      // min u in [u_left, u_right] f(u) = 0.5 * u^2
+      if (u_left <= zero && u_right >= zero) { return g(zero); }
+      return g(std::min(std::abs(u_left), std::abs(u_right)));
+    }
+    // max u in [u_right, u_left] f(u) = 0.5 * u^2
+    return g(std::max(std::abs(u_left), std::abs(u_right)));
+  };
+
+  // -----------------------------------------------------------------------------------------------
 
   Matrix<Float> u_curr = u0;
   Matrix<Float> u_next = Matrix<Float>::Zero(u0.rows(), u0.cols());
@@ -85,10 +106,10 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
     for (Eigen::Index row = 1; row < u0.rows() - 1; ++row) {
       for (Eigen::Index col = 1; col < u0.cols() - 1; ++col) {
         // clang-format off
-        const auto F_x_minus = godunov_flux(u_curr(row,     col - 1), u_curr(row,     col    ));
-        const auto F_x_plus  = godunov_flux(u_curr(row,     col    ), u_curr(row,     col + 1));
-        const auto F_y_minus = godunov_flux(u_curr(row - 1, col    ), u_curr(row,     col    ));
-        const auto F_y_plus  = godunov_flux(u_curr(row,     col    ), u_curr(row + 1, col    ));
+        const auto F_x_minus = godunov_flux_x(u_curr(row,     col - 1), u_curr(row,     col    ));
+        const auto F_x_plus  = godunov_flux_x(u_curr(row,     col    ), u_curr(row,     col + 1));
+        const auto F_y_minus = godunov_flux_y(u_curr(row - 1, col    ), u_curr(row,     col    ));
+        const auto F_y_plus  = godunov_flux_y(u_curr(row,     col    ), u_curr(row + 1, col    ));
 
         u_next(row, col) = u_curr(row, col) -
                            (dt / dx) * (F_x_plus - F_x_minus) -
@@ -98,7 +119,7 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
     }
 
     // Solve for boundary cells
-    boundary(u_next, u_curr, dt, dx, dy, godunov_flux);
+    boundary(u_next, u_curr, dt, dx, dy, godunov_flux_x, godunov_flux_y);
 
     // Update time
     t += dt;

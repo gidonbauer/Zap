@@ -113,9 +113,10 @@ auto run_mat_based(size_t nx,
                      Float dt,
                      Float local_dx,
                      Float local_dy,
-                     auto numerical_flux) {
+                     auto numerical_flux_x,
+                     auto numerical_flux_y) {
     return Zap::MatBased::equal_value_boundary(
-        u_next, u_curr, dt, local_dx, local_dy, numerical_flux);
+        u_next, u_curr, dt, local_dx, local_dy, numerical_flux_x, numerical_flux_y);
   };
 
   const std::string u_filename =
