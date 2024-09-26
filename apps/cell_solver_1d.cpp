@@ -190,9 +190,10 @@ auto main(int argc, char** argv) -> int {
   constexpr auto t_file = OUTPUT_DIR "t_1d.mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-#if 0
+// #define SAVE_ONLY_INITIAL_STATE
+#ifdef SAVE_ONLY_INITIAL_STATE
   if (!grid_writer.write_data(grid)) { return 1; }
-  if (!t_writer.write_data(Float{-1.0})) { return 1; }
+  if (!t_writer.write_data(Float{0})) { return 1; }
 #else
 #ifdef OLD_SOLVER
   IGOR_TIME_SCOPE("Solver") {
