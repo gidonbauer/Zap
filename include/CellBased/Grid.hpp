@@ -570,7 +570,7 @@ class UniformGrid {
     }
     std::vector<Point<Float>> entry_points{};
 
-    // Handle first point; extend curve backwards to cut cell containing the first point
+    // - Handle first point; extend curve backwards to cut cell containing the first point ---------
     {
       const auto& cell = m_cells[cell_idx];
       const auto& p0   = points[0];
@@ -601,7 +601,7 @@ class UniformGrid {
       m_cut_cell_idxs.push_back(cell_idx);
     }
 
-    // Handle all point pairs
+    // - Handle all point pairs --------------------------------------------------------------------
     for (size_t point_idx = 0; point_idx < points.size() - 1; ++point_idx) {
       auto p0        = points[point_idx];
       const auto& p1 = points[point_idx + 1];
@@ -623,9 +623,12 @@ class UniformGrid {
             (cell.y_min - p0(Y)) / s(Y),
             (cell.y_min + cell.dy - p0(Y)) / s(Y),
         };
+
         Float r_exit = std::numeric_limits<Float>::max();
         for (Float r : rs) {
-          if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
+          // TODO: Maybe r > -EPS<Float>; x-ramp example seems to only work like this.
+          // TODO: What if the points are on the grid lines? See x-ramp example.
+          if (r > EPS<Float> && r < r_exit) { r_exit = r; }
         }
         if (!(r_exit < std::numeric_limits<Float>::max())) {
           IGOR_DEBUG_PRINT(s);
@@ -653,11 +656,19 @@ class UniformGrid {
         p0 = p0_next;
         entry_points.push_back(p0);
         cell_idx = find_next_cell_to_cut(cell, entry_points.back());
+
+        if (std::find(m_cut_cell_idxs.cbegin(), m_cut_cell_idxs.cend(), cell_idx) !=
+            m_cut_cell_idxs.cend()) {
+          Igor::Todo("Went back to previous cell, {} is already contained in {}.",
+                     cell_idx,
+                     m_cut_cell_idxs);
+        }
+
         m_cut_cell_idxs.push_back(cell_idx);
       }
     }
 
-    // Handle last point; extend curve backwards to cut cell containing the first point
+    // - Handle last point; extend curve forwards to cut cell containing the last point ------------
     {
       const auto& cell = m_cells[cell_idx];
       const auto& p0   = points[points.size() - 2];

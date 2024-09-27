@@ -384,6 +384,7 @@ auto main(int argc, char** argv) -> int {
       3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ, /* 71UZ, */
       81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
   };
+  // constexpr std::array ns = {3UZ, 5UZ, 7UZ, 9UZ, 11UZ, 15UZ, 21UZ, 31UZ, 41UZ, 51UZ};
 
   const auto hr_nx  = 800;
   const auto hr_ny  = 800;

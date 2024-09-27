@@ -73,16 +73,16 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("tend = {}", tend);
 
   const Float x_min = 0.0;
-  const Float x_max = 2.0;
+  const Float x_max = 5.0;
   const Float y_min = 0.0;
-  const Float y_max = 2.0;
+  const Float y_max = 5.0;
 
   Zap::CellBased::UniformGrid<Float, DIM> grid(x_min, x_max, nx, y_min, y_max, ny);
   grid.same_value_boundary();
   // grid.periodic_boundary();
 
-#define RAMP_X
-// #define QUARTER_CIRCLE
+// #define RAMP_X
+#define QUARTER_CIRCLE
 // #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
   auto u0 = [=](Float x, Float y) -> Float {
@@ -207,7 +207,7 @@ auto main(int argc, char** argv) -> int {
 #else
   IGOR_TIME_SCOPE("Solver") {
     Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
-    const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5);
+    const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.25);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
