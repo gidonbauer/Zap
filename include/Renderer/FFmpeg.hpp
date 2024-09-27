@@ -25,7 +25,8 @@ class FFmpeg {
                        size_t height,
                        const std::string& output_file,
                        size_t fps                        = 60,
-                       const std::string& output_bitrate = "100000k") noexcept {
+                       const std::string& output_bitrate = "100000k",
+                       bool quiet                        = false) noexcept {
     std::array<int, 2> pipefd{};
     if (pipe(pipefd.data()) == -1) { Igor::Panic("Opening pipe failed: {}", std::strerror(errno)); }
 
@@ -53,10 +54,15 @@ class FFmpeg {
       assert(fps > 0);
       const auto FPS = std::to_string(fps);
 
+      const std::string loglevel = [quiet] {
+        if (quiet) { return "quiet"; }
+        return "info";
+      }();
+
       // clang-format off
     int ret = execlp("ffmpeg", // NOLINT
         "ffmpeg",
-        // "-loglevel", "verbose",
+        "-loglevel", loglevel.c_str(),
         "-y",
         "-f", "rawvideo",
         "-pix_fmt", "rgb24",

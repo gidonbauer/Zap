@@ -310,7 +310,12 @@ template <typename Float, size_t DIM>
 
     Igor::ScopeTimer timer{"Rendering"};
 
-    const Rd::FFmpeg ffmpeg(canvas.width(), canvas.height(), args.output_file, args.fps);
+    const Rd::FFmpeg ffmpeg(canvas.width(),
+                            canvas.height(),
+                            args.output_file,
+                            args.fps,
+                            "100000k",
+                            args.save_frame_images != Args::NO_SAVE);
     Eigen::Vector<Float, DIM> min{};
     Eigen::Vector<Float, DIM> max{};
     for (size_t iter = 0; true; ++iter) {
