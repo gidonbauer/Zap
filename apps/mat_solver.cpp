@@ -4,9 +4,35 @@
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "mat_based/"
 
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto parse_size_t(const char* cstr) -> size_t {
+  char* end        = nullptr;
+  const size_t val = std::strtoul(cstr, &end, 10);
+  if (end != cstr + std::strlen(cstr)) {  // NOLINT
+    Igor::Panic("String `{}` contains non-digits.", cstr);
+  }
+  if (val == 0UL) { Igor::Panic("Could not parse string `{}` to size_t.", cstr); }
+  if (val == std::numeric_limits<unsigned long>::max()) {
+    Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
+  }
+  return val;
+}
+
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto parse_double(const char* cstr) -> double {
+  char* end        = nullptr;
+  const double val = std::strtod(cstr, &end);
+  if (val == HUGE_VAL) {
+    Igor::Panic("Could not parse string `{}` to double: Out of range.", cstr);
+  }
+  if (cstr == end) { Igor::Panic("Could not parse string `{}` to double.", cstr); }
+  return val;
+}
+
+// -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  if (argc < 3) {
-    Igor::Warn("Usage: {} <nx> <ny>", *argv);
+  if (argc < 4) {
+    Igor::Warn("Usage: {} <nx> <ny> <tend>", *argv);
     return 1;
   }
 
@@ -25,26 +51,20 @@ auto main(int argc, char** argv) -> int {
   constexpr auto y_min = static_cast<Float>(0.0);
   constexpr auto y_max = static_cast<Float>(5.0);
 
-  auto parse_size_t = [](const char* cstr) -> size_t {
-    char* end        = nullptr;
-    const size_t val = std::strtoul(cstr, &end, 10);
-    if (end != cstr + std::strlen(cstr)) {  // NOLINT
-      Igor::Panic("String `{}` contains non-digits.", cstr);
-    }
-    if (val == 0UL) { Igor::Panic("Could not parse string `{}` to size_t.", cstr); }
-    if (val == std::numeric_limits<unsigned long>::max()) {
-      Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
-    }
-    return val;
-  };
-
-  const auto nx = parse_size_t(argv[1]);  // NOLINT
-  const auto ny = parse_size_t(argv[2]);  // NOLINT
+  const auto nx   = parse_size_t(argv[1]);                      // NOLINT
+  const auto ny   = parse_size_t(argv[2]);                      // NOLINT
+  const auto tend = static_cast<Float>(parse_double(argv[3]));  // NOLINT
   assert(nx < std::numeric_limits<int>::max());
   assert(ny < std::numeric_limits<int>::max());
 
-  Igor::Info("nx = {}", nx);
-  Igor::Info("ny = {}", ny);
+  if (tend <= 0) {
+    Igor::Warn("tend must be larger than 0, but is {}.", tend);
+    return 1;
+  }
+
+  Igor::Info("nx   = {}", nx);
+  Igor::Info("ny   = {}", ny);
+  Igor::Info("tend = {}", tend);
 
   const auto dx = (x_max - x_min) / static_cast<Float>(nx);
   const auto dy = (y_max - y_min) / static_cast<Float>(ny);
@@ -84,8 +104,6 @@ auto main(int argc, char** argv) -> int {
       // u0(yi, xi) = 2 * static_cast<Float>(x(xi) >= (x_min + x_max) / 2);
     }
   }
-
-  constexpr auto tend = static_cast<Float>(1.0);
 
   auto boundary = [](Zap::MatBased::Matrix<Float>& u_next,
                      const Zap::MatBased::Matrix<Float>& u_curr,
