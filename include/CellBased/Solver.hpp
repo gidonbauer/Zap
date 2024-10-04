@@ -11,6 +11,8 @@
 
 namespace Zap::CellBased {
 
+// TODO: Use grid coordinates for all geometry operations
+
 template <typename Float, int DIM>
 requires(DIM > 0)
 constexpr void get_eigen_decomp(const Eigen::Matrix<Float, DIM, DIM>& mat,
@@ -193,8 +195,8 @@ class Solver {
     return FullInterface<Float, DIM>{
         .left_value  = cell.get_cut().left_value,
         .right_value = cell.get_cut().right_value,
-        .begin       = cell.get_cut().cut1,
-        .end         = cell.get_cut().cut2,
+        .begin       = cell.cut1(),
+        .end         = cell.cut2(),
     };
   }
 

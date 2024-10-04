@@ -550,9 +550,165 @@ class UniformGrid {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<Point<Float>> points) noexcept
       -> bool {
-    Igor::Todo();
-    (void)points;
-    std::unreachable();
+    // TODO: Do something smarter using the fact that the grid is equaly spaced with 1x1 cells.
+    // https://stackoverflow.com/questions/13884200/getting-all-intersection-points-between-a-line-segment-and-a-2n-grid-in-intege
+    // https://stackoverflow.com/questions/3270840/find-the-intersection-between-line-and-grid-in-a-fast-manner
+
+    // Remove points outside of grid
+    std::erase_if(points, [this](const Point<Float>& p) { return !point_in_grid(p); });
+    assert(points.size() >= 2);
+
+    auto cell_idx = find_cell_grid_coord(to_grid_coord(points[0]));
+    assert(cell_idx != NULL_INDEX);
+
+    if (!m_cut_cell_idxs.empty()) {
+      Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
+      return false;
+    }
+    std::vector<Point<Float>> entry_points{};
+
+    // - Handle first point; extend curve backwards to cut cell containing the first point ---------
+    {
+      const auto& cell = m_cells[cell_idx];
+      const auto& p0   = to_grid_coord(points[0]);
+      const auto& p1   = to_grid_coord(points[1]);
+
+      const Point<Float> s = p1 - p0;
+      const std::array<Float, 4> rs{
+          (static_cast<Float>(cell.x_idx) - p0(X)) / s(X),
+          (static_cast<Float>(cell.x_idx + 1) - p0(X)) / s(X),
+          (static_cast<Float>(cell.y_idx) - p0(Y)) / s(Y),
+          (static_cast<Float>(cell.y_idx + 1) - p0(Y)) / s(Y),
+      };
+
+      Float r_entry = -std::numeric_limits<Float>::max();
+      for (Float r : rs) {
+        if (r < EPS<Float> && r > r_entry) { r_entry = r; }
+      }
+      if (!(r_entry != -std::numeric_limits<Float>::max())) {
+        IGOR_DEBUG_PRINT(s);
+        IGOR_DEBUG_PRINT(r_entry);
+        IGOR_DEBUG_PRINT(rs);
+        IGOR_DEBUG_PRINT(p0);
+        IGOR_DEBUG_PRINT(p1);
+      }
+      assert(r_entry != -std::numeric_limits<Float>::max());
+
+      entry_points.emplace_back(p0 + r_entry * s);
+      m_cut_cell_idxs.push_back(cell_idx);
+    }
+
+    // - Handle all point pairs --------------------------------------------------------------------
+    for (size_t point_idx = 0; point_idx < points.size() - 1; ++point_idx) {
+      auto p0        = to_grid_coord(points[point_idx]);
+      const auto& p1 = to_grid_coord(points[point_idx + 1]);
+
+      const Point<Float> s = (p1 - p0).normalized();
+
+      while (!point_in_cell_grid_coord(p1, m_cells[cell_idx])) {
+        const auto& cell = m_cells[cell_idx];
+        if (!point_in_cell_grid_coord(p0, cell)) {
+          std::cout << "cell = " << cell << '\n';
+          IGOR_DEBUG_PRINT(p0);
+          IGOR_DEBUG_PRINT(p1);
+        }
+        assert(point_in_cell_grid_coord(p0, cell));
+
+        const std::array<Float, 4> rs{
+            (static_cast<Float>(cell.x_idx) - p0(X)) / s(X),
+            (static_cast<Float>(cell.x_idx + 1) - p0(X)) / s(X),
+            (static_cast<Float>(cell.y_idx) - p0(Y)) / s(Y),
+            (static_cast<Float>(cell.y_idx + 1) - p0(Y)) / s(Y),
+        };
+
+        Float r_exit = std::numeric_limits<Float>::max();
+        for (Float r : rs) {
+          // TODO: Maybe r > -EPS<Float>; x-ramp example seems to only work like this.
+          // TODO: What if the points are on the grid lines? See x-ramp example.
+          if (r > EPS<Float> && r < r_exit) { r_exit = r; }
+        }
+        if (!(r_exit < std::numeric_limits<Float>::max())) {
+          IGOR_DEBUG_PRINT(s);
+          IGOR_DEBUG_PRINT(r_exit);
+          IGOR_DEBUG_PRINT(rs);
+          IGOR_DEBUG_PRINT(p0);
+          IGOR_DEBUG_PRINT(p1);
+        }
+        assert(r_exit < std::numeric_limits<Float>::max());
+
+        const Point<Float> p0_next = p0 + r_exit * s;
+        if (!point_in_cell_grid_coord(p0_next, cell)) {
+          std::cout << "cell = " << cell << '\n';
+          IGOR_DEBUG_PRINT(p0);
+          IGOR_DEBUG_PRINT(p0_next);
+          IGOR_DEBUG_PRINT(p1);
+          IGOR_DEBUG_PRINT(s);
+          IGOR_DEBUG_PRINT(r_exit);
+          IGOR_DEBUG_PRINT(entry_points);
+          IGOR_DEBUG_PRINT(m_cut_cell_idxs);
+          IGOR_DEBUG_PRINT(point_idx);
+          IGOR_DEBUG_PRINT(points.size());
+        }
+
+        p0 = p0_next;
+        entry_points.push_back(p0);
+        cell_idx = find_next_cell_to_cut(cell, entry_points.back());
+
+        if (std::find(m_cut_cell_idxs.cbegin(), m_cut_cell_idxs.cend(), cell_idx) !=
+            m_cut_cell_idxs.cend()) {
+          Igor::Todo("Went back to previous cell, {} is already contained in {}.",
+                     cell_idx,
+                     m_cut_cell_idxs);
+        }
+
+        m_cut_cell_idxs.push_back(cell_idx);
+      }
+    }
+
+    // - Handle last point; extend curve forwards to cut cell containing the last point ------------
+    {
+      const auto& cell = m_cells[cell_idx];
+      const auto& p0   = to_grid_coord(points[points.size() - 2]);
+      const auto& p1   = to_grid_coord(points[points.size() - 1]);
+
+      const Point<Float> s = p1 - p0;
+      const std::array<Float, 4> rs{
+          (static_cast<Float>(cell.x_idx) - p1(X)) / s(X),
+          (static_cast<Float>(cell.x_idx + 1) - p1(X)) / s(X),
+          (static_cast<Float>(cell.y_idx) - p1(Y)) / s(Y),
+          (static_cast<Float>(cell.y_idx + 1) - p1(Y)) / s(Y),
+      };
+
+      Float r_exit = std::numeric_limits<Float>::max();
+      for (Float r : rs) {
+        if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
+      }
+      assert(r_exit != std::numeric_limits<Float>::max());
+
+      entry_points.emplace_back(p1 + r_exit * s);
+    }
+
+    assert(m_cut_cell_idxs.size() + 1 == entry_points.size());
+    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
+      auto& cell_to_cut = m_cells[m_cut_cell_idxs[i]];
+      auto cut1_point   = entry_points[i];
+      auto cut2_point   = entry_points[i + 1];
+
+      const auto type = classify_cut(cell_to_cut, cut1_point, cut2_point);
+
+      Eigen::Vector<Float, DIM> old_value = Eigen::Vector<Float, DIM>::Zero();
+      if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
+
+      cell_to_cut.value = CutValue<Float, DIM>{
+          .left_value  = old_value,
+          .right_value = old_value,
+          .type        = type,
+          .cut1        = cut1_point,
+          .cut2        = cut2_point,
+      };
+    }
+
+    return true;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -575,6 +731,12 @@ class UniformGrid {
                    cell_polygon.area()};
     }
     m_cut_cell_idxs.clear();
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto point_in_grid(const Point<Float>& point) const noexcept -> bool {
+    return point(X) - m_x_min >= -EPS<Float> && m_x_max - point(X) >= -EPS<Float> &&  //
+           point(Y) - m_y_min >= -EPS<Float> && m_y_max - point(Y) >= -EPS<Float>;
   }
 
   // -----------------------------------------------------------------------------------------------
