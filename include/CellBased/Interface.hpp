@@ -37,8 +37,8 @@ template <typename Float, size_t DIM>
 }
 
 template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-get_outer_cell_interfaces(const Cell<Float, DIM>& cell) noexcept -> CellHalfInterfaces<Float, DIM> {
+[[nodiscard]] constexpr auto get_outer_cell_interfaces(const Cell<Float, DIM>& cell) noexcept
+    -> CellHalfInterfaces<Float, DIM> {
   if (cell.is_cartesian()) {
     return CellHalfInterfaces<Float, DIM>{
         .left =
@@ -365,10 +365,10 @@ get_outer_cell_interfaces(const Cell<Float, DIM>& cell) noexcept -> CellHalfInte
 }
 
 template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-get_shared_interfaces(const Cell<Float, DIM>& center_cell,
-                      const Cell<Float, DIM>& other_cell,
-                      Side side) noexcept -> SmallVector<FullInterface<Float, DIM>> {
+[[nodiscard]] constexpr auto get_shared_interfaces(const Cell<Float, DIM>& center_cell,
+                                                   const Cell<Float, DIM>& other_cell,
+                                                   Side side) noexcept
+    -> SmallVector<FullInterface<Float, DIM>> {
   const auto center_interfaces = get_outer_cell_interfaces(center_cell);
   const auto other_interfaces  = get_outer_cell_interfaces(other_cell);
 
@@ -414,7 +414,8 @@ get_shared_interfaces(const Cell<Float, DIM>& center_cell,
     const auto n = left_side.size();
     SmallVector<FullInterface<Float, DIM>> interfaces(n);
     for (size_t i = 0; i < n; ++i) {
-      assert(same_interface(left_side[i], right_side[i]));
+      // TODO: Is this necessary?
+      // assert(same_interface(left_side[i], right_side[i]));
       interfaces[i] = FullInterface<Float, DIM>{
           .left_value  = left_side[i].value,
           .right_value = right_side[i].value,

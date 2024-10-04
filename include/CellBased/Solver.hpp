@@ -37,8 +37,8 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto
-  cfl_factor(const UniformGrid<Float, DIM>& grid) const noexcept -> Float {
+  [[nodiscard]] constexpr auto cfl_factor(const UniformGrid<Float, DIM>& grid) const noexcept
+      -> Float {
     return std::transform_reduce(
         std::cbegin(grid.m_cells),
         std::cend(grid.m_cells),
@@ -69,9 +69,9 @@ class Solver {
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
   requires(DIM > 0)
-  [[nodiscard]] constexpr auto
-  calculate_interface(const FullInterface<Float, DIM>& interface,
-                      Float dt) const noexcept -> SmallVector<WaveProperties<Float, DIM>> {
+  [[nodiscard]] constexpr auto calculate_interface(const FullInterface<Float, DIM>& interface,
+                                                   Float dt) const noexcept
+      -> SmallVector<WaveProperties<Float, DIM>> {
     // Vector tangential to interface
     const Eigen::Vector<Float, 2> tangent_vector = (interface.end - interface.begin).normalized();
 
@@ -187,8 +187,8 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto
-  get_internal_interface(const Cell<Float, DIM>& cell) const noexcept -> FullInterface<Float, DIM> {
+  [[nodiscard]] constexpr auto get_internal_interface(const Cell<Float, DIM>& cell) const noexcept
+      -> FullInterface<Float, DIM> {
     assert(cell.is_cut());
     return FullInterface<Float, DIM>{
         .left_value  = cell.get_cut().left_value,
@@ -375,12 +375,12 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename Float, size_t DIM, typename GridWriter, typename TimeWriter>
-  [[nodiscard]] auto
-  solve(UniformGrid<Float, DIM> grid,
-        Float tend,
-        GridWriter& grid_writer,
-        TimeWriter& time_writer,
-        Float CFL_safety_factor = 0.5) noexcept -> std::optional<UniformGrid<Float, DIM>> {
+  [[nodiscard]] auto solve(UniformGrid<Float, DIM> grid,
+                           Float tend,
+                           GridWriter& grid_writer,
+                           TimeWriter& time_writer,
+                           Float CFL_safety_factor = 0.5) noexcept
+      -> std::optional<UniformGrid<Float, DIM>> {
     if (!(CFL_safety_factor > 0 && CFL_safety_factor <= 1)) {
       Igor::Warn("CFL_safety_factor must be in (0, 1], is {}", CFL_safety_factor);
       return std::nullopt;

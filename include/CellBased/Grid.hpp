@@ -10,6 +10,13 @@
 
 namespace Zap::CellBased {
 
+// IDEA: Introduce scaled grid
+//        - each cell is 1x1; global scaling factor for x and y
+//        - each cell only holds its indices (and value)
+//        - cut are always in [0, 1]
+//        - "grid coordinates" vs "simulation coordinates"
+//        - handle waves over periodic boundary conditions via grid coordinates
+
 template <typename Float, size_t DIM>
 class UniformGrid {
   enum { ON_MIN = -1, NOT_ON = 0, ON_MAX = 1 };
@@ -47,8 +54,8 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto to_corner_idx(size_t xi,
-                                             size_t yi) const noexcept -> m_CornerIndices {
+  [[nodiscard]] constexpr auto to_corner_idx(size_t xi, size_t yi) const noexcept
+      -> m_CornerIndices {
     assert(xi < m_nx);
     assert(yi < m_ny);
     return {
@@ -349,9 +356,9 @@ class UniformGrid {
     return type;
   }
 
-  [[nodiscard]] constexpr auto
-  find_next_cell_to_cut(const m_Cell& cell,
-                        const Point<Float>& exit_point) const noexcept -> size_t {
+  [[nodiscard]] constexpr auto find_next_cell_to_cut(const m_Cell& cell,
+                                                     const Point<Float>& exit_point) const noexcept
+      -> size_t {
     assert(point_in_cell(exit_point, cell));
 
     const int on_x = approx_eq(cell.x_min, exit_point(X)) * ON_MIN +
@@ -549,8 +556,8 @@ class UniformGrid {
            point(Y) - m_y_min >= -EPS<Float> && m_y_max - point(Y) >= -EPS<Float>;
   }
 
-  [[nodiscard]] constexpr auto
-  cut_piecewise_linear(std::vector<Point<Float>> points) noexcept -> bool {
+  [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<Point<Float>> points) noexcept
+      -> bool {
     // Remove points outside of grid
     std::erase_if(points, [this](const Point<Float>& p) { return !point_in_grid(p); });
     assert(points.size() >= 2);
@@ -839,8 +846,8 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto
-  eval(const Point<Float>& point) const noexcept -> Eigen::Vector<Float, DIM> {
+  [[nodiscard]] constexpr auto eval(const Point<Float>& point) const noexcept
+      -> Eigen::Vector<Float, DIM> {
     assert(point_in_grid(point));
 
     const auto cell_it = std::find_if(std::cbegin(m_cells),
@@ -898,8 +905,8 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto
-  get_existing_neighbours(size_t idx) const noexcept -> SmallVector<size_t> {
+  [[nodiscard]] constexpr auto get_existing_neighbours(size_t idx) const noexcept
+      -> SmallVector<size_t> {
     if (!is_cell(idx)) { return {}; }
 
     const auto& center_cell = m_cells[idx];
