@@ -1,5 +1,5 @@
-#ifndef ZAP_CELL_BASED_SMALL_VECTOR_HPP__
-#define ZAP_CELL_BASED_SMALL_VECTOR_HPP__
+#ifndef ZAP_CELL_BASED_SMALL_VECTOR_HPP_
+#define ZAP_CELL_BASED_SMALL_VECTOR_HPP_
 
 // TODO: Replace by Igor::StaticVector
 
@@ -137,4 +137,4 @@ class SmallVector {
 
 }  // namespace Zap::CellBased
 
-#endif  // ZAP_CELL_BASED_SMALL_VECTOR_HPP__
+#endif  // ZAP_CELL_BASED_SMALL_VECTOR_HPP_

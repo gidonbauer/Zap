@@ -14,21 +14,27 @@ template <typename Float>
 };
 
 template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto point_on_boundary(const Point<Float>& p,
-                                               const Cell<Float, DIM>& cell) -> bool {
-
-  return ((approx_eq(p(X), cell.x_min) || approx_eq(p(X), cell.x_min + cell.dx)) &&
-          (p(Y) >= cell.y_min && p(Y) <= cell.y_min + cell.dy)) ||
-         ((approx_eq(p(Y), cell.y_min) || approx_eq(p(Y), cell.y_min + cell.dy)) &&
-          (p(X) >= cell.x_min && p(X) <= cell.x_min + cell.dx));
+[[nodiscard]] constexpr auto point_on_boundary_grid_coord(const Point<Float>& p,
+                                                          const Cell<Float, DIM>& cell) -> bool {
+  // TODO: Do we need to add tolerance to the second check that makes sure that we are within the
+  // cell? (line 23 and 26)
+  return ((approx_eq(p(X), static_cast<Float>(cell.x_idx)) ||
+           approx_eq(p(X), static_cast<Float>(cell.x_idx + 1))) &&
+          (p(Y) - static_cast<Float>(cell.y_idx) >= -EPS<Float> &&
+           p(Y) - static_cast<Float>(cell.y_idx + 1) <= EPS<Float>)) ||
+         ((approx_eq(p(Y), static_cast<Float>(cell.y_idx)) ||
+           approx_eq(p(Y), static_cast<Float>(cell.y_idx + 1))) &&
+          (p(X) - static_cast<Float>(cell.x_idx) >= -EPS<Float> &&
+           p(X) - static_cast<Float>(cell.x_idx + 1) <= EPS<Float>));
 };
 
 template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto point_in_cell(const Point<Float>& p, const Cell<Float, DIM>& cell) {
-  return p(X) - cell.x_min >= -EPS<Float> &&             //
-         p(X) - (cell.x_min + cell.dx) <= EPS<Float> &&  //
-         p(Y) - cell.y_min >= -EPS<Float> &&             //
-         p(Y) - (cell.y_min + cell.dy) <= EPS<Float>;
+[[nodiscard]] constexpr auto point_in_cell_grid_coord(const Point<Float>& p,
+                                                      const Cell<Float, DIM>& cell) {
+  return p(X) - static_cast<Float>(cell.x_idx) >= -EPS<Float> &&     //
+         p(X) - static_cast<Float>(cell.x_idx + 1) <= EPS<Float> &&  //
+         p(Y) - static_cast<Float>(cell.y_idx) >= -EPS<Float> &&     //
+         p(Y) - static_cast<Float>(cell.y_idx + 1) <= EPS<Float>;
 };
 
 // template <typename Float, size_t DIM>

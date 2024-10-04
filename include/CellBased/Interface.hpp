@@ -45,32 +45,32 @@ template <typename Float, size_t DIM>
             {
                 {
                     .value = cell.get_cartesian().value,
-                    .begin = {cell.x_min, cell.y_min},
-                    .end   = {cell.x_min, cell.y_min + cell.dy},
+                    .begin = {cell.x_min(), cell.y_min()},
+                    .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                 },
             },
         .right =
             {
                 {
                     .value = cell.get_cartesian().value,
-                    .begin = {cell.x_min + cell.dx, cell.y_min},
-                    .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                    .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                    .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                 },
             },
         .bottom =
             {
                 {
                     .value = cell.get_cartesian().value,
-                    .begin = {cell.x_min, cell.y_min},
-                    .end   = {cell.x_min + cell.dx, cell.y_min},
+                    .begin = {cell.x_min(), cell.y_min()},
+                    .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                 },
             },
         .top =
             {
                 {
                     .value = cell.get_cartesian().value,
-                    .begin = {cell.x_min, cell.y_min + cell.dy},
-                    .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                    .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                    .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                 },
             },
     };
@@ -82,42 +82,42 @@ template <typename Float, size_t DIM>
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min, cell.get_cut().y2_cut},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min(), cell.get_cut().cut2(Y)},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min, cell.get_cut().y2_cut},
-                        .end   = {cell.x_min, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.get_cut().cut2(Y)},
+                        .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                     },
                 },
             .right =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min + cell.dx, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
             .bottom =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.get_cut().x1_cut, cell.y_min},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.get_cut().cut1(X), cell.y_min()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.get_cut().x1_cut, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min},
+                        .begin = {cell.get_cut().cut1(X), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min, cell.y_min + cell.dy},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
         };
@@ -128,42 +128,42 @@ template <typename Float, size_t DIM>
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                     },
                 },
             .right =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min + cell.dx, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.get_cut().y2_cut},
+                        .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.get_cut().cut2(Y)},
                     },
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min + cell.dx, cell.get_cut().y2_cut},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min() + cell.dx(), cell.get_cut().cut2(Y)},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
             .bottom =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.get_cut().x1_cut, cell.y_min},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.get_cut().cut1(X), cell.y_min()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.get_cut().x1_cut, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min},
+                        .begin = {cell.get_cut().cut1(X), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min + cell.dy},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
         };
@@ -174,42 +174,42 @@ template <typename Float, size_t DIM>
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                     },
                 },
             .right =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min + cell.dx, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.get_cut().y1_cut},
+                        .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.get_cut().cut1(Y)},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min + cell.dx, cell.get_cut().y1_cut},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min() + cell.dx(), cell.get_cut().cut1(Y)},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
             .bottom =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min + cell.dy},
-                        .end   = {cell.get_cut().x2_cut, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                        .end   = {cell.get_cut().cut2(X), cell.y_min() + cell.dy()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.get_cut().x2_cut, cell.y_min + cell.dy},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.get_cut().cut2(X), cell.y_min() + cell.dy()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
         };
@@ -220,42 +220,42 @@ template <typename Float, size_t DIM>
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min, cell.get_cut().y2_cut},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min(), cell.get_cut().cut2(Y)},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min, cell.get_cut().y2_cut},
-                        .end   = {cell.x_min, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.get_cut().cut2(Y)},
+                        .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                     },
                 },
             .right =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min + cell.dx, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
             .bottom =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min, cell.y_min + cell.dy},
-                        .end   = {cell.get_cut().x1_cut, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                        .end   = {cell.get_cut().cut1(X), cell.y_min() + cell.dy()},
                     },
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.get_cut().x1_cut, cell.y_min + cell.dy},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.get_cut().cut1(X), cell.y_min() + cell.dy()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
         };
@@ -266,42 +266,42 @@ template <typename Float, size_t DIM>
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min, cell.get_cut().y2_cut},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min(), cell.get_cut().cut2(Y)},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min, cell.get_cut().y2_cut},
-                        .end   = {cell.x_min, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.get_cut().cut2(Y)},
+                        .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                     },
                 },
             .right =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min + cell.dx, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.get_cut().y1_cut},
+                        .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.get_cut().cut1(Y)},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min + cell.dx, cell.get_cut().y1_cut},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min() + cell.dx(), cell.get_cut().cut1(Y)},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
             .bottom =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min, cell.y_min + cell.dy},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
         };
@@ -312,42 +312,42 @@ template <typename Float, size_t DIM>
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.x_min, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.x_min(), cell.y_min() + cell.dy()},
                     },
                 },
             .right =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.x_min + cell.dx, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.x_min() + cell.dx(), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
             .bottom =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min},
-                        .end   = {cell.get_cut().x1_cut, cell.y_min},
+                        .begin = {cell.x_min(), cell.y_min()},
+                        .end   = {cell.get_cut().cut1(X), cell.y_min()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.get_cut().x1_cut, cell.y_min},
-                        .end   = {cell.x_min + cell.dx, cell.y_min},
+                        .begin = {cell.get_cut().cut1(X), cell.y_min()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.x_min, cell.y_min + cell.dy},
-                        .end   = {cell.get_cut().x2_cut, cell.y_min + cell.dy},
+                        .begin = {cell.x_min(), cell.y_min() + cell.dy()},
+                        .end   = {cell.get_cut().cut2(X), cell.y_min() + cell.dy()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.get_cut().x2_cut, cell.y_min + cell.dy},
-                        .end   = {cell.x_min + cell.dx, cell.y_min + cell.dy},
+                        .begin = {cell.get_cut().cut2(X), cell.y_min() + cell.dy()},
+                        .end   = {cell.x_min() + cell.dx(), cell.y_min() + cell.dy()},
                     },
                 },
         };

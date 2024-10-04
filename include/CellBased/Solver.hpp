@@ -40,8 +40,8 @@ class Solver {
   [[nodiscard]] constexpr auto cfl_factor(const UniformGrid<Float, DIM>& grid) const noexcept
       -> Float {
     return std::transform_reduce(
-        std::cbegin(grid.m_cells),
-        std::cend(grid.m_cells),
+        std::cbegin(grid.cells()),
+        std::cend(grid.cells()),
         Float{0},
         [](const Float a, const Float b) { return std::max(a, b); },
         [this](const Cell<Float, DIM>& cell) {
@@ -193,8 +193,8 @@ class Solver {
     return FullInterface<Float, DIM>{
         .left_value  = cell.get_cut().left_value,
         .right_value = cell.get_cut().right_value,
-        .begin       = {cell.get_cut().x1_cut, cell.get_cut().y1_cut},
-        .end         = {cell.get_cut().x2_cut, cell.get_cut().y2_cut},
+        .begin       = cell.get_cut().cut1,
+        .end         = cell.get_cut().cut2,
     };
   }
 
@@ -206,7 +206,7 @@ class Solver {
                   Float dt) const noexcept -> std::optional<std::vector<Point<Float>>> {
     // Move old cuts according to strongest wave
     std::vector<std::pair<Point<Float>, Point<Float>>> new_shock_points;
-    for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
+    for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
       const auto& curr_cell = curr_grid[cell_idx];
       assert(curr_cell.is_cut());
 
@@ -403,7 +403,7 @@ class Solver {
 
       next_grid = curr_grid;
 #ifndef ZAP_STATIC_CUT
-      if (!curr_grid.m_cut_cell_idxs.empty()) {
+      if (!curr_grid.cut_cell_idxs().empty()) {
         next_grid.merge_cut_cells();
 
         auto avg_new_shock_points = move_wave_front(curr_grid, next_grid, dt);
@@ -414,13 +414,13 @@ class Solver {
           return std::nullopt;
         }
         // Igor::Debug("t = {}", t);
-        // Igor::Debug("#cut cells curr_grid = {}", curr_grid.m_cut_cell_idxs.size());
-        // Igor::Debug("#cut cells next_grid = {}", next_grid.m_cut_cell_idxs.size());
+        // Igor::Debug("#cut cells curr_grid = {}", curr_grid.cut_cell_idxs().size());
+        // Igor::Debug("#cut cells next_grid = {}", next_grid.cut_cell_idxs().size());
         // std::cout << "----------------------------------------\n";
       }
 
       // Re-calculate value for newly cut cells
-      for (size_t new_cut_idx : next_grid.m_cut_cell_idxs) {
+      for (size_t new_cut_idx : next_grid.cut_cell_idxs()) {
         auto& next_cell       = next_grid[new_cut_idx];
         const auto& curr_cell = curr_grid[new_cut_idx];
         assert(next_cell.is_cut());
@@ -492,7 +492,7 @@ class Solver {
         apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
       }
 
-      for (size_t cell_idx : curr_grid.m_cut_cell_idxs) {
+      for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
         const auto& curr_cell = curr_grid[cell_idx];
         assert(curr_cell.is_cut());
         auto& next_cell = next_grid[cell_idx];
@@ -968,7 +968,7 @@ class Solver {
     }
 
     if (!grid.is_cell(idx)) { return apply_boundary_flux(cell, side, idx); }
-    const auto& other_cell = grid.m_cells[idx];
+    const auto& other_cell = grid[idx];
     assert(cell.is_cartesian() || cell.is_cut() && "Invalid cell type.");
     assert(other_cell.is_cartesian() || other_cell.is_cut() && "Invalid cell type.");
 
@@ -993,7 +993,7 @@ class Solver {
       s << cell;
       Igor::Debug("cell = {}", s.str());
       s.str("");
-      s << grid.m_cells[idx];
+      s << grid[idx];
       Igor::Debug("other_cell = {}", s.str());
 
       Igor::Todo("Flux for cartesian to cut cells is not implemented yet.");
@@ -1005,7 +1005,7 @@ class Solver {
       s << cell;
       Igor::Debug("cell = {}", s.str());
       s.str("");
-      s << grid.m_cells[idx];
+      s << grid[idx];
       Igor::Debug("other_cell = {}", s.str());
 
       Igor::Todo("Flux for cut to cartesian cells is not implemented yet.");
@@ -1017,7 +1017,7 @@ class Solver {
       s << cell;
       Igor::Debug("cell = {}", s.str());
       s.str("");
-      s << grid.m_cells[idx];
+      s << grid[idx];
       Igor::Debug("other_cell = {}", s.str());
 
       Igor::Todo("Flux for cut to cut cells is not implemented yet.");
@@ -1069,7 +1069,7 @@ class Solver {
       const Float dt = std::min(0.5 * curr_grid.min_delta() / CFL_factor, tend - t);
 
 #pragma omp parallel for
-      for (std::size_t i = 0; i < curr_grid.m_cells.size(); ++i) {
+      for (std::size_t i = 0; i < curr_grid.size(); ++i) {
         const auto& curr_cell = curr_grid[i];
         auto& next_cell       = next_grid[i];
 
@@ -1110,7 +1110,7 @@ class Solver {
       // Update time
       t += dt;
 
-      std::swap(curr_grid.m_cells, next_grid.m_cells);
+      std::swap(curr_grid.cells(), next_grid.cells());
 
       if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(t)) { return std::nullopt; }
     }

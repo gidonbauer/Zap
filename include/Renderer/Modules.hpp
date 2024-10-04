@@ -99,13 +99,13 @@ template <typename Float, size_t DIM>
     if (cell.is_cartesian()) {
       const Box rect{
           .col = to_pixel_coord(
-              norm_point(cell.x_min, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
+              norm_point(cell.x_min(), u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
           .row = to_pixel_coord(
-              norm_point(cell.y_min, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
+              norm_point(cell.y_min(), u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
           .width = to_pixel_coord(
-              norm_length(cell.dx, u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
+              norm_length(cell.dx(), u_reader.x_min(), u_reader.x_max()), u_reader.nx(), scale),
           .height = to_pixel_coord(
-              norm_length(cell.dy, u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
+              norm_length(cell.dy(), u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
       };
       RGB c{};
       if (same_range) {
@@ -126,7 +126,7 @@ template <typename Float, size_t DIM>
 
       // Left sub-cell
       {
-        const auto points = Zap::CellBased::get_left_points<decltype(cell), Float>(cell);
+        const auto points = cell.get_left_points();
         std::vector<Point> canvas_points(points.size());
         for (size_t i = 0; i < points.size(); ++i) {
           canvas_points[i] = Point{
@@ -157,7 +157,7 @@ template <typename Float, size_t DIM>
 
       // Right sub-cell
       {
-        const auto points = Zap::CellBased::get_right_points<decltype(cell), Float>(cell);
+        const auto points = cell.get_right_points();
         std::vector<Point> canvas_points(points.size());
         for (size_t i = 0; i < points.size(); ++i) {
           canvas_points[i] = Point{
@@ -188,20 +188,24 @@ template <typename Float, size_t DIM>
 
       // Draw shock curve
       const Point p1{
-          .col = to_pixel_coord(norm_point(cut_value.x1_cut, u_reader.x_min(), u_reader.x_max()),
-                                u_reader.nx(),
-                                scale),
-          .row = to_pixel_coord(norm_point(cut_value.y1_cut, u_reader.y_min(), u_reader.y_max()),
-                                u_reader.ny(),
-                                scale),
+          .col = to_pixel_coord(
+              norm_point(cut_value.cut1(CellBased::X), u_reader.x_min(), u_reader.x_max()),
+              u_reader.nx(),
+              scale),
+          .row = to_pixel_coord(
+              norm_point(cut_value.cut1(CellBased::Y), u_reader.y_min(), u_reader.y_max()),
+              u_reader.ny(),
+              scale),
       };
       const Point p2{
-          .col = to_pixel_coord(norm_point(cut_value.x2_cut, u_reader.x_min(), u_reader.x_max()),
-                                u_reader.nx(),
-                                scale),
-          .row = to_pixel_coord(norm_point(cut_value.y2_cut, u_reader.y_min(), u_reader.y_max()),
-                                u_reader.ny(),
-                                scale),
+          .col = to_pixel_coord(
+              norm_point(cut_value.cut2(CellBased::X), u_reader.x_min(), u_reader.x_max()),
+              u_reader.nx(),
+              scale),
+          .row = to_pixel_coord(
+              norm_point(cut_value.cut2(CellBased::Y), u_reader.y_min(), u_reader.y_max()),
+              u_reader.ny(),
+              scale),
       };
 
       if (!canvas.draw_line(p1, p2, graph_box, RGB{.r = 0xFF}, true)) {

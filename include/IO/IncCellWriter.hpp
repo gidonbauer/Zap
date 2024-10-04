@@ -53,8 +53,9 @@ class IncCellWriter {
 
  private:
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] auto write_header(
-      Float x_min, Float x_max, size_t nx, Float y_min, Float y_max, size_t ny) noexcept -> bool {
+  [[nodiscard]] auto
+  write_header(Float x_min, Float x_max, size_t nx, Float y_min, Float y_max, size_t ny) noexcept
+      -> bool {
     if (!m_out.write(IncCellHeaderLayout::MAGIC_STRING.data(),
                      IncCellHeaderLayout::MAGIC_STRING.size())) {
       Igor::Warn("Could not write magic string to `{}`.", m_filename);
@@ -129,14 +130,21 @@ class IncCellWriter {
  public:
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto write_data(const CellBased::UniformGrid<Float, DIM>& grid) noexcept -> bool {
-    for (const auto& cell : grid.m_cells) {
+    // TODO: Make sure that cuts are not relative to the cell
+
+    for (const auto& cell : grid) {
       if (cell.is_cartesian()) {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
         m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cartesian));
-        m_out.write(reinterpret_cast<const char*>(&cell.x_min), sizeof(cell.x_min));
-        m_out.write(reinterpret_cast<const char*>(&cell.dx), sizeof(cell.dx));
-        m_out.write(reinterpret_cast<const char*>(&cell.y_min), sizeof(cell.y_min));
-        m_out.write(reinterpret_cast<const char*>(&cell.dy), sizeof(cell.dy));
+
+        const Float x_min = cell.x_min();
+        const Float y_min = cell.y_min();
+        const Float dx    = cell.dx();
+        const Float dy    = cell.dy();
+        m_out.write(reinterpret_cast<const char*>(&x_min), sizeof(x_min));
+        m_out.write(reinterpret_cast<const char*>(&dx), sizeof(dx));
+        m_out.write(reinterpret_cast<const char*>(&y_min), sizeof(y_min));
+        m_out.write(reinterpret_cast<const char*>(&dy), sizeof(dy));
 
         const auto value = cell.get_cartesian().value;
         m_out.write(reinterpret_cast<const char*>(value.data()), DIM * sizeof(Float));
@@ -146,18 +154,26 @@ class IncCellWriter {
         m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cut));
 
         // Extend of cell
-        m_out.write(reinterpret_cast<const char*>(&cell.x_min), sizeof(cell.x_min));
-        m_out.write(reinterpret_cast<const char*>(&cell.dx), sizeof(cell.dx));
-        m_out.write(reinterpret_cast<const char*>(&cell.y_min), sizeof(cell.y_min));
-        m_out.write(reinterpret_cast<const char*>(&cell.dy), sizeof(cell.dy));
+        const Float x_min = cell.x_min();
+        const Float y_min = cell.y_min();
+        const Float dx    = cell.dx();
+        const Float dy    = cell.dy();
+        m_out.write(reinterpret_cast<const char*>(&x_min), sizeof(x_min));
+        m_out.write(reinterpret_cast<const char*>(&dx), sizeof(dx));
+        m_out.write(reinterpret_cast<const char*>(&y_min), sizeof(y_min));
+        m_out.write(reinterpret_cast<const char*>(&dy), sizeof(dy));
 
         // Cut
         const auto& cell_value = cell.get_cut();
         m_out.put(static_cast<char>(cell_value.type));
-        m_out.write(reinterpret_cast<const char*>(&cell_value.x1_cut), sizeof(cell_value.x1_cut));
-        m_out.write(reinterpret_cast<const char*>(&cell_value.y1_cut), sizeof(cell_value.y1_cut));
-        m_out.write(reinterpret_cast<const char*>(&cell_value.x2_cut), sizeof(cell_value.x2_cut));
-        m_out.write(reinterpret_cast<const char*>(&cell_value.y2_cut), sizeof(cell_value.y2_cut));
+        const Float x1_cut = cell_value.cut1(CellBased::X) * dx + x_min;
+        const Float y1_cut = cell_value.cut1(CellBased::Y) * dy + y_min;
+        const Float x2_cut = cell_value.cut2(CellBased::X) * dx + x_min;
+        const Float y2_cut = cell_value.cut2(CellBased::Y) * dy + y_min;
+        m_out.write(reinterpret_cast<const char*>(&x1_cut), sizeof(x1_cut));
+        m_out.write(reinterpret_cast<const char*>(&y1_cut), sizeof(y1_cut));
+        m_out.write(reinterpret_cast<const char*>(&x2_cut), sizeof(x2_cut));
+        m_out.write(reinterpret_cast<const char*>(&y2_cut), sizeof(y2_cut));
 
         // Value
         m_out.write(reinterpret_cast<const char*>(cell_value.left_value.data()),

@@ -183,8 +183,8 @@ constexpr void usage(std::string_view prog) {
 
 // -------------------------------------------------------------------------------------------------
 template <typename Float, size_t DIM>
-[[nodiscard]] auto min_max_cell_value(
-    const std::vector<typename Zap::IO::IncCellReader<Float, DIM>::ReducedCell>& cells) noexcept
+[[nodiscard]] auto
+min_max_cell_value(const std::vector<Zap::IO::ReducedCell<Float, DIM>>& cells) noexcept
     -> std::pair<Eigen::Vector<Float, DIM>, Eigen::Vector<Float, DIM>> {
   Eigen::Vector<Float, DIM> min = [cell = cells.front()] {
     assert(cell.is_cartesian() || cell.is_cut());

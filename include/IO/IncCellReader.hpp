@@ -4,59 +4,177 @@
 #include <variant>
 
 #include "CellBased/Cell.hpp"
+#include "CellBased/Definitions.hpp"
+#include "CellBased/SmallVector.hpp"
 #include "IO/IncCellWriter.hpp"
 
 namespace Zap::IO {
 
 template <typename Float, size_t DIM>
-class IncCellReader {
+struct ReducedCartesianValue {
+  Eigen::Vector<Float, DIM> value;
+};
+
+template <typename Float, size_t DIM>
+struct ReducedCutValue {
+  CellBased::CutType type;
+  CellBased::Point<Float> cut1;
+  CellBased::Point<Float> cut2;
+
+  Eigen::Vector<Float, DIM> left_value;
+  Eigen::Vector<Float, DIM> right_value;
+};
+
+template <typename Float, size_t DIM>
+class ReducedCell {
+  Float m_x_min;
+  Float m_dx;
+  Float m_y_min;
+  Float m_dy;
+
  public:
-  struct ReducedCartesianValue {
-    Eigen::Vector<Float, DIM> value;
-  };
+  std::variant<ReducedCartesianValue<Float, DIM>, ReducedCutValue<Float, DIM>> value;
+  [[nodiscard]] constexpr auto is_cartesian() const noexcept -> bool {
+    return std::holds_alternative<ReducedCartesianValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto is_cut() const noexcept -> bool {
+    return std::holds_alternative<ReducedCutValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto get_cartesian() noexcept -> ReducedCartesianValue<Float, DIM>& {
+    assert(is_cartesian());
+    return std::get<ReducedCartesianValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto get_cartesian() const noexcept
+      -> const ReducedCartesianValue<Float, DIM>& {
+    assert(is_cartesian());
+    return std::get<ReducedCartesianValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto get_cut() noexcept -> ReducedCutValue<Float, DIM>& {
+    assert(is_cut());
+    return std::get<ReducedCutValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto get_cut() const noexcept -> const ReducedCutValue<Float, DIM>& {
+    assert(is_cut());
+    return std::get<ReducedCutValue<Float, DIM>>(value);
+  }
+  [[nodiscard]] constexpr auto x_min() noexcept -> Float& { return m_x_min; }
+  [[nodiscard]] constexpr auto dx() noexcept -> Float& { return m_dx; }
+  [[nodiscard]] constexpr auto y_min() noexcept -> Float& { return m_y_min; }
+  [[nodiscard]] constexpr auto dy() noexcept -> Float& { return m_dy; }
+  [[nodiscard]] constexpr auto x_min() const noexcept -> Float { return m_x_min; }
+  [[nodiscard]] constexpr auto dx() const noexcept -> Float { return m_dx; }
+  [[nodiscard]] constexpr auto y_min() const noexcept -> Float { return m_y_min; }
+  [[nodiscard]] constexpr auto dy() const noexcept -> Float { return m_dy; }
 
-  struct ReducedCutValue {
-    CellBased::CutType type;
-    Float x1_cut;
-    Float y1_cut;
-    Float x2_cut;
-    Float y2_cut;
+  // -------------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto get_left_points() const noexcept
+      -> CellBased::SmallVector<CellBased::Point<Float>> {
+    const auto& cell_value = get_cut();
+    switch (cell_value.type) {
+      case CellBased::CutType::BOTTOM_LEFT:
+        return {
+            CellBased::Point<Float>{x_min(), y_min()},
+            cell_value.cut1,
+            cell_value.cut2,
+        };
+      case CellBased::CutType::BOTTOM_RIGHT:
+        return {
+            CellBased::Point<Float>{x_min(), y_min()},
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::Point<Float>{x_min(), y_min() + dy()},
+        };
+      case CellBased::CutType::TOP_RIGHT:
+        return {
+            CellBased::Point<Float>{x_min(), y_min()},
+            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min(), y_min() + dy()},
+        };
+      case CellBased::CutType::TOP_LEFT:
+        return {
+            CellBased::Point<Float>{x_min(), y_min()},
+            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            cell_value.cut1,
+            cell_value.cut2,
+        };
+      case CellBased::CutType::MIDDLE_HORI:
+        return {
+            CellBased::Point<Float>{x_min(), y_min()},
+            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            cell_value.cut1,
+            cell_value.cut2,
+        };
+      case CellBased::CutType::MIDDLE_VERT:
+        return {
+            CellBased::Point<Float>{x_min(), y_min()},
+            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            cell_value.cut1,
+            cell_value.cut2,
+        };
+      default:
+        Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
+        std::unreachable();
+    }
+  }
 
-    Eigen::Vector<Float, DIM> left_value;
-    Eigen::Vector<Float, DIM> right_value;
-  };
+  // -------------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto get_right_points() const noexcept
+      -> CellBased::SmallVector<CellBased::Point<Float>> {
+    const auto& cell_value = get_cut();
+    switch (cell_value.type) {
+      case CellBased::CutType::BOTTOM_LEFT:
+        return {
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+        };
+      case CellBased::CutType::BOTTOM_RIGHT:
+        return {
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min() + dx(), y_min()},
+        };
+      case CellBased::CutType::TOP_RIGHT:
+        return {
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+        };
+      case CellBased::CutType::TOP_LEFT:
+        return {
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min(), y_min() + dy()},
+        };
+      case CellBased::CutType::MIDDLE_HORI:
+        return {
+            cell_value.cut1,
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+        };
+      case CellBased::CutType::MIDDLE_VERT:
+        return {
+            cell_value.cut1,
+            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            cell_value.cut2,
+            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+        };
+      default:
+        Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
+        std::unreachable();
+    }
+  }
+};
 
-  struct ReducedCell {
-    Float x_min;
-    Float dx;
-    Float y_min;
-    Float dy;
-
-    std::variant<ReducedCartesianValue, ReducedCutValue> value;
-    [[nodiscard]] constexpr auto is_cartesian() const noexcept -> bool {
-      return std::holds_alternative<ReducedCartesianValue>(value);
-    }
-    [[nodiscard]] constexpr auto is_cut() const noexcept -> bool {
-      return std::holds_alternative<ReducedCutValue>(value);
-    }
-    [[nodiscard]] constexpr auto get_cartesian() noexcept -> ReducedCartesianValue& {
-      assert(is_cartesian());
-      return std::get<ReducedCartesianValue>(value);
-    }
-    [[nodiscard]] constexpr auto get_cartesian() const noexcept -> const ReducedCartesianValue& {
-      assert(is_cartesian());
-      return std::get<ReducedCartesianValue>(value);
-    }
-    [[nodiscard]] constexpr auto get_cut() noexcept -> ReducedCutValue& {
-      assert(is_cut());
-      return std::get<ReducedCutValue>(value);
-    }
-    [[nodiscard]] constexpr auto get_cut() const noexcept -> const ReducedCutValue& {
-      assert(is_cut());
-      return std::get<ReducedCutValue>(value);
-    }
-  };
-
+template <typename Float, size_t DIM>
+class IncCellReader {
  private:
   std::string m_filename;
   std::ifstream m_in;
@@ -68,7 +186,7 @@ class IncCellReader {
   size_t m_nx   = std::numeric_limits<size_t>::max();
   size_t m_ny   = std::numeric_limits<size_t>::max();
 
-  std::vector<ReducedCell> m_cells{};
+  std::vector<ReducedCell<Float, DIM>> m_cells{};
   bool m_read_once = false;
 
   // -----------------------------------------------------------------------------------------------
@@ -156,31 +274,17 @@ class IncCellReader {
       }
     }
 
-    if (!read_next_float(m_x_min)) {
-      return false;
-    }
-    if (!read_next_float(m_x_max)) {
-      return false;
-    }
-    if (!read_next_size_t(m_nx)) {
-      return false;
-    }
+    if (!read_next_float(m_x_min)) { return false; }
+    if (!read_next_float(m_x_max)) { return false; }
+    if (!read_next_size_t(m_nx)) { return false; }
 
-    if (!read_next_float(m_y_min)) {
-      return false;
-    }
-    if (!read_next_float(m_y_max)) {
-      return false;
-    }
-    if (!read_next_size_t(m_ny)) {
-      return false;
-    }
+    if (!read_next_float(m_y_min)) { return false; }
+    if (!read_next_float(m_y_max)) { return false; }
+    if (!read_next_size_t(m_ny)) { return false; }
 
     {
       size_t dim{};
-      if (!read_next_size_t(dim)) {
-        return false;
-      }
+      if (!read_next_size_t(dim)) { return false; }
       if (dim != DIM) {
         Igor::Warn("Incompatible dimension {}, expected {}", dim, DIM);
         return false;
@@ -199,9 +303,7 @@ class IncCellReader {
       if (!m_in.get(cell_type)) {
         if constexpr (WARN_END) {
           Igor::Warn("Could not read cell type from `{}`.", m_filename);
-          if (m_in.eof()) {
-            Igor::Warn("Reached end of file.");
-          }
+          if (m_in.eof()) { Igor::Warn("Reached end of file."); }
         }
         return false;
       }
@@ -210,40 +312,32 @@ class IncCellReader {
         case static_cast<char>(IncCellHeaderLayout::CellType::Cartesian):
           {
             auto& cell = m_cells.at(i);
-            cell.value = ReducedCartesianValue{};
-            if (!read_next_float(cell.x_min)) {
+            cell.value = ReducedCartesianValue<Float, DIM>{};
+            if (!read_next_float(cell.x_min())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read x_min from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.dx)) {
+            if (!read_next_float(cell.dx())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read dx from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.y_min)) {
+            if (!read_next_float(cell.y_min())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read y_min from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.dy)) {
+            if (!read_next_float(cell.dy())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read dy from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
@@ -251,9 +345,7 @@ class IncCellReader {
                            DIM * sizeof(Float))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read value from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
@@ -262,40 +354,32 @@ class IncCellReader {
         case static_cast<char>(IncCellHeaderLayout::CellType::Cut):
           {
             auto& cell = m_cells.at(i);
-            cell.value = ReducedCutValue{};
-            if (!read_next_float(cell.x_min)) {
+            cell.value = ReducedCutValue<Float, DIM>{};
+            if (!read_next_float(cell.x_min())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read x_min from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.dx)) {
+            if (!read_next_float(cell.dx())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read dx from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.y_min)) {
+            if (!read_next_float(cell.y_min())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read y_min from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.dy)) {
+            if (!read_next_float(cell.dy())) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read dy from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
@@ -305,48 +389,38 @@ class IncCellReader {
               if (!m_in.get(cut_type)) {
                 if constexpr (WARN_END) {
                   Igor::Warn("Could not read cut type from `{}`", m_filename);
-                  if (m_in.eof()) {
-                    Igor::Warn("Reached end of file.");
-                  }
+                  if (m_in.eof()) { Igor::Warn("Reached end of file."); }
                 }
                 return false;
               }
               assert(cut_type >= 0 && cut_type < 7);
               cell.get_cut().type = static_cast<CellBased::CutType>(cut_type);
             }
-            if (!read_next_float(cell.get_cut().x1_cut)) {
+            if (!read_next_float(cell.get_cut().cut1(CellBased::X))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read x1_cut from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.get_cut().y1_cut)) {
+            if (!read_next_float(cell.get_cut().cut1(CellBased::Y))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read y1_cut from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.get_cut().x2_cut)) {
+            if (!read_next_float(cell.get_cut().cut2(CellBased::X))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read x2_cut from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.get_cut().y2_cut)) {
+            if (!read_next_float(cell.get_cut().cut2(CellBased::Y))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read y2_cut from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
@@ -355,9 +429,7 @@ class IncCellReader {
                            DIM * sizeof(Float))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read left value from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
@@ -365,9 +437,7 @@ class IncCellReader {
                            DIM * sizeof(Float))) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read right value from `{}`", m_filename);
-                if (m_in.eof()) {
-                  Igor::Warn("Reached end of file.");
-                }
+                if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
@@ -393,16 +463,16 @@ class IncCellReader {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept -> const ReducedCell& {
-    if (!m_read_once) {
-      Igor::Panic("No data available, call `read_next`.");
-    }
+  [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept
+      -> const ReducedCell<Float, DIM>& {
+    if (!m_read_once) { Igor::Panic("No data available, call `read_next`."); }
 
     assert(idx < m_nx * m_ny);
     return m_cells[idx];
   }
 
-  [[nodiscard]] constexpr auto cells() const noexcept -> const std::vector<ReducedCell>& {
+  [[nodiscard]] constexpr auto cells() const noexcept
+      -> const std::vector<ReducedCell<Float, DIM>>& {
     return m_cells;
   }
   [[nodiscard]] constexpr auto x_min() const noexcept -> Float { return m_x_min; }

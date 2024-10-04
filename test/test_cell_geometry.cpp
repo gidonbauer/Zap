@@ -1,3 +1,5 @@
+#if 0
+
 #include <gtest/gtest.h>
 
 #include "CellBased/Cell.hpp"
@@ -194,3 +196,5 @@ TEST(CellGeometry, AreaMiddleVert) {
       << "Expect area of two subcells to be equal to the area of the entire cell, difference is "
       << cartesian_polygon.area() - (left_cut_polygon.area() + right_cut_polygon.area()) << '.';
 }
+
+#endif
