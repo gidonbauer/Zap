@@ -133,14 +133,16 @@ class IncCellWriter {
     // TODO: Make sure that cuts are not relative to the cell
 
     for (const auto& cell : grid) {
+      // Extend of cell
+      const Float x_min = cell.template x_min<CellBased::CoordType::SIM>();
+      const Float y_min = cell.template y_min<CellBased::CoordType::SIM>();
+      const Float dx    = cell.template dx<CellBased::CoordType::SIM>();
+      const Float dy    = cell.template dy<CellBased::CoordType::SIM>();
+
       if (cell.is_cartesian()) {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
         m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cartesian));
 
-        const Float x_min = cell.x_min();
-        const Float y_min = cell.y_min();
-        const Float dx    = cell.dx();
-        const Float dy    = cell.dy();
         m_out.write(reinterpret_cast<const char*>(&x_min), sizeof(x_min));
         m_out.write(reinterpret_cast<const char*>(&dx), sizeof(dx));
         m_out.write(reinterpret_cast<const char*>(&y_min), sizeof(y_min));
@@ -153,11 +155,6 @@ class IncCellWriter {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
         m_out.put(static_cast<char>(IncCellHeaderLayout::CellType::Cut));
 
-        // Extend of cell
-        const Float x_min = cell.x_min();
-        const Float y_min = cell.y_min();
-        const Float dx    = cell.dx();
-        const Float dy    = cell.dy();
         m_out.write(reinterpret_cast<const char*>(&x_min), sizeof(x_min));
         m_out.write(reinterpret_cast<const char*>(&dx), sizeof(dx));
         m_out.write(reinterpret_cast<const char*>(&y_min), sizeof(y_min));
@@ -166,14 +163,13 @@ class IncCellWriter {
         // Cut
         const auto& cell_value = cell.get_cut();
         m_out.put(static_cast<char>(cell_value.type));
-        const Float x1_cut = cell_value.cut1(CellBased::X) * dx + x_min;
-        const Float y1_cut = cell_value.cut1(CellBased::Y) * dy + y_min;
-        const Float x2_cut = cell_value.cut2(CellBased::X) * dx + x_min;
-        const Float y2_cut = cell_value.cut2(CellBased::Y) * dy + y_min;
-        m_out.write(reinterpret_cast<const char*>(&x1_cut), sizeof(x1_cut));
-        m_out.write(reinterpret_cast<const char*>(&y1_cut), sizeof(y1_cut));
-        m_out.write(reinterpret_cast<const char*>(&x2_cut), sizeof(x2_cut));
-        m_out.write(reinterpret_cast<const char*>(&y2_cut), sizeof(y2_cut));
+
+        const auto cut1 = cell.template cut1<CellBased::CoordType::SIM>();
+        const auto cut2 = cell.template cut2<CellBased::CoordType::SIM>();
+        m_out.write(reinterpret_cast<const char*>(&cut1.x), sizeof(cut1.x));
+        m_out.write(reinterpret_cast<const char*>(&cut1.y), sizeof(cut1.y));
+        m_out.write(reinterpret_cast<const char*>(&cut2.x), sizeof(cut2.x));
+        m_out.write(reinterpret_cast<const char*>(&cut2.y), sizeof(cut2.y));
 
         // Value
         m_out.write(reinterpret_cast<const char*>(cell_value.left_value.data()),

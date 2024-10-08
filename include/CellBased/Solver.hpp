@@ -61,33 +61,31 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
+  template <typename Float, size_t DIM, Point2D_c PointType>
   requires(DIM > 0)
   struct WaveProperties {
     Eigen::Vector<Float, DIM> value;
-    Geometry::Polygon<Float> polygon;
+    Geometry::Polygon<PointType> polygon;
   };
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
+  template <typename Float, size_t DIM, Point2D_c PointType>
   requires(DIM > 0)
-  [[nodiscard]] constexpr auto calculate_interface(const FullInterface<Float, DIM>& interface,
-                                                   Float dt) const noexcept
-      -> SmallVector<WaveProperties<Float, DIM>> {
+  [[nodiscard]] constexpr auto
+  calculate_interface(const FullInterface<Float, DIM, PointType>& interface,
+                      Float dt) const noexcept
+      -> SmallVector<WaveProperties<Float, DIM, PointType>> {
     // Vector tangential to interface
-    const Eigen::Vector<Float, 2> tangent_vector = (interface.end - interface.begin).normalized();
+    const PointType tangent_vector = (interface.end - interface.begin).normalized();
 
     // Angle between cut_vector and y-axis (0, 1)
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
     // <=> cut_angle = arccos(cut_vector_1 / ||cut_vector||)
-    auto interface_angle = std::acos(tangent_vector(Y));
-    if (tangent_vector(X) > 0) {
-      interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
-    }
+    auto interface_angle = std::acos(tangent_vector.y);
+    if (tangent_vector.x > 0) { interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle; }
 
     // Vector normal to cut
-    const Eigen::Vector<Float, 2> normal_vector{std::cos(interface_angle),
-                                                std::sin(interface_angle)};
+    const PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
     assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
 
     const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
@@ -100,20 +98,21 @@ class Solver {
     Eigen::Matrix<Float, DIM, DIM> eig_vals;
     Eigen::Matrix<Float, DIM, DIM> eig_vecs;
     get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
+    // TODO: wave_lengths requires scaling if we are working in GRID Coordinates
     const Eigen::Matrix<Float, DIM, DIM> wave_lengths = eig_vals * dt;
 
     // Eigen expansion of jump; wave strength
     const Eigen::Vector<Float, DIM> alpha =
         eig_vecs.inverse() * (interface.right_value - interface.left_value);
 
-    SmallVector<WaveProperties<Float, DIM>> waves(DIM);
+    SmallVector<WaveProperties<Float, DIM, PointType>> waves(DIM);
 
     for (Eigen::Index p = 0; p < static_cast<Eigen::Index>(DIM); ++p) {
       auto& wave = waves[static_cast<size_t>(p)];
 
       wave.value = alpha(p, p) * eig_vecs.col(p);
 
-      wave.polygon = Geometry::Polygon<Float>{{
+      wave.polygon = Geometry::Polygon<PointType>{{
           interface.begin,
           interface.begin + normal_vector * wave_lengths(p, p),
           interface.end,
@@ -125,12 +124,13 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
-  constexpr void update_cell(Cell<Float, DIM>& cell, const WaveProperties<Float, DIM>& wave) {
+  template <typename Float, size_t DIM, Point2D_c PointType>
+  constexpr void update_cell(Cell<Float, DIM>& cell,
+                             const WaveProperties<Float, DIM, PointType>& wave) {
     // TODO: Do something about periodic boundary conditions
     assert(cell.is_cartesian() || cell.is_cut());
     auto update_value = [&](Eigen::Vector<Float, DIM>& value,
-                            const Geometry::Polygon<Float>& cell_polygon) {
+                            const Geometry::Polygon<PointType>& cell_polygon) {
       const auto cell_area = cell_polygon.area();
       assert(cell_area > 0 || std::abs(cell_area) <= EPS<Float>);
       if (std::abs(cell_area) <= EPS<Float>) { return; }
@@ -143,13 +143,17 @@ class Solver {
 
       value -= (intersect_area / cell_area) * wave.value;
     };
+
+    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
+                                         ? CoordType::SIM
+                                         : CoordType::GRID;
     if (cell.is_cartesian()) {
-      update_value(cell.get_cartesian().value, cell.get_cartesian_polygon());
+      update_value(cell.get_cartesian().value, cell.template get_cartesian_polygon<coord_type>());
     } else {
       // Left subcell
-      update_value(cell.get_cut().left_value, cell.get_cut_left_polygon());
+      update_value(cell.get_cut().left_value, cell.template get_cut_left_polygon<coord_type>());
       // Right subcell
-      update_value(cell.get_cut().right_value, cell.get_cut_right_polygon());
+      update_value(cell.get_cut().right_value, cell.template get_cut_right_polygon<coord_type>());
     }
   }
 
@@ -163,7 +167,8 @@ class Solver {
                                        Float dt) {
     if (curr_grid.is_cell(idx)) {
       const auto& other_cell = curr_grid[idx];
-      const auto interfaces  = get_shared_interfaces(curr_cell, other_cell, side);
+      const auto interfaces =
+          get_shared_interfaces<Float, DIM, GridCoord<Float>>(curr_cell, other_cell, side);
       for (const auto& interface : interfaces) {
         const auto waves = calculate_interface(interface, dt);
         for (const auto& wave : waves) {
@@ -188,15 +193,20 @@ class Solver {
   };
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
+  template <typename Float, size_t DIM, Point2D_c PointType>
   [[nodiscard]] constexpr auto get_internal_interface(const Cell<Float, DIM>& cell) const noexcept
-      -> FullInterface<Float, DIM> {
+      -> FullInterface<Float, DIM, PointType> {
     assert(cell.is_cut());
-    return FullInterface<Float, DIM>{
+
+    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
+                                         ? CoordType::SIM
+                                         : CoordType::GRID;
+
+    return FullInterface<Float, DIM, PointType>{
         .left_value  = cell.get_cut().left_value,
         .right_value = cell.get_cut().right_value,
-        .begin       = cell.cut1(),
-        .end         = cell.cut2(),
+        .begin       = cell.template cut1<coord_type>(),
+        .end         = cell.template cut2<coord_type>(),
     };
   }
 
@@ -205,23 +215,25 @@ class Solver {
   [[nodiscard]] constexpr auto
   move_wave_front(const UniformGrid<Float, DIM>& curr_grid,
                   [[maybe_unused]] const UniformGrid<Float, DIM>& next_grid,
-                  Float dt) const noexcept -> std::optional<std::vector<Point<Float>>> {
+                  Float dt) const noexcept -> std::optional<std::vector<SimCoord<Float>>> {
+    using PointType = SimCoord<Float>;
+
     // Move old cuts according to strongest wave
-    std::vector<std::pair<Point<Float>, Point<Float>>> new_shock_points;
+    std::vector<std::pair<PointType, PointType>> new_shock_points;
     for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
       const auto& curr_cell = curr_grid[cell_idx];
       assert(curr_cell.is_cut());
 
-      const auto interface = get_internal_interface(curr_cell);
+      const auto interface = get_internal_interface<Float, DIM, PointType>(curr_cell);
 
-      const Point<Float> tangent_vector = (interface.end - interface.begin).normalized();
+      const auto tangent_vector = (interface.end - interface.begin).normalized();
       assert(std::abs(tangent_vector.norm() - 1) <= 1e-8);
 
-      auto interface_angle = std::acos(tangent_vector(Y));
-      if (tangent_vector(X) > 0) {
+      auto interface_angle = std::acos(tangent_vector.y);
+      if (tangent_vector.x > 0) {
         interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
       }
-      const Point<Float> normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
+      const PointType normal_vector{.x = std::cos(interface_angle), .y = std::sin(interface_angle)};
       assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
 
       const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
@@ -249,113 +261,13 @@ class Solver {
                                     interface.end + normal_vector * wave_length);
     }
 
-    std::vector<Point<Float>> avg_new_shock_points(new_shock_points.size() + 1);
+    std::vector<PointType> avg_new_shock_points(new_shock_points.size() + 1);
     assert(avg_new_shock_points.size() > 2);
     avg_new_shock_points[0] = new_shock_points[0].first;
     for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
       avg_new_shock_points[i] = (new_shock_points[i - 1].second + new_shock_points[i].first) / 2;
     }
     avg_new_shock_points[new_shock_points.size()] = new_shock_points.back().second;
-
-    // const auto try_value = [](Float& r, Float prop_r) {
-    //   if (prop_r >= 0 && prop_r < r) { r = prop_r; }
-    // };
-    // Move first point to boundary
-    // {
-    //   auto& first_point = avg_new_shock_points.front();
-    //   const auto first_point_cell =
-    //       std::find_if(std::cbegin(next_grid),
-    //                    std::cend(next_grid),
-    //                    [point = first_point](const Cell<Float, DIM>& cell) {
-    //                      return point_in_cell(point, cell);
-    //                    });
-    //   if (first_point_cell == std::cend(next_grid)) {
-    //     const auto second_point_cell =
-    //         std::find_if(std::cbegin(next_grid),
-    //                      std::cend(next_grid),
-    //                      [point = avg_new_shock_points[1]](const Cell<Float, DIM>& cell) {
-    //                        return point_in_cell(point, cell);
-    //                      });
-    //     if (second_point_cell == std::cend(next_grid)) {
-    //       Igor::Warn("First and second point not in grid.");
-    //       return std::nullopt;
-    //     }
-
-    //     Point<Float> slope = avg_new_shock_points[1] - first_point;
-
-    //     Float r = std::numeric_limits<Float>::max();
-    //     try_value(r, (second_point_cell->x_min - first_point(X)) / slope(X));
-    //     try_value(r,
-    //               (second_point_cell->x_min + second_point_cell->dx - first_point(X)) /
-    //               slope(X));
-    //     try_value(r, (second_point_cell->y_min - first_point(Y)) / slope(Y));
-    //     try_value(r,
-    //               (second_point_cell->y_min + second_point_cell->dy - first_point(Y)) /
-    //               slope(Y));
-
-    //     first_point += r * slope;
-    //   } else {
-    //     Point<Float> slope = first_point - avg_new_shock_points[1];
-
-    //     Float r = std::numeric_limits<Float>::max();
-    //     try_value(r, (first_point_cell->x_min - first_point(X)) / slope(X));
-    //     try_value(r, (first_point_cell->x_min + first_point_cell->dx - first_point(X)) /
-    //     slope(X)); try_value(r, (first_point_cell->y_min - first_point(Y)) / slope(Y));
-    //     try_value(r, (first_point_cell->y_min + first_point_cell->dy - first_point(Y)) /
-    //     slope(Y)); first_point += r * slope;
-    //   }
-    // }
-
-    // Move last point to boundary
-    // {
-    //   auto& last_point           = avg_new_shock_points.back();
-    //   const auto last_point_cell = std::find_if(std::cbegin(next_grid),
-    //                                             std::cend(next_grid),
-    //                                             [point = last_point](const Cell<Float, DIM>&
-    //                                             cell) {
-    //                                               return point_in_cell(point, cell);
-    //                                             });
-
-    //   // Last point is outside of grid
-    //   if (last_point_cell == std::cend(next_grid)) {
-    //     const auto second_last_point_cell =
-    //         std::find_if(std::cbegin(next_grid),
-    //                      std::cend(next_grid),
-    //                      [point = avg_new_shock_points[avg_new_shock_points.size() - 2]](
-    //                          const Cell<Float, DIM>& cell) { return point_in_cell(point, cell);
-    //                          });
-    //     // Second to last point also not in grid
-    //     if (second_last_point_cell == std::cend(next_grid)) {
-    //       Igor::Warn("Last (and second to last) point not in grid.");
-    //       return std::nullopt;
-    //     }
-
-    //     Point<Float> slope =
-    //         avg_new_shock_points[avg_new_shock_points.size() - 2] - last_point;
-
-    //     Float r = std::numeric_limits<Float>::max();
-    //     try_value(r, (second_last_point_cell->x_min - last_point(X)) / slope(X));
-    //     try_value(r,
-    //               (second_last_point_cell->x_min + second_last_point_cell->dx - last_point(X)) /
-    //                   slope(X));
-    //     try_value(r, (second_last_point_cell->y_min - last_point(Y)) / slope(Y));
-    //     try_value(r,
-    //               (second_last_point_cell->y_min + second_last_point_cell->dy - last_point(Y)) /
-    //                   slope(Y));
-
-    //     last_point += r * slope;
-    //   } else {
-    //     Point<Float> slope =
-    //         last_point - avg_new_shock_points[avg_new_shock_points.size() - 2];
-
-    //     Float r = std::numeric_limits<Float>::max();
-    //     try_value(r, (last_point_cell->x_min - last_point(X)) / slope(X));
-    //     try_value(r, (last_point_cell->x_min + last_point_cell->dx - last_point(X)) / slope(X));
-    //     try_value(r, (last_point_cell->y_min - last_point(Y)) / slope(Y));
-    //     try_value(r, (last_point_cell->y_min + last_point_cell->dy - last_point(Y)) / slope(Y));
-    //     last_point += r * slope;
-    //   }
-    // }
 
     if ((avg_new_shock_points[0] - avg_new_shock_points[1]).norm() < 1e-2) {
       avg_new_shock_points.erase(std::next(std::begin(avg_new_shock_points)));
@@ -429,12 +341,16 @@ class Solver {
         assert(curr_cell.is_cartesian() || curr_cell.is_cut());
 
         if (curr_cell.is_cut()) {
-          const auto curr_cell_left_polygon  = curr_cell.get_cut_left_polygon();
-          const auto curr_cell_right_polygon = curr_cell.get_cut_right_polygon();
+          // TODO: Change the type for one to SIM to see compilation error
+          const auto curr_cell_left_polygon =
+              curr_cell.template get_cut_left_polygon<CoordType::GRID>();
+          const auto curr_cell_right_polygon =
+              curr_cell.template get_cut_right_polygon<CoordType::GRID>();
 
           // Left subcell
           {
-            const auto next_subcell_polygon = next_cell.get_cut_left_polygon();
+            const auto next_subcell_polygon =
+                next_cell.template get_cut_left_polygon<CoordType::GRID>();
             assert(next_subcell_polygon.area() > 0 ||
                    std::abs(next_subcell_polygon.area()) <= EPS<Float>);
             if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
@@ -454,7 +370,8 @@ class Solver {
 
           // Right subcell
           {
-            const auto next_subcell_polygon = next_cell.get_cut_right_polygon();
+            const auto next_subcell_polygon =
+                next_cell.template get_cut_right_polygon<CoordType::GRID>();
             assert(next_subcell_polygon.area() > 0 ||
                    std::abs(next_subcell_polygon.area()) <= EPS<Float>);
             if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
@@ -501,8 +418,10 @@ class Solver {
         assert(next_cell.is_cartesian() || next_cell.is_cut());
 
         // - Handle internal interface -----------------------------------------------------------
-        const auto internal_interface = get_internal_interface(curr_cell);
-        const auto internal_waves     = calculate_interface(internal_interface, dt);
+        const auto internal_interface =
+            get_internal_interface<Float, DIM, GridCoord<Float>>(curr_cell);
+        const auto internal_waves =
+            calculate_interface<Float, DIM, GridCoord<Float>>(internal_interface, dt);
 
         const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
         for (const auto& wave : internal_waves) {

@@ -10,7 +10,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
 #include "Renderer/Canvas.hpp"
 
 namespace Zap::Renderer {

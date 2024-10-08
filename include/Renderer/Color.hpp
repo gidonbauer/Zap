@@ -5,7 +5,7 @@
 #include <cassert>
 #include <cstdint>
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
 
 namespace Zap::Renderer {
 

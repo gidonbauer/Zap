@@ -1,8 +1,7 @@
-#include <atomic>
 #include <cmath>
 #include <filesystem>
 
-#define ZAP_STATIC_CUT
+// #define ZAP_STATIC_CUT
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Solver.hpp"
@@ -13,7 +12,8 @@
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
+#include "Igor/Macros.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "example_static_shock/"
 
@@ -48,18 +48,17 @@ constexpr Float Y_MAX = 5.0;
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto init_shock(Float t) noexcept -> Zap::CellBased::Point<Float> {
+[[nodiscard]] auto init_shock(Float t) noexcept -> Zap::CellBased::SimCoord<Float> {
   const auto r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
-  return Zap::CellBased::Point<Float>{
-      r * std::cos(std::numbers::pi_v<Float> / 2 * t),
-      r * std::sin(std::numbers::pi_v<Float> / 2 * t),
+  return {
+      .x = r * std::cos(std::numbers::pi_v<Float> / 2 * t),
+      .y = r * std::sin(std::numbers::pi_v<Float> / 2 * t),
   };
 };
 
 // -------------------------------------------------------------------------------------------------
-auto run_cell_based(size_t nx,
-                    size_t ny,
-                    Float tend) noexcept -> std::optional<Zap::CellBased::UniformGrid<Float, DIM>> {
+auto run_cell_based(size_t nx, size_t ny, Float tend) noexcept
+    -> std::optional<Zap::CellBased::UniformGrid<Float, DIM>> {
   Zap::CellBased::UniformGrid<Float, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   grid.same_value_boundary();
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
@@ -78,11 +77,10 @@ auto run_cell_based(size_t nx,
 }
 
 // -------------------------------------------------------------------------------------------------
-auto run_mat_based(size_t nx,
-                   size_t ny,
-                   Float tend) noexcept -> std::optional<std::tuple<Zap::MatBased::Vector<Float>,
-                                                                    Zap::MatBased::Vector<Float>,
-                                                                    Zap::MatBased::Matrix<Float>>> {
+auto run_mat_based(size_t nx, size_t ny, Float tend) noexcept
+    -> std::optional<std::tuple<Zap::MatBased::Vector<Float>,
+                                Zap::MatBased::Vector<Float>,
+                                Zap::MatBased::Matrix<Float>>> {
   const auto dx = (X_MAX - X_MIN) / static_cast<Float>(nx);
   const auto dy = (Y_MAX - Y_MIN) / static_cast<Float>(ny);
 
@@ -209,13 +207,9 @@ constexpr auto eval_mat_at(Float x,
 
 // -------------------------------------------------------------------------------------------------
 template <typename FUNC>
-[[nodiscard]] auto simpsons_rule_2d(FUNC f,
-                                    Float x_min,
-                                    Float x_max,
-                                    Float y_min,
-                                    Float y_max,
-                                    size_t nx,
-                                    size_t ny) noexcept -> Float {
+[[nodiscard]] auto simpsons_rule_2d(
+    FUNC f, Float x_min, Float x_max, Float y_min, Float y_max, size_t nx, size_t ny) noexcept
+    -> Float {
   auto get_w = [](size_t idx, size_t end_idx) -> Float {
     if (idx == 0 || idx == end_idx) {
       return 1;
@@ -299,7 +293,9 @@ auto compare(size_t nx,
 
   // - L1 of cell-based ----------------------------------------------------------------------------
   {
-    auto f        = [&](Float x, Float y) { return std::abs(cell_res->eval({x, y})(0)); };
+    auto f = [&](Float x, Float y) {
+      return std::abs(cell_res->eval(Zap::CellBased::SimCoord<Float>{.x = x, .y = y})(0));
+    };
     const auto L1 = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
     out << "L1_cell = " << L1 << '\n';
   }
@@ -311,7 +307,7 @@ auto compare(size_t nx,
   {
     auto f = [&](Float x, Float y) {
       return std::abs(
-          cell_res->eval({x, y})(0) -
+          cell_res->eval(Zap::CellBased::SimCoord<Float>{.x = x, .y = y})(0) -
           eval_mat_at(x, y, std::get<0>(*mat_res), std::get<1>(*mat_res), std::get<2>(*mat_res)));
     };
     const auto L1_error = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
@@ -322,7 +318,7 @@ auto compare(size_t nx,
   {
     auto f = [&](Float x, Float y) {
       return std::abs(
-          cell_res->eval({x, y})(0) -
+          cell_res->eval(Zap::CellBased::SimCoord<Float>{.x = x, .y = y})(0) -
           eval_mat_at(x, y, std::get<0>(hr_res), std::get<1>(hr_res), std::get<2>(hr_res)));
     };
     const auto L1_error = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
@@ -370,7 +366,11 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("tend = {}", tend);
   Igor::Info("Save results in `" OUTPUT_DIR "`.");
 
+#ifdef ZAP_STATIC_CUT
   constexpr auto output_file = "./static_cut_results.txt";
+#else
+  constexpr auto output_file = "./moving_cut_results.txt";
+#endif  // ZAP_STATIC_CUT
   std::ofstream out(output_file);
   if (!out) {
     Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
@@ -380,11 +380,14 @@ auto main(int argc, char** argv) -> int {
   // TODO: Find out why 71 does not work
   // TODO: Investigate why 161 has constant max. value 6.24992
   //        -> maybe because a subcell becomes very small
+#ifdef ZAP_STATIC_CUT
   constexpr std::array ns = {
       3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ, /* 71UZ, */
       81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
   };
-  // constexpr std::array ns = {3UZ, 5UZ, 7UZ, 9UZ, 11UZ, 15UZ, 21UZ, 31UZ, 41UZ, 51UZ};
+#else
+  constexpr std::array ns = {3UZ, 5UZ, 7UZ, 9UZ, 11UZ, 15UZ, 21UZ, 31UZ, 41UZ, 51UZ};
+#endif  // ZAP_STATIC_CUT
 
   const auto hr_nx  = 800;
   const auto hr_ny  = 800;

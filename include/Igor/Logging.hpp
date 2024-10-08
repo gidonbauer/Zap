@@ -19,25 +19,15 @@
 // OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-#ifndef IGOR_HPP_
-#define IGOR_HPP_
+#ifndef IGOR_LOGGING_HPP_
+#define IGOR_LOGGING_HPP_
 
-#include <cassert>
-#include <chrono>
+#include <cstdint>
 #include <format>
-#include <iomanip>
 #include <iostream>
-#include <memory>
+#include <ranges>
 #include <source_location>
 #include <string>
-#include <type_traits>
-#include <utility>
-#include <version>
-
-#include <cxxabi.h>
-
-static_assert(__cpp_lib_source_location >= 201907L, "Requires source_location.");
-// static_assert(__cpp_lib_format >= 201907L, "Requires std::format.");
 
 namespace Igor {
 
@@ -45,16 +35,40 @@ enum class ExitCode : int {  // NOLINT(performance-enum-size)
   NO_EARLY_EXIT,
   PANIC,
   TODO,
+  ASSERT,
 };
 
 namespace detail {
 
-[[nodiscard]] constexpr auto error_loc(
-    const std::source_location loc = std::source_location::current()) noexcept -> std::string {
+[[nodiscard]] constexpr auto strip_path(std::string_view full_path) noexcept -> std::string_view {
+#if defined(WIN32) || defined(_WIN32)
+#error "Not implemented yet: Requires different path separator ('\\') and potentially uses wchar"
+#else
+  constexpr char separator = '/';
+#endif
+
+  size_t counter = 0;
+  for (char c : std::ranges::reverse_view(full_path)) {
+    if (c == separator) {
+      break;
+    }
+    ++counter;
+  }
+
+  return full_path.substr(full_path.size() - counter, counter);
+}
+
+[[nodiscard]] constexpr auto
+error_loc(const std::source_location loc = std::source_location::current()) noexcept
+    -> std::string {
   try {
     return std::format("`{}` (\033[95m{}:{}:{}\033[0m)",
                        loc.function_name(),
+#ifdef IGOR_ERROR_LOC_FULL_PATH
                        loc.file_name(),
+#else
+                       strip_path(loc.file_name()),
+#endif  // IGOR_ERROR_LOC_FULL_PATH
                        loc.line(),
                        loc.column());
   } catch (const std::exception& e) {
@@ -70,6 +84,7 @@ enum class Level : std::uint8_t {
   PANIC,
   DEBUG,
   TIME,
+  ASSERT,
 };
 
 consteval auto level_stream(Level level) noexcept -> std::ostream& {
@@ -81,6 +96,7 @@ consteval auto level_stream(Level level) noexcept -> std::ostream& {
     case Level::TODO:
     case Level::PANIC:
     case Level::DEBUG:
+    case Level::ASSERT:
       return std::cerr;
   }
 }
@@ -99,6 +115,8 @@ consteval auto level_repr(Level level) noexcept {
       return "\033[94m[DEBUG]\033[0m ";
     case Level::TIME:
       return "\033[94m[TIME]\033[0m ";
+    case Level::ASSERT:
+      return "\033[31m[ASSERT]\033[0m ";
   }
 }
 
@@ -209,6 +227,42 @@ Panic(std::format_string<Args...>, Args&&...) -> Panic<Args...>;
 
 // -------------------------------------------------------------------------------------------------
 template <typename... Args>
+class [[maybe_unused]] Assert final
+    : detail::Print<detail::Level::ASSERT, ExitCode::ASSERT, Args...> {
+  using P = detail::Print<detail::Level::ASSERT, ExitCode::ASSERT, Args...>;
+
+ public:
+  [[noreturn]] constexpr Assert(
+      std::format_string<Args...> fmt,
+      Args&&... args,
+      const std::source_location loc = std::source_location::current()) noexcept
+      : P{loc, fmt, std::forward<Args>(args)...} {
+    std::unreachable();
+  }
+};
+template <typename... Args>
+Assert(std::format_string<Args...>, Args&&...) -> Assert<Args...>;
+
+#ifndef IGOR_NDEBUG
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define IGOR_ASSERT(cond, ...)                                                                     \
+  do {                                                                                             \
+    if (!(cond)) {                                                                                 \
+      using t = decltype(std::make_tuple(__VA_ARGS__));                                            \
+      static_assert(std::tuple_size_v<t> > 0,                                                      \
+                    "`IGOR_ASSERT` requires an error message, please provide a format string and " \
+                    "the corresponding values");                                                   \
+      static_assert(std::is_convertible_v<std::tuple_element_t<0, t>, std::string>,                \
+                    "First argument for error message must be a format string.");                  \
+      Igor::Assert("Assertion `{}` failed: {}", #cond, std::format(__VA_ARGS__));                  \
+    }                                                                                              \
+  } while (false)
+#else
+#define IGOR_ASSERT(cond, ...) ((void)0)
+#endif  // IGOR_NDEBUG
+
+// -------------------------------------------------------------------------------------------------
+template <typename... Args>
 class [[maybe_unused]] Debug final
     : detail::Print<detail::Level::DEBUG, ExitCode::NO_EARLY_EXIT, Args...> {
   using P = detail::Print<detail::Level::DEBUG, ExitCode::NO_EARLY_EXIT, Args...>;
@@ -222,142 +276,6 @@ Debug(std::format_string<Args...>, Args&&...) -> Debug<Args...>;
 
 #define IGOR_DEBUG_PRINT(x) Igor::Debug("{} = {}", #x, x)  // NOLINT(cppcoreguidelines-macro-usage)
 
-// -------------------------------------------------------------------------------------------------
-#define IGOR_STRINGIFY(s) IGOR_XSTRINGIFY(s)  // NOLINT(cppcoreguidelines-macro-usage)
-#define IGOR_XSTRINGIFY(s) #s                 // NOLINT(cppcoreguidelines-macro-usage)
-
-// -------------------------------------------------------------------------------------------------
-template <typename T>
-[[nodiscard]] constexpr auto type_name() -> std::string {
-  using namespace std::string_literals;
-
-  int status;
-  constexpr auto free_deleter = [](void* p) constexpr noexcept {
-    std::free(p);  // NOLINT(cppcoreguidelines-owning-memory,cppcoreguidelines-no-malloc)
-  };
-  std::unique_ptr<char, decltype(free_deleter)> name_cstr{
-      abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status), free_deleter};
-
-  if (status != 0 || name_cstr == nullptr) {
-    switch (status) {
-      case -1:
-        throw std::runtime_error(
-            "Demagleing failed with status -1: A memory allocation failure occurred.");
-      case -2:
-        throw std::runtime_error("Demagleing failed with status -2: mangled_name is not a valid "
-                                 "name under the C++ ABI mangling rules.");
-      case -3:
-        throw std::runtime_error(
-            "Demagleing failed with status -3: One of the arguments is invalid.");
-      default:
-        throw std::runtime_error("Demagleing failed with unknown status "s +
-                                 std::to_string(status) + "."s);
-    }
-  }
-
-  std::string name{name_cstr.get()};
-  if (std::is_volatile_v<std::remove_reference_t<T>>) {
-    name += " volatile"s;
-  }
-  if (std::is_const_v<std::remove_reference_t<T>>) {
-    name += " const"s;
-  }
-  if (std::is_lvalue_reference_v<T>) {
-    name += "&"s;
-  }
-  if (std::is_rvalue_reference_v<T>) {
-    name += "&&"s;
-  }
-
-  return name;
-}
-
-template <typename T>
-[[nodiscard]] constexpr auto type_name(T /*ignored*/) -> std::string {
-  return type_name<T>();
-}
-
-// - Times the duration of the scope in wall-clock time --------------------------------------------
-class ScopeTimer {
-  std::string m_scope_name;
-  std::chrono::high_resolution_clock::time_point m_t_begin;
-
- public:
-  [[nodiscard]] ScopeTimer(std::string scope_name = "Scope") noexcept
-      : m_scope_name(std::move(scope_name)),
-        m_t_begin(std::chrono::high_resolution_clock::now()) {}
-
-  ScopeTimer(const ScopeTimer& other) noexcept                    = delete;
-  ScopeTimer(ScopeTimer&& other) noexcept                         = delete;
-  auto operator=(const ScopeTimer& other) noexcept -> ScopeTimer& = delete;
-  auto operator=(ScopeTimer&& other) noexcept -> ScopeTimer&      = delete;
-  ~ScopeTimer() noexcept {
-    const auto t_duration =
-        std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - m_t_begin);
-    detail::Time("{} took {}.", m_scope_name, t_duration);
-  }
-};
-
-#define IGOR_COMBINE1(X, Y) X##Y                // NOLINT
-#define IGOR_COMBINE(X, Y) IGOR_COMBINE1(X, Y)  // NOLINT
-
-// NOLINTNEXTLINE
-#define IGOR_TIME_SCOPE(...)                                                                       \
-  if (const auto IGOR_COMBINE(IGOR__SCOPE__TIMER__NAME__, __LINE__) =                              \
-          Igor::ScopeTimer{__VA_ARGS__};                                                           \
-      true)
-
-// - Simple command line progress bar --------------------------------------------------------------
-class ProgressBar {
-  std::size_t m_max_progress;
-  std::size_t m_length;
-  std::size_t m_progress = 0UZ;
-
-  enum : char {
-    DONE_CHAR     = '#',
-    NOT_DONE_CHAR = '.',
-  };
-
- public:
-  constexpr ProgressBar(std::size_t max_progress, std::size_t length) noexcept
-      : m_max_progress(max_progress),
-        m_length(length - 5UZ) {
-    assert(length < std::numeric_limits<int>::max());
-  }
-
-  constexpr void update() noexcept {
-    m_progress = std::min(m_progress + 1, m_max_progress);
-    show();
-  }
-
-  void show() const noexcept {
-    const auto done_length = (m_length * m_progress) / m_max_progress;
-    const auto done_prct   = (100UZ * m_progress) / m_max_progress;
-    std::cout << "\r[";
-    std::cout << std::string(done_length, DONE_CHAR);
-    std::cout << std::string(m_length - done_length, NOT_DONE_CHAR);
-    std::cout << "] ";
-    std::cout << std::setw(3) << done_prct << "%" << std::flush;
-  }
-};
-
-// - Transforms memory in bytes to a human readable string -----------------------------------------
-[[nodiscard]] auto memory_to_string(uint64_t mem_in_bytes) noexcept -> std::string {
-  using namespace std::string_literals;
-  constexpr uint64_t step_factor = 1024;
-
-  if (mem_in_bytes < step_factor) {
-    return std::to_string(mem_in_bytes) + " B"s;
-  }
-  if (mem_in_bytes < step_factor * step_factor) {
-    return std::to_string(mem_in_bytes / step_factor) + " kB"s;
-  }
-  if (mem_in_bytes < step_factor * step_factor * step_factor) {
-    return std::to_string(mem_in_bytes / (step_factor * step_factor)) + " MB"s;
-  }
-  return std::to_string(mem_in_bytes / (step_factor * step_factor * step_factor)) + " GB"s;
-}
-
 }  // namespace Igor
 
-#endif  // IGOR_HPP_
+#endif  // IGOR_LOGGING_HPP_

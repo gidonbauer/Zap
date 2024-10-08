@@ -5,7 +5,7 @@
 
 #include <Eigen/Dense>
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
 #include "MatBased/Matrix.hpp"
 
 namespace Zap::MatBased {

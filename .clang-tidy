@@ -17,6 +17,7 @@ Checks:
   -readability-else-after-return,
   -readability-function-cognitive-complexity,
   -readability-math-missing-parentheses,
+  -performance-enum-size,
   -bugprone-easily-swappable-parameters,
   -cert-dcl16-c
 

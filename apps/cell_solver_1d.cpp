@@ -9,7 +9,9 @@
 #include "IO/IncMatrixWriter.hpp"
 #include "IO/VTKWriter.hpp"
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
+#include "Igor/Macros.hpp"
+#include "Igor/Timer.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 
@@ -92,10 +94,10 @@ auto main(int argc, char** argv) -> int {
                               std::pow((x_min + x_max + y_min + y_max) / 4, 2));
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 4;
-    return Eigen::Vector<T, 2>{
+    return {
         r * std::cos(std::numbers::pi_v<Float> / 2 * t),
         r * std::sin(std::numbers::pi_v<Float> / 2 * t),
     };
@@ -110,10 +112,10 @@ auto main(int argc, char** argv) -> int {
                               std::pow((x_min + x_max + y_min + y_max) / 8, 2));
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 8;
-    return Eigen::Vector<T, 2>{
+    return {
         r * std::cos(2 * std::numbers::pi_v<Float> * t) + x_mid,
         r * std::sin(2 * std::numbers::pi_v<Float> * t) + y_mid,
     };
@@ -124,9 +126,9 @@ auto main(int argc, char** argv) -> int {
     return (x - x_min) * static_cast<Float>((x - x_min) < (x_max - x_min) / 2);
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::Point<T> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
     assert(t >= 0 && t <= 1);
-    return Zap::CellBased::Point<T>{
+    return {
         (x_max - x_min) / 2,
         t * (y_max - y_min) + y_min,
     };
@@ -142,9 +144,9 @@ auto main(int argc, char** argv) -> int {
     }
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Eigen::Vector<T, 2> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
     static_assert(false, "Not implemented yet.");
-    return Eigen::Vector<T, 2>::Zero();
+    return Zap::CellBased::SimCoord<T>::Zero();
   };
 #else
   static_assert(false, "No initial condition defined.");
@@ -215,22 +217,21 @@ auto main(int argc, char** argv) -> int {
 
     const auto final_shock = res->get_shock_curve();
     // Igor::Info("Final shock curve: {}", final_shock);
-    const auto mean_shock_x = std::transform_reduce(std::cbegin(final_shock),
-                                                    std::cend(final_shock),
-                                                    Float{0},
-                                                    std::plus<>{},
-                                                    [](const Zap::CellBased::Point<Float>& p) {
-                                                      return p(Zap::CellBased::X);
-                                                    }) /
-                              static_cast<Float>(final_shock.size());
+    const auto mean_shock_x =
+        std::transform_reduce(std::cbegin(final_shock),
+                              std::cend(final_shock),
+                              Float{0},
+                              std::plus<>{},
+                              [](const Zap::CellBased::SimCoord<Float>& p) { return p.x; }) /
+        static_cast<Float>(final_shock.size());
 
     const auto std_dev_shock_x =
         std::sqrt(std::transform_reduce(std::cbegin(final_shock),
                                         std::cend(final_shock),
                                         Float{0},
                                         std::plus<>{},
-                                        [=](const Zap::CellBased::Point<Float>& p) {
-                                          return std::pow(p(Zap::CellBased::X) - mean_shock_x, 2);
+                                        [=](const Zap::CellBased::SimCoord<Float>& p) {
+                                          return std::pow(p.x - mean_shock_x, 2);
                                         }) /
                   static_cast<Float>(final_shock.size()));
 

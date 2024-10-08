@@ -7,7 +7,9 @@
 #include "IO/IncMatrixWriter.hpp"
 #include "IO/VTKWriter.hpp"
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
+#include "Igor/Macros.hpp"
+#include "Igor/Timer.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 

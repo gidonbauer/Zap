@@ -48,11 +48,20 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto to_grid_coord(const Point<Float>& simulation_coord) const noexcept
-      -> Point<Float> {
-    return Point<Float>{
-        (simulation_coord(X) - m_x_min) / m_dx,
-        (simulation_coord(Y) - m_y_min) / m_dy,
+  [[nodiscard]] constexpr auto to_grid_coord(const SimCoord<Float>& simulation_coord) const noexcept
+      -> GridCoord<Float> {
+    return GridCoord<Float>{
+        .x = (simulation_coord.x - m_x_min) / m_dx,
+        .y = (simulation_coord.y - m_y_min) / m_dy,
+    };
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto to_sim_coord(const GridCoord<Float>& grid_coord) const noexcept
+      -> SimCoord<Float> {
+    return SimCoord<Float>{
+        .x = grid_coord.x * m_dx + m_x_min,
+        .y = grid_coord.y * m_dy + m_y_min,
     };
   }
 
@@ -190,11 +199,15 @@ class UniformGrid {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
         if constexpr (DIM == 1) {
-          value(0) = f(cell.x_min() + static_cast<Float>(0.5) * cell.dx(),
-                       cell.y_min() + static_cast<Float>(0.5) * cell.dy());
+          value(0) = f(cell.template x_min<CoordType::SIM>() +
+                           static_cast<Float>(0.5) * cell.template dx<CoordType::SIM>(),
+                       cell.template y_min<CoordType::SIM>() +
+                           static_cast<Float>(0.5) * cell.template dy<CoordType::SIM>());
         } else {
-          value = f(cell.x_min() + static_cast<Float>(0.5) * cell.dx(),
-                    cell.y_min() + static_cast<Float>(0.5) * cell.dy());
+          value = f(cell.template x_min<CoordType::SIM>() +
+                        static_cast<Float>(0.5) * cell.template dx<CoordType::SIM>(),
+                    cell.template y_min<CoordType::SIM>() +
+                        static_cast<Float>(0.5) * cell.template dy<CoordType::SIM>());
         }
       } else if (cell.is_cut()) {
         Eigen::Vector<Float, 2> left_centroid =
@@ -223,34 +236,48 @@ class UniformGrid {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
         if constexpr (DIM == 1) {
-          value(0) = (f(cell.x_min() + cell.dx() / 4, cell.y_min() + cell.dy() / 4) +
-                      f(cell.x_min() + 3 * cell.dx() / 4, cell.y_min() + cell.dy() / 4) +
-                      f(cell.x_min() + cell.dx() / 4, cell.y_min() + 3 * cell.dy() / 4) +
-                      f(cell.x_min() + 3 * cell.dx() / 4, cell.y_min() + 3 * cell.dy() / 4)) /
-                     4;
+          value(0) =
+              (f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
+               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
+               f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() +
+                     3 * cell.template dy<CoordType::SIM>() / 4) +
+               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() +
+                     3 * cell.template dy<CoordType::SIM>() / 4)) /
+              4;
         } else {
-          value = (f(cell.x_min() + cell.dx() / 4, cell.y_min() + cell.dy() / 4) +
-                   f(cell.x_min() + 3 * cell.dx() / 4, cell.y_min() + cell.dy() / 4) +
-                   f(cell.x_min() + cell.dx() / 4, cell.y_min() + 3 * cell.dy() / 4) +
-                   f(cell.x_min() + 3 * cell.dx() / 4, cell.y_min() + 3 * cell.dy() / 4)) /
-                  4;
+          value =
+              (f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
+               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
+               f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() +
+                     3 * cell.template dy<CoordType::SIM>() / 4) +
+               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
+                 cell.template y_min<CoordType::SIM>() +
+                     3 * cell.template dy<CoordType::SIM>() / 4)) /
+              4;
         }
       } else if (cell.is_cut()) {
         auto& cut_value = cell.get_cut();
 
         // Left side
         {
-          const auto corners = cell.get_left_points();
+          const auto corners = cell.template get_left_points<CoordType::SIM>();
           for (size_t j = 0; j < corners.size(); ++j) {
-            Eigen::Vector<Float, 2> point = Eigen::Vector<Float, 2>::Zero();
+            auto point = SimCoord<Float>::Zero();
             for (size_t i = 0; i < corners.size(); ++i) {
-              point += (1 + (i == j)) * corners[i] / (corners.size() + 1);
+              point += (1 + (i == j)) * corners[i] / static_cast<Float>(corners.size() + 1);
             }
 
             if constexpr (DIM == 1) {
-              cut_value.left_value(0) += f(point(X), point(Y));
+              cut_value.left_value(0) += f(point.x, point.y);
             } else {
-              cut_value.left_value += f(point(X), point(Y));
+              cut_value.left_value += f(point.x, point.y);
             }
           }
           cut_value.left_value /= static_cast<Float>(corners.size());
@@ -258,17 +285,17 @@ class UniformGrid {
 
         // Right side
         {
-          const auto corners = cell.get_right_points();
+          const auto corners = cell.template get_right_points<CoordType::SIM>();
           for (size_t j = 0; j < corners.size(); ++j) {
-            Eigen::Vector<Float, 2> point = Eigen::Vector<Float, 2>::Zero();
+            auto point = SimCoord<Float>::Zero();
             for (size_t i = 0; i < corners.size(); ++i) {
-              point += (1 + (i == j)) * corners[i] / (corners.size() + 1);
+              point += (1 + (i == j)) * corners[i] / static_cast<Float>(corners.size() + 1);
             }
 
             if constexpr (DIM == 1) {
-              cut_value.right_value(0) += f(point(X), point(Y));
+              cut_value.right_value(0) += f(point.x, point.y);
             } else {
-              cut_value.right_value += f(point(X), point(Y));
+              cut_value.right_value += f(point.x, point.y);
             }
           }
           cut_value.right_value /= static_cast<Float>(corners.size());
@@ -280,13 +307,24 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  template <Point2D_c PointType>
   [[nodiscard]] constexpr auto classify_cut(const Cell<Float, DIM>& cell,
-                                            Point<Float>& cut1_point,
-                                            Point<Float>& cut2_point) const noexcept -> CutType {
-    const int cut1_on_x = approx_eq(static_cast<Float>(cell.x_idx), cut1_point(X)) * ON_MIN +
-                          approx_eq(static_cast<Float>(cell.x_idx + 1), cut1_point(X)) * ON_MAX;
-    const int cut1_on_y = approx_eq(static_cast<Float>(cell.y_idx), cut1_point(Y)) * ON_MIN +
-                          approx_eq(static_cast<Float>(cell.y_idx + 1), cut1_point(Y)) * ON_MAX;
+                                            PointType& cut1_point,
+                                            PointType& cut2_point) const noexcept -> CutType {
+    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
+                                         ? CoordType::SIM
+                                         : CoordType::GRID;
+
+    const int cut1_on_x =
+        approx_eq(cell.template x_min<coord_type>(), cut1_point.x) * ON_MIN +
+        approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                  cut1_point.x) *
+            ON_MAX;
+    const int cut1_on_y =
+        approx_eq(cell.template y_min<coord_type>(), cut1_point.y) * ON_MIN +
+        approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
+                  cut1_point.y) *
+            ON_MAX;
     assert(cut1_on_x != NOT_ON || cut1_on_y != NOT_ON);
     // NOLINTBEGIN
     Side cut1_loc = cut1_on_x == ON_MIN   ? LEFT
@@ -295,10 +333,16 @@ class UniformGrid {
                                           : TOP;
     // NOLINTEND
 
-    const int cut2_on_x = approx_eq(static_cast<Float>(cell.x_idx), cut2_point(X)) * ON_MIN +
-                          approx_eq(static_cast<Float>(cell.x_idx + 1), cut2_point(X)) * ON_MAX;
-    const int cut2_on_y = approx_eq(static_cast<Float>(cell.y_idx), cut2_point(Y)) * ON_MIN +
-                          approx_eq(static_cast<Float>(cell.y_idx + 1), cut2_point(Y)) * ON_MAX;
+    const int cut2_on_x =
+        approx_eq(cell.template x_min<coord_type>(), cut2_point.x) * ON_MIN +
+        approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                  cut2_point.x) *
+            ON_MAX;
+    const int cut2_on_y =
+        approx_eq(cell.template y_min<coord_type>(), cut2_point.y) * ON_MIN +
+        approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
+                  cut2_point.y) *
+            ON_MAX;
     assert(cut2_on_x != NOT_ON || cut2_on_y != NOT_ON);
     // NOLINTBEGIN
     Side cut2_loc = cut2_on_x == ON_MIN   ? LEFT
@@ -338,36 +382,50 @@ class UniformGrid {
     }
 
     // Make cut relative to cell size, i.e. cut in [0, 1]
-    cut1_point(X) -= static_cast<Float>(cell.x_idx);
-    cut1_point(Y) -= static_cast<Float>(cell.y_idx);
-    cut2_point(X) -= static_cast<Float>(cell.x_idx);
-    cut2_point(Y) -= static_cast<Float>(cell.y_idx);
-    if (!(cut1_point(X) >= -EPS<Float> && cut1_point(X) - 1 <= EPS<Float>)) {
-      Igor::Panic("Cut1-x {} is not in [0, 1].", cut1_point(X));
-    }
-    if (!(cut1_point(Y) >= -EPS<Float> && cut1_point(Y) - 1 <= EPS<Float>)) {
-      Igor::Panic("Cut1-y {} is not in [0, 1].", cut1_point(Y));
-    }
-    if (!(cut2_point(X) >= -EPS<Float> && cut2_point(X) - 1 <= EPS<Float>)) {
-      Igor::Panic("Cut2-x {} is not in [0, 1].", cut2_point(X));
-    }
-    if (!(cut2_point(Y) >= -EPS<Float> && cut2_point(Y) - 1 <= EPS<Float>)) {
-      Igor::Panic("Cut2-y {} is not in [0, 1].", cut2_point(Y));
-    }
+    cut1_point.x =
+        (cut1_point.x - cell.template x_min<coord_type>()) / cell.template dx<coord_type>();
+    cut1_point.y =
+        (cut1_point.y - cell.template y_min<coord_type>()) / cell.template dy<coord_type>();
+    cut2_point.x =
+        (cut2_point.x - cell.template x_min<coord_type>()) / cell.template dx<coord_type>();
+    cut2_point.y =
+        (cut2_point.y - cell.template y_min<coord_type>()) / cell.template dy<coord_type>();
+
+    IGOR_ASSERT(cut1_point.x >= -EPS<Float> && cut1_point.x - 1 <= EPS<Float>,
+                "Cut1-x {} is not in [0, 1].",
+                cut1_point.x);
+    IGOR_ASSERT(cut1_point.y >= -EPS<Float> && cut1_point.y - 1 <= EPS<Float>,
+                "Cut1-y {} is not in [0, 1].",
+                cut1_point.y);
+    IGOR_ASSERT(cut2_point.x >= -EPS<Float> && cut2_point.x - 1 <= EPS<Float>,
+                "Cut2-x {} is not in [0, 1].",
+                cut2_point.x);
+    IGOR_ASSERT(cut2_point.y >= -EPS<Float> && cut2_point.y - 1 <= EPS<Float>,
+                "Cut2-y {} is not in [0, 1].",
+                cut2_point.y);
 
     return type;
   }
 
   // -----------------------------------------------------------------------------------------------
+  template <Point2D_c PointType>
   [[nodiscard]] constexpr auto find_next_cell_to_cut(const Cell<Float, DIM>& cell,
-                                                     const Point<Float>& exit_point) const noexcept
+                                                     const PointType& exit_point) const noexcept
       -> size_t {
-    assert(point_in_cell_grid_coord(exit_point, cell));
+    assert(point_in_cell(exit_point, cell));
 
-    const int on_x = approx_eq(static_cast<Float>(cell.x_idx), exit_point(X)) * ON_MIN +
-                     approx_eq(static_cast<Float>(cell.x_idx + 1), exit_point(X)) * ON_MAX;
-    const int on_y = approx_eq(static_cast<Float>(cell.y_idx), exit_point(Y)) * ON_MIN +
-                     approx_eq(static_cast<Float>(cell.y_idx + 1), exit_point(Y)) * ON_MAX;
+    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
+                                         ? CoordType::SIM
+                                         : CoordType::GRID;
+
+    const int on_x = approx_eq(cell.template x_min<coord_type>(), exit_point.x) * ON_MIN +
+                     approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                               exit_point.x) *
+                         ON_MAX;
+    const int on_y = approx_eq(cell.template y_min<coord_type>(), exit_point.y) * ON_MIN +
+                     approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
+                               exit_point.y) *
+                         ON_MAX;
     assert(on_x != NOT_ON || on_y != NOT_ON);
 
     if (on_x != NOT_ON && on_y != NOT_ON) {
@@ -438,13 +496,14 @@ class UniformGrid {
   [[nodiscard]] constexpr auto cut_curve(ParamCurve curve) noexcept -> bool {
     enum { T_BELOW_EXIT = -1, T_IS_EXIT, T_ABOVE_EXIT };
 
+    using PointType = GridCoord<Float>;
+
     const auto t_location = [this,
                              curve](Float t, const Cell<Float, DIM>& cell, Float t_entry) -> int {
       const auto pos = to_grid_coord(curve(t));
-      if (t <= t_entry ||
-          (point_in_cell_grid_coord(pos, cell) && !point_on_boundary_grid_coord(pos, cell))) {
+      if (t <= t_entry || (point_in_cell(pos, cell) && !point_on_boundary(pos, cell))) {
         return T_BELOW_EXIT;
-      } else if (point_on_boundary_grid_coord(pos, cell)) {
+      } else if (point_on_boundary(pos, cell)) {
         return T_IS_EXIT;
       }
       return T_ABOVE_EXIT;
@@ -452,7 +511,7 @@ class UniformGrid {
 
     Float t             = 0;
     const auto init_pos = to_grid_coord(curve(t));
-    auto cell_idx       = find_cell_grid_coord(init_pos);
+    auto cell_idx       = find_cell(init_pos);
     if (cell_idx == NULL_INDEX) {
       Igor::Warn("Point {} on parametrized curve is not in the grid.", curve(t));
       return false;
@@ -464,7 +523,7 @@ class UniformGrid {
     }
 
     m_cut_cell_idxs.push_back(cell_idx);
-    std::vector<Point<Float>> entry_points{};
+    std::vector<PointType> entry_points{};
     entry_points.push_back(init_pos);
 
     while (t < 1) {
@@ -492,7 +551,7 @@ class UniformGrid {
           IGOR_DEBUG_PRINT(t_upper);
           IGOR_DEBUG_PRINT(curve(t_upper));
           IGOR_DEBUG_PRINT(to_grid_coord(curve(t_upper)));
-          IGOR_DEBUG_PRINT(point_on_boundary_grid_coord(to_grid_coord(curve(t_upper)), cell));
+          IGOR_DEBUG_PRINT(point_on_boundary(to_grid_coord(curve(t_upper)), cell));
           Igor::Warn("upper t ({}) is inside of cell.", t_upper);
         }
         assert(t_upper_loc == T_ABOVE_EXIT || t_upper_loc == T_IS_EXIT);
@@ -539,8 +598,8 @@ class UniformGrid {
           .left_value  = old_value,
           .right_value = old_value,
           .type        = type,
-          .cut1        = cut1_point,
-          .cut2        = cut2_point,
+          .rel_cut1    = {cut1_point.x, cut1_point.y},
+          .rel_cut2    = {cut2_point.x, cut2_point.y},
       };
     }
 
@@ -548,37 +607,42 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<Point<Float>> points) noexcept
+  template <Point2D_c PointType>
+  [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<PointType> points) noexcept
       -> bool {
     // TODO: Do something smarter using the fact that the grid is equaly spaced with 1x1 cells.
     // https://stackoverflow.com/questions/13884200/getting-all-intersection-points-between-a-line-segment-and-a-2n-grid-in-intege
     // https://stackoverflow.com/questions/3270840/find-the-intersection-between-line-and-grid-in-a-fast-manner
 
+    constexpr CoordType coord_type =
+        std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<double>> ? CoordType::SIM
+                                                                         : CoordType::GRID;
+
     // Remove points outside of grid
-    std::erase_if(points, [this](const Point<Float>& p) { return !point_in_grid(p); });
+    std::erase_if(points, [this](const PointType& p) { return !point_in_grid(p); });
     assert(points.size() >= 2);
 
-    auto cell_idx = find_cell_grid_coord(to_grid_coord(points[0]));
+    auto cell_idx = find_cell(points[0]);
     assert(cell_idx != NULL_INDEX);
 
     if (!m_cut_cell_idxs.empty()) {
       Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
       return false;
     }
-    std::vector<Point<Float>> entry_points{};
+    std::vector<PointType> entry_points{};
 
     // - Handle first point; extend curve backwards to cut cell containing the first point ---------
     {
       const auto& cell = m_cells[cell_idx];
-      const auto& p0   = to_grid_coord(points[0]);
-      const auto& p1   = to_grid_coord(points[1]);
+      const auto& p0   = points[0];
+      const auto& p1   = points[1];
 
-      const Point<Float> s = p1 - p0;
+      const PointType s = p1 - p0;
       const std::array<Float, 4> rs{
-          (static_cast<Float>(cell.x_idx) - p0(X)) / s(X),
-          (static_cast<Float>(cell.x_idx + 1) - p0(X)) / s(X),
-          (static_cast<Float>(cell.y_idx) - p0(Y)) / s(Y),
-          (static_cast<Float>(cell.y_idx + 1) - p0(Y)) / s(Y),
+          (cell.template x_min<coord_type>() - p0.x) / s.x,
+          (cell.template x_min<coord_type>() + cell.template dx<coord_type>() - p0.x) / s.x,
+          (cell.template y_min<coord_type>() - p0.y) / s.y,
+          (cell.template y_min<coord_type>() + cell.template dy<coord_type>() - p0.y) / s.y,
       };
 
       Float r_entry = -std::numeric_limits<Float>::max();
@@ -600,25 +664,25 @@ class UniformGrid {
 
     // - Handle all point pairs --------------------------------------------------------------------
     for (size_t point_idx = 0; point_idx < points.size() - 1; ++point_idx) {
-      auto p0        = to_grid_coord(points[point_idx]);
-      const auto& p1 = to_grid_coord(points[point_idx + 1]);
+      auto p0        = points[point_idx];
+      const auto& p1 = points[point_idx + 1];
 
-      const Point<Float> s = (p1 - p0).normalized();
+      const PointType s = (p1 - p0).normalized();
 
-      while (!point_in_cell_grid_coord(p1, m_cells[cell_idx])) {
+      while (!point_in_cell(p1, m_cells[cell_idx])) {
         const auto& cell = m_cells[cell_idx];
-        if (!point_in_cell_grid_coord(p0, cell)) {
+        if (!point_in_cell(p0, cell)) {
           std::cout << "cell = " << cell << '\n';
           IGOR_DEBUG_PRINT(p0);
           IGOR_DEBUG_PRINT(p1);
         }
-        assert(point_in_cell_grid_coord(p0, cell));
+        assert(point_in_cell(p0, cell));
 
         const std::array<Float, 4> rs{
-            (static_cast<Float>(cell.x_idx) - p0(X)) / s(X),
-            (static_cast<Float>(cell.x_idx + 1) - p0(X)) / s(X),
-            (static_cast<Float>(cell.y_idx) - p0(Y)) / s(Y),
-            (static_cast<Float>(cell.y_idx + 1) - p0(Y)) / s(Y),
+            (cell.template x_min<coord_type>() - p0.x) / s.x,
+            (cell.template x_min<coord_type>() + cell.template dx<coord_type>() - p0.x) / s.x,
+            (cell.template y_min<coord_type>() - p0.y) / s.y,
+            (cell.template y_min<coord_type>() + cell.template dy<coord_type>() - p0.y) / s.y,
         };
 
         Float r_exit = std::numeric_limits<Float>::max();
@@ -636,8 +700,8 @@ class UniformGrid {
         }
         assert(r_exit < std::numeric_limits<Float>::max());
 
-        const Point<Float> p0_next = p0 + r_exit * s;
-        if (!point_in_cell_grid_coord(p0_next, cell)) {
+        const PointType p0_next = p0 + r_exit * s;
+        if (!point_in_cell(p0_next, cell)) {
           std::cout << "cell = " << cell << '\n';
           IGOR_DEBUG_PRINT(p0);
           IGOR_DEBUG_PRINT(p0_next);
@@ -668,15 +732,15 @@ class UniformGrid {
     // - Handle last point; extend curve forwards to cut cell containing the last point ------------
     {
       const auto& cell = m_cells[cell_idx];
-      const auto& p0   = to_grid_coord(points[points.size() - 2]);
-      const auto& p1   = to_grid_coord(points[points.size() - 1]);
+      const auto& p0   = points[points.size() - 2];
+      const auto& p1   = points[points.size() - 1];
 
-      const Point<Float> s = p1 - p0;
+      const PointType s = p1 - p0;
       const std::array<Float, 4> rs{
-          (static_cast<Float>(cell.x_idx) - p1(X)) / s(X),
-          (static_cast<Float>(cell.x_idx + 1) - p1(X)) / s(X),
-          (static_cast<Float>(cell.y_idx) - p1(Y)) / s(Y),
-          (static_cast<Float>(cell.y_idx + 1) - p1(Y)) / s(Y),
+          (cell.template x_min<coord_type>() - p1.x) / s.x,
+          (cell.template x_min<coord_type>() + cell.template dx<coord_type>() - p1.x) / s.x,
+          (cell.template y_min<coord_type>() - p1.y) / s.y,
+          (cell.template y_min<coord_type>() + cell.template dy<coord_type>() - p1.y) / s.y,
       };
 
       Float r_exit = std::numeric_limits<Float>::max();
@@ -703,8 +767,8 @@ class UniformGrid {
           .left_value  = old_value,
           .right_value = old_value,
           .type        = type,
-          .cut1        = cut1_point,
-          .cut2        = cut2_point,
+          .rel_cut1    = {cut1_point.x, cut1_point.y},
+          .rel_cut2    = {cut2_point.x, cut2_point.y},
       };
     }
 
@@ -719,12 +783,12 @@ class UniformGrid {
       assert(cell.is_cut());
 
       const auto left_value   = cell.get_cut().left_value;
-      const auto left_polygon = cell.get_cut_left_polygon();
+      const auto left_polygon = cell.template get_cut_left_polygon<CoordType::SIM>();
 
       const auto right_value   = cell.get_cut().right_value;
-      const auto right_polygon = cell.get_cut_right_polygon();
+      const auto right_polygon = cell.template get_cut_right_polygon<CoordType::SIM>();
 
-      const auto cell_polygon = cell.get_cartesian_polygon();
+      const auto cell_polygon = cell.template get_cartesian_polygon<CoordType::SIM>();
 
       cell.value = CartesianValue<Float, DIM>{
           .value = (left_value * left_polygon.area() + right_value * right_polygon.area()) /
@@ -734,31 +798,85 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto point_in_grid(const Point<Float>& point) const noexcept -> bool {
-    return point(X) - m_x_min >= -EPS<Float> && m_x_max - point(X) >= -EPS<Float> &&  //
-           point(Y) - m_y_min >= -EPS<Float> && m_y_max - point(Y) >= -EPS<Float>;
+  template <typename PointType>
+  [[nodiscard]] constexpr auto point_in_grid(const PointType& point) const noexcept -> bool {
+    if constexpr (std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>) {
+      return point.x - m_x_min >= -EPS<Float> && m_x_max - point.x >= -EPS<Float> &&  //
+             point.y - m_y_min >= -EPS<Float> && m_y_max - point.y >= -EPS<Float>;
+    } else {
+      return point.x >= -EPS<Float> && static_cast<Float>(m_nx) - point.x >= -EPS<Float> &&  //
+             point.y >= -EPS<Float> && static_cast<Float>(m_ny) - point.y >= -EPS<Float>;
+    }
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto find_cell_grid_coord(const Point<Float>& pos) const noexcept
-      -> size_t {
-    if (pos(X) < 0 || pos(X) >= static_cast<Float>(m_nx + 1)) {
+  template <Point2D_c PointType>
+  [[nodiscard]] constexpr auto find_cell(const PointType& pos) const noexcept -> size_t {
+    const GridCoord<Float> gpos = [this, &pos] {
+      if constexpr (std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>) {
+        return to_grid_coord(pos);
+      } else {
+        (void)this;
+        return pos;
+      }
+    }();
+
+    if (gpos.x < 0 || gpos.x > static_cast<Float>(m_nx)) {
       Igor::Warn("x-component of position {} is not in grid with nx={}", pos, m_nx);
       return NULL_INDEX;
     }
-    if (pos(Y) < 0 || pos(Y) >= static_cast<Float>(m_ny + 1)) {
+    if (gpos.y < 0 || gpos.y > static_cast<Float>(m_ny)) {
       Igor::Warn("y-component of position {} is not in grid with ny={}", pos, m_ny);
       return NULL_INDEX;
     }
 
-    return to_vec_idx(static_cast<size_t>(std::floor(pos(X))),
-                      static_cast<size_t>(std::floor(pos(Y))));
+    const size_t xi = [this, &gpos] {
+      if (approx_eq(gpos.x, static_cast<Float>(m_nx))) {
+        return m_nx - 1;
+      } else {
+        return static_cast<size_t>(std::floor(gpos.x));
+      }
+    }();
+
+    const size_t yi = [this, &gpos] {
+      if (approx_eq(gpos.y, static_cast<Float>(m_ny))) {
+        return m_ny - 1;
+      } else {
+        return static_cast<size_t>(std::floor(gpos.y));
+      }
+    }();
+
+    IGOR_ASSERT(xi < m_nx,
+                "gpos.x={:.16f} translates to xi={} which is out of bounds for nx={}.",
+                gpos.x,
+                xi,
+                m_nx);
+    IGOR_ASSERT(yi < m_nx,
+                "gpos.y={:.16f} translates to yi={} which is out of bounds for ny={}.",
+                gpos.y,
+                yi,
+                m_ny);
+
+    return to_vec_idx(xi, yi);
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto get_shock_curve() const noexcept -> std::vector<Point<Float>> {
-    Igor::Todo();
-    std::unreachable();
+  [[nodiscard]] constexpr auto get_shock_curve() const noexcept -> std::vector<SimCoord<Float>> {
+    if (m_cut_cell_idxs.empty()) { return {}; }
+
+    std::vector<SimCoord<Float>> curve_points(m_cut_cell_idxs.size() + 1);
+
+    {
+      const auto& cell = m_cells[m_cut_cell_idxs.front()];
+      curve_points[0]  = cell.template cut1<CoordType::SIM>();
+    }
+
+    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
+      const auto& cell    = m_cells[m_cut_cell_idxs[i]];
+      curve_points[i + 1] = cell.template cut2<CoordType::SIM>();
+    }
+
+    return curve_points;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -812,9 +930,10 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto eval(const Point<Float>& point) const noexcept
+  template <Point2D_c PointType>
+  [[nodiscard]] constexpr auto eval(const PointType& point) const noexcept
       -> Eigen::Vector<Float, DIM> {
-    const auto cell_idx = find_cell_grid_coord(to_grid_coord(point));
+    const auto cell_idx = find_cell(point);
     if (cell_idx == NULL_INDEX) {
       Igor::Panic(
           "Point {} is not in grid [{}, {}]x[{}, {}].", point, m_x_min, m_x_max, m_y_min, m_y_max);
@@ -824,20 +943,28 @@ class UniformGrid {
     if (cell.is_cartesian()) {
       return cell.get_cartesian().value;
     } else if (cell.is_cut()) {
-      const auto point_in_left  = cell.get_cut_left_polygon().point_in_polygon(point);
-      const auto point_in_right = cell.get_cut_right_polygon().point_in_polygon(point);
+      constexpr CoordType coord_type =
+          std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>> ? CoordType::SIM
+                                                                          : CoordType::GRID;
+
+      const auto point_in_left =
+          cell.template get_cut_left_polygon<coord_type>().point_in_polygon(point);
+      const auto point_in_right =
+          cell.template get_cut_right_polygon<coord_type>().point_in_polygon(point);
 
       if (point_in_left) {
         return cell.get_cut().left_value;
       } else if (point_in_right) {
         return cell.get_cut().right_value;
       } else {
+#ifdef ZAP_WARN_GRID_EVAL
         if (point_in_left && point_in_right) {
           Igor::Warn("Point {} is in both subcells, take the average.", point);
         } else if (!(point_in_left || point_in_right)) {
           Igor::Warn("Point {} is in neither subcell, probably a rounding error, take the average.",
                      point);
         }
+#endif  // ZAP_WARN_GRID_EVAL
         return (cell.get_cut().left_value + cell.get_cut().right_value) / 2;
       }
     } else {

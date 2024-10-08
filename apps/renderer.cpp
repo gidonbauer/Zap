@@ -8,6 +8,9 @@
 #include "Renderer/FFmpeg.hpp"
 #include "Renderer/Modules.hpp"
 
+#include "Igor/Logging.hpp"
+#include "Igor/Timer.hpp"
+
 #define ZAP_PARALLEL_RENDERING
 
 // TODO: Fix rendering of cut cells, sometimes cell goes out of bounds

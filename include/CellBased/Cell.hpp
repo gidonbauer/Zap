@@ -12,7 +12,7 @@
 #include "CellBased/Definitions.hpp"
 #include "CellBased/Geometry.hpp"
 #include "CellBased/SmallVector.hpp"
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
 
 namespace Zap::CellBased {
 
@@ -49,8 +49,8 @@ struct CutValue {
 
   // Linear cut
   CutType type{};
-  Point<Float> cut1{};  // Entry point
-  Point<Float> cut2{};  // Exit point
+  Point<Float> rel_cut1{};  // Entry point
+  Point<Float> rel_cut2{};  // Exit point
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -79,28 +79,59 @@ struct Cell {
   size_t top_idx    = NULL_INDEX;
 
   // -----------------------------------------------------------------------------------------------
+  template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto x_min() const noexcept -> Float {
-    return parent->m_x_min + static_cast<Float>(x_idx) * parent->m_dx;
+    if constexpr (COORD_TYPE == CoordType::SIM) {
+      return parent->m_x_min + static_cast<Float>(x_idx) * parent->m_dx;
+    } else {
+      return static_cast<Float>(x_idx);
+    }
   }
-  [[nodiscard]] constexpr auto y_min() const noexcept -> Float {
-    return parent->m_y_min + static_cast<Float>(y_idx) * parent->m_dy;
-  }
-  [[nodiscard]] constexpr auto dx() const noexcept -> Float { return parent->m_dx; }
-  [[nodiscard]] constexpr auto dy() const noexcept -> Float { return parent->m_dy; }
 
-  [[nodiscard]] constexpr auto cut1() const noexcept -> Point<Float> {
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto y_min() const noexcept -> Float {
+    if constexpr (COORD_TYPE == CoordType::SIM) {
+      return parent->m_y_min + static_cast<Float>(y_idx) * parent->m_dy;
+    } else {
+      return static_cast<Float>(y_idx);
+    }
+  }
+
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto dx() const noexcept -> Float {
+    if constexpr (COORD_TYPE == CoordType::SIM) {
+      return parent->m_dx;
+    } else {
+      return 1;
+    }
+  }
+
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto dy() const noexcept -> Float {
+    if constexpr (COORD_TYPE == CoordType::SIM) {
+      return parent->m_dy;
+    } else {
+      return 1;
+    }
+  }
+
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto cut1() const noexcept -> Coord_t<Float, COORD_TYPE> {
     assert(is_cut());
-    return Point<Float>{
-        get_cut().cut1(X) * dx() + x_min(),
-        get_cut().cut1(Y) * dy() + y_min(),
+
+    return Coord_t<Float, COORD_TYPE>{
+        .x = get_cut().rel_cut1(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
+        .y = get_cut().rel_cut1(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
-  [[nodiscard]] constexpr auto cut2() const noexcept -> Point<Float> {
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto cut2() const noexcept -> Coord_t<Float, COORD_TYPE> {
     assert(is_cut());
-    return Point<Float>{
-        get_cut().cut2(X) * dx() + x_min(),
-        get_cut().cut2(Y) * dy() + y_min(),
+
+    return Coord_t<Float, COORD_TYPE>{
+        .x = get_cut().rel_cut2(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
+        .y = get_cut().rel_cut2(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
@@ -129,70 +160,80 @@ struct Cell {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept -> Geometry::Polygon<Float> {
-    return Geometry::Polygon<Float>{{
-        Point<Float>{x_min(), y_min()},
-        Point<Float>{x_min() + dx(), y_min()},
-        Point<Float>{x_min(), y_min() + dy()},
-        Point<Float>{x_min() + dx(), y_min() + dy()},
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept
+      -> Geometry::Polygon<Coord_t<Float, COORD_TYPE>> {
+    return Geometry::Polygon<Coord_t<Float, COORD_TYPE>>{{
+        {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+        {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+        {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+        {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
     }};
   }
-  [[nodiscard]] constexpr auto get_cut_left_polygon() const noexcept -> Geometry::Polygon<Float> {
+
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_cut_left_polygon() const noexcept
+      -> Geometry::Polygon<Coord_t<Float, COORD_TYPE>> {
     assert(is_cut());
-    return Geometry::Polygon<Float>{get_left_points()};
+    return Geometry::Polygon<Coord_t<Float, COORD_TYPE>>{get_left_points<COORD_TYPE>()};
   }
-  [[nodiscard]] constexpr auto get_cut_right_polygon() const noexcept -> Geometry::Polygon<Float> {
+
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_cut_right_polygon() const noexcept
+      -> Geometry::Polygon<Coord_t<Float, COORD_TYPE>> {
     assert(is_cut());
-    return Geometry::Polygon<Float>{get_right_points()};
+    return Geometry::Polygon<Coord_t<Float, COORD_TYPE>>{get_right_points<COORD_TYPE>()};
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto get_left_points() const noexcept -> SmallVector<Point<Float>> {
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_left_points() const noexcept
+      -> SmallVector<Coord_t<Float, COORD_TYPE>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CutType::BOTTOM_LEFT:
         return {
-            Point<Float>{x_min(), y_min()},
-            cut1(),
-            cut2(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
         };
       case CutType::BOTTOM_RIGHT:
         return {
-            Point<Float>{x_min(), y_min()},
-            cut1(),
-            cut2(),
-            Point<Float>{x_min() + dx(), y_min() + dy()},
-            Point<Float>{x_min(), y_min() + dy()},
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       case CutType::TOP_RIGHT:
         return {
-            Point<Float>{x_min(), y_min()},
-            Point<Float>{x_min() + dx(), y_min()},
-            cut1(),
-            cut2(),
-            Point<Float>{x_min(), y_min() + dy()},
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       case CutType::TOP_LEFT:
         return {
-            Point<Float>{x_min(), y_min()},
-            Point<Float>{x_min() + dx(), y_min()},
-            Point<Float>{x_min() + dx(), y_min() + dy()},
-            cut1(),
-            cut2(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
         };
       case CutType::MIDDLE_HORI:
         return {
-            Point<Float>{x_min(), y_min()},
-            Point<Float>{x_min() + dx(), y_min()},
-            cut1(),
-            cut2(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
         };
       case CutType::MIDDLE_VERT:
         return {
-            Point<Float>{x_min(), y_min()},
-            Point<Float>{x_min(), y_min() + dy()},
-            cut1(),
-            cut2(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
         };
       default:
         Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
@@ -201,48 +242,50 @@ struct Cell {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto get_right_points() const noexcept -> SmallVector<Point<Float>> {
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_right_points() const noexcept
+      -> SmallVector<Coord_t<Float, COORD_TYPE>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CutType::BOTTOM_LEFT:
         return {
-            cut1(),
-            cut2(),
-            Point<Float>{x_min(), y_min() + dy()},
-            Point<Float>{x_min() + dx(), y_min()},
-            Point<Float>{x_min() + dx(), y_min() + dy()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       case CutType::BOTTOM_RIGHT:
         return {
-            cut1(),
-            cut2(),
-            Point<Float>{x_min() + dx(), y_min()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
         };
       case CutType::TOP_RIGHT:
         return {
-            cut1(),
-            cut2(),
-            Point<Float>{x_min() + dx(), y_min() + dy()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       case CutType::TOP_LEFT:
         return {
-            cut1(),
-            cut2(),
-            Point<Float>{x_min(), y_min() + dy()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       case CutType::MIDDLE_HORI:
         return {
-            cut1(),
-            cut2(),
-            Point<Float>{x_min(), y_min() + dy()},
-            Point<Float>{x_min() + dx(), y_min() + dy()},
+            cut1<COORD_TYPE>(),
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       case CutType::MIDDLE_VERT:
         return {
-            cut1(),
-            Point<Float>{x_min() + dx(), y_min()},
-            cut2(),
-            Point<Float>{x_min() + dx(), y_min() + dy()},
+            cut1<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
       default:
         Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
@@ -308,10 +351,10 @@ auto operator<<(std::ostream& out, const CutValue<Float, DIM>& cut_value) noexce
   }
   out << ',' << end_char;
 
-  out << double_indent << ".cut1 = [" << cut_value.cut1(X) << ", " << cut_value.cut1(Y) << ']'
-      << end_char;
-  out << double_indent << ".cut2 = [" << cut_value.cut2(X) << ", " << cut_value.cut2(Y) << ']'
-      << end_char;
+  out << double_indent << ".rel_cut1 = [" << cut_value.rel_cut1(X) << ", " << cut_value.rel_cut1(Y)
+      << ']' << end_char;
+  out << double_indent << ".rel_cut2 = [" << cut_value.rel_cut2(X) << ", " << cut_value.rel_cut2(Y)
+      << ']' << end_char;
 
   out << single_indent << '}';
 
@@ -339,10 +382,10 @@ auto operator<<(std::ostream& out, const Cell<Float, DIM>& cell) noexcept -> std
   out << indent << ".x_idx = " << cell.x_idx << ',' << end_char;
   out << indent << ".y_idx = " << cell.y_idx << ',' << end_char;
 
-  out << indent << ".x_min = " << cell.x_min() << ',' << end_char;
-  out << indent << ".dx = " << cell.dx() << ',' << end_char;
-  out << indent << ".y_min = " << cell.y_min() << ',' << end_char;
-  out << indent << ".dy = " << cell.dy() << ',' << end_char;
+  out << indent << ".x_min = " << cell.template x_min<CoordType::SIM>() << ',' << end_char;
+  out << indent << ".dx = " << cell.template dx<CoordType::SIM>() << ',' << end_char;
+  out << indent << ".y_min = " << cell.template y_min<CoordType::SIM>() << ',' << end_char;
+  out << indent << ".dy = " << cell.template dy<CoordType::SIM>() << ',' << end_char;
 
   out << indent << ".left_idx = ";
   if (cell.left_idx == NULL_INDEX) {

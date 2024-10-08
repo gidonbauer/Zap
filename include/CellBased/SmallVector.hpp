@@ -9,7 +9,7 @@
 #include <type_traits>
 #endif  // ZAP_SMALL_VECTOR_CAPACITY
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
 
 namespace Zap::CellBased {
 

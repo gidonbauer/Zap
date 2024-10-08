@@ -8,7 +8,9 @@
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
 
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
+#include "Igor/Macros.hpp"
+#include "Igor/Timer.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "example_x_ramp/"
 
@@ -46,11 +48,11 @@ constexpr Float Y_MAX = 2.0;
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto init_shock(Float t) -> Zap::CellBased::Point<Float> {
+[[nodiscard]] auto init_shock(Float t) -> Zap::CellBased::SimCoord<Float> {
   assert(t >= 0 && t <= 1);
-  return Zap::CellBased::Point<Float>{
-      (X_MAX - X_MIN) / 2,
-      t * (Y_MAX - Y_MIN) + Y_MIN,
+  return {
+      .x = (X_MAX - X_MIN) / 2,
+      .y = t * (Y_MAX - Y_MIN) + Y_MIN,
   };
 };
 
@@ -75,22 +77,21 @@ void print_shock_error(const Zap::CellBased::UniformGrid<Float, DIM>& numerical_
                        std::ostream& out) noexcept {
   const auto final_shock = numerical_solution.get_shock_curve();
 
-  const auto mean_shock_x = std::transform_reduce(std::cbegin(final_shock),
-                                                  std::cend(final_shock),
-                                                  Float{0},
-                                                  std::plus<>{},
-                                                  [](const Zap::CellBased::Point<Float>& p) {
-                                                    return p(Zap::CellBased::X);
-                                                  }) /
-                            static_cast<Float>(final_shock.size());
+  const auto mean_shock_x =
+      std::transform_reduce(std::cbegin(final_shock),
+                            std::cend(final_shock),
+                            Float{0},
+                            std::plus<>{},
+                            [](const Zap::CellBased::SimCoord<Float>& p) { return p.x; }) /
+      static_cast<Float>(final_shock.size());
 
   const auto std_dev_shock_x =
       std::sqrt(std::transform_reduce(std::cbegin(final_shock),
                                       std::cend(final_shock),
                                       Float{0},
                                       std::plus<>{},
-                                      [=](const Zap::CellBased::Point<Float>& p) {
-                                        return std::pow(p(Zap::CellBased::X) - mean_shock_x, 2);
+                                      [=](const Zap::CellBased::SimCoord<Float>& p) {
+                                        return std::pow(p.x - mean_shock_x, 2);
                                       }) /
                 static_cast<Float>(final_shock.size()));
 
@@ -125,18 +126,22 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
   for (size_t i = 1; i <= n / 2; ++i) {
     {
       const Float x = static_cast<Float>(2 * i - 2) * dx + X_MIN;
-      L1_error += std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                           analytical_quasi_1d(x, tend, Float{0}));
+      L1_error +=
+          std::abs(numerical_solution.eval(Zap::CellBased::SimCoord<Float>{.x = x, .y = 1.0})(0) -
+                   analytical_quasi_1d(x, tend, Float{0}));
     }
     {
       const Float x = static_cast<Float>(2 * i - 1) * dx + X_MIN;
-      L1_error += 4 * std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                               analytical_quasi_1d(x, tend, Float{0}));
+      L1_error +=
+          4 *
+          std::abs(numerical_solution.eval(Zap::CellBased::SimCoord<Float>{.x = x, .y = 1.0})(0) -
+                   analytical_quasi_1d(x, tend, Float{0}));
     }
     {
       const Float x = static_cast<Float>(2 * i) * dx + X_MIN;
-      L1_error += std::abs(numerical_solution.eval(Zap::CellBased::Point<Float>{x, 1.0})(0) -
-                           analytical_quasi_1d(x, tend, Float{0}));
+      L1_error +=
+          std::abs(numerical_solution.eval(Zap::CellBased::SimCoord<Float>{.x = x, .y = 1.0})(0) -
+                   analytical_quasi_1d(x, tend, Float{0}));
     }
   }
   L1_error *= dx / 3;

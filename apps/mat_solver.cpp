@@ -2,6 +2,9 @@
 #include "MatBased/BoundaryConditions.hpp"
 #include "MatBased/Solver.hpp"
 
+#include "Igor/Logging.hpp"
+#include "Igor/Macros.hpp"
+
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "mat_based/"
 
 // -------------------------------------------------------------------------------------------------

@@ -17,7 +17,7 @@
 #include <STB/stb_image_write.h>
 
 #include "Color.hpp"
-#include "Igor.hpp"
+#include "Igor/Logging.hpp"
 
 namespace Zap::Renderer {
 
@@ -169,10 +169,9 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] static constexpr auto get_gylph_box(Box text_box,
-                                                    FT_GlyphSlot glyph,
-                                                    size_t& hori_pos,
-                                                    Box& glyph_box) noexcept -> bool {
+  [[nodiscard]] static constexpr auto
+  get_gylph_box(Box text_box, FT_GlyphSlot glyph, size_t& hori_pos, Box& glyph_box) noexcept
+      -> bool {
     const auto above_line_height = 3UZ * text_box.height / 4UZ;
 
     assert(glyph->metrics.width >= 0);
@@ -245,8 +244,8 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto
-  draw_text(std::string_view str, Box box, bool centered) noexcept -> bool {
+  [[nodiscard]] constexpr auto draw_text(std::string_view str, Box box, bool centered) noexcept
+      -> bool {
     if (!box_in_canvas(box)) {
       Igor::Warn("Box {} is not within the canvas with dimension {}x{}", box, m_width, m_height);
       return false;
@@ -344,10 +343,9 @@ class Canvas {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto draw_rect(Box rect,
-                                         Box bounding_box,
-                                         PixelType color,
-                                         bool is_y_upwards = false) noexcept -> bool {
+  [[nodiscard]] constexpr auto
+  draw_rect(Box rect, Box bounding_box, PixelType color, bool is_y_upwards = false) noexcept
+      -> bool {
     if (!box_in_canvas(bounding_box)) {
       Igor::Warn("Bounding box {} is not within canvas with dimension {}x{}.",
                  bounding_box,
