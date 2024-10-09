@@ -443,4 +443,23 @@ auto operator<<(std::ostream& out, const Cell<Float, DIM>& cell) noexcept -> std
 
 }  // namespace Zap::CellBased
 
+namespace std {
+
+template <typename Float, size_t DIM>
+struct formatter<Zap::CellBased::Cell<Float, DIM>> {
+  template <typename ParseContext>
+  static constexpr auto parse(ParseContext& ctx) noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  static constexpr auto format(const Zap::CellBased::Cell<Float, DIM>& cell,
+                               FormatContext& ctx) noexcept {
+    std::stringstream s;
+    s << cell;
+    return std::format_to(ctx.out(), "{}", s.str());
+  }
+};
+
+}  // namespace std
+
 #endif  // ZAP_CELL_BASED_CELL_HPP_

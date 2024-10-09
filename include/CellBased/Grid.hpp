@@ -405,7 +405,7 @@ class UniformGrid {
   [[nodiscard]] constexpr auto find_next_cell_to_cut(const Cell<Float, DIM>& cell,
                                                      const PointType& exit_point) const noexcept
       -> size_t {
-    assert(point_in_cell(exit_point, cell));
+    IGOR_ASSERT(point_in_cell(exit_point, cell), "Point {} is not in cell {}", exit_point, cell);
 
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
