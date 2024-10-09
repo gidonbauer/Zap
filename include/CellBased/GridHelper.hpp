@@ -16,9 +16,7 @@ template <typename Float>
 template <typename Float, size_t DIM, Point2D_c PointType>
 [[nodiscard]] constexpr auto point_on_boundary(const PointType& p, const Cell<Float, DIM>& cell)
     -> bool {
-  constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                       ? CoordType::SIM
-                                       : CoordType::GRID;
+  constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
   return ((approx_eq(p.x, cell.template x_min<coord_type>()) ||
            approx_eq(p.x, cell.template x_min<coord_type>() + cell.template dx<coord_type>())) &&
@@ -33,9 +31,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
 
 template <typename Float, size_t DIM, Point2D_c PointType>
 [[nodiscard]] constexpr auto point_in_cell(const PointType& p, const Cell<Float, DIM>& cell) {
-  constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                       ? CoordType::SIM
-                                       : CoordType::GRID;
+  constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
   return p.x - cell.template x_min<coord_type>() >= -EPS<Float> &&
          p.x - cell.template x_min<coord_type>() + cell.template dx<coord_type>() <= EPS<Float> &&

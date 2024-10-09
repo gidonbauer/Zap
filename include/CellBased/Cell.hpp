@@ -55,10 +55,6 @@ struct CutValue {
 
 // -------------------------------------------------------------------------------------------------
 template <typename Float, size_t DIM>
-class UniformGrid;
-
-// -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
 struct Cell {
   static_assert(DIM > 0, "Dimension must be at least 1.");
 
@@ -66,7 +62,11 @@ struct Cell {
   std::variant<CartesianValue<Float, DIM>, CutValue<Float, DIM>> value =
       CartesianValue<Float, DIM>{};
 
-  UniformGrid<Float, DIM>* parent;
+  // Copy the cell dimension from grid; same for all cells
+  Float m_x_min;
+  Float m_y_min;
+  Float m_dx;
+  Float m_dy;
 
   // Grid index
   size_t x_idx{};
@@ -81,8 +81,8 @@ struct Cell {
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto x_min() const noexcept -> Float {
-    if constexpr (COORD_TYPE == CoordType::SIM) {
-      return parent->m_x_min + static_cast<Float>(x_idx) * parent->m_dx;
+    if constexpr (COORD_TYPE == SIM_C) {
+      return m_x_min + static_cast<Float>(x_idx) * m_dx;
     } else {
       return static_cast<Float>(x_idx);
     }
@@ -90,8 +90,8 @@ struct Cell {
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto y_min() const noexcept -> Float {
-    if constexpr (COORD_TYPE == CoordType::SIM) {
-      return parent->m_y_min + static_cast<Float>(y_idx) * parent->m_dy;
+    if constexpr (COORD_TYPE == SIM_C) {
+      return m_y_min + static_cast<Float>(y_idx) * m_dy;
     } else {
       return static_cast<Float>(y_idx);
     }
@@ -99,8 +99,8 @@ struct Cell {
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto dx() const noexcept -> Float {
-    if constexpr (COORD_TYPE == CoordType::SIM) {
-      return parent->m_dx;
+    if constexpr (COORD_TYPE == SIM_C) {
+      return m_dx;
     } else {
       return 1;
     }
@@ -108,28 +108,28 @@ struct Cell {
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto dy() const noexcept -> Float {
-    if constexpr (COORD_TYPE == CoordType::SIM) {
-      return parent->m_dy;
+    if constexpr (COORD_TYPE == SIM_C) {
+      return m_dy;
     } else {
       return 1;
     }
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto cut1() const noexcept -> Coord_t<Float, COORD_TYPE> {
+  [[nodiscard]] constexpr auto cut1() const noexcept -> CoordType2PointType<Float, COORD_TYPE> {
     assert(is_cut());
 
-    return Coord_t<Float, COORD_TYPE>{
+    return CoordType2PointType<Float, COORD_TYPE>{
         .x = get_cut().rel_cut1(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
         .y = get_cut().rel_cut1(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto cut2() const noexcept -> Coord_t<Float, COORD_TYPE> {
+  [[nodiscard]] constexpr auto cut2() const noexcept -> CoordType2PointType<Float, COORD_TYPE> {
     assert(is_cut());
 
-    return Coord_t<Float, COORD_TYPE>{
+    return CoordType2PointType<Float, COORD_TYPE>{
         .x = get_cut().rel_cut2(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
         .y = get_cut().rel_cut2(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
@@ -162,8 +162,8 @@ struct Cell {
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept
-      -> Geometry::Polygon<Coord_t<Float, COORD_TYPE>> {
-    return Geometry::Polygon<Coord_t<Float, COORD_TYPE>>{{
+      -> Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>> {
+    return Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>>{{
         {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
         {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
         {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
@@ -173,22 +173,23 @@ struct Cell {
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cut_left_polygon() const noexcept
-      -> Geometry::Polygon<Coord_t<Float, COORD_TYPE>> {
+      -> Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>> {
     assert(is_cut());
-    return Geometry::Polygon<Coord_t<Float, COORD_TYPE>>{get_left_points<COORD_TYPE>()};
+    return Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>>{get_left_points<COORD_TYPE>()};
   }
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cut_right_polygon() const noexcept
-      -> Geometry::Polygon<Coord_t<Float, COORD_TYPE>> {
+      -> Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>> {
     assert(is_cut());
-    return Geometry::Polygon<Coord_t<Float, COORD_TYPE>>{get_right_points<COORD_TYPE>()};
+    return Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>>{
+        get_right_points<COORD_TYPE>()};
   }
 
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_left_points() const noexcept
-      -> SmallVector<Coord_t<Float, COORD_TYPE>> {
+      -> SmallVector<CoordType2PointType<Float, COORD_TYPE>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CutType::BOTTOM_LEFT:
@@ -244,7 +245,7 @@ struct Cell {
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_right_points() const noexcept
-      -> SmallVector<Coord_t<Float, COORD_TYPE>> {
+      -> SmallVector<CoordType2PointType<Float, COORD_TYPE>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CutType::BOTTOM_LEFT:
@@ -382,10 +383,10 @@ auto operator<<(std::ostream& out, const Cell<Float, DIM>& cell) noexcept -> std
   out << indent << ".x_idx = " << cell.x_idx << ',' << end_char;
   out << indent << ".y_idx = " << cell.y_idx << ',' << end_char;
 
-  out << indent << ".x_min = " << cell.template x_min<CoordType::SIM>() << ',' << end_char;
-  out << indent << ".dx = " << cell.template dx<CoordType::SIM>() << ',' << end_char;
-  out << indent << ".y_min = " << cell.template y_min<CoordType::SIM>() << ',' << end_char;
-  out << indent << ".dy = " << cell.template dy<CoordType::SIM>() << ',' << end_char;
+  out << indent << ".x_min = " << cell.template x_min<SIM_C>() << ',' << end_char;
+  out << indent << ".dx = " << cell.template dx<SIM_C>() << ',' << end_char;
+  out << indent << ".y_min = " << cell.template y_min<SIM_C>() << ',' << end_char;
+  out << indent << ".dy = " << cell.template dy<SIM_C>() << ',' << end_char;
 
   out << indent << ".left_idx = ";
   if (cell.left_idx == NULL_INDEX) {

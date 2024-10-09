@@ -85,7 +85,10 @@ class UniformGrid {
       for (size_t xi = 0; xi < nx; ++xi) {
         // clang-format off
         m_cells[to_vec_idx(xi, yi)] = Cell<Float, DIM>{
-            .parent     = this,
+            .m_x_min    = m_x_min,
+            .m_y_min    = m_y_min,
+            .m_dx       = m_dx,
+            .m_dy       = m_dy,
             .x_idx      = xi,
             .y_idx      = yi,
             .left_idx   = xi == 0        ? NULL_INDEX : to_vec_idx(xi - 1, yi),
@@ -199,15 +202,13 @@ class UniformGrid {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
         if constexpr (DIM == 1) {
-          value(0) = f(cell.template x_min<CoordType::SIM>() +
-                           static_cast<Float>(0.5) * cell.template dx<CoordType::SIM>(),
-                       cell.template y_min<CoordType::SIM>() +
-                           static_cast<Float>(0.5) * cell.template dy<CoordType::SIM>());
+          value(0) =
+              f(cell.template x_min<SIM_C>() + static_cast<Float>(0.5) * cell.template dx<SIM_C>(),
+                cell.template y_min<SIM_C>() + static_cast<Float>(0.5) * cell.template dy<SIM_C>());
         } else {
-          value = f(cell.template x_min<CoordType::SIM>() +
-                        static_cast<Float>(0.5) * cell.template dx<CoordType::SIM>(),
-                    cell.template y_min<CoordType::SIM>() +
-                        static_cast<Float>(0.5) * cell.template dy<CoordType::SIM>());
+          value =
+              f(cell.template x_min<SIM_C>() + static_cast<Float>(0.5) * cell.template dx<SIM_C>(),
+                cell.template y_min<SIM_C>() + static_cast<Float>(0.5) * cell.template dy<SIM_C>());
         }
       } else if (cell.is_cut()) {
         Eigen::Vector<Float, 2> left_centroid =
@@ -236,38 +237,32 @@ class UniformGrid {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
         if constexpr (DIM == 1) {
-          value(0) =
-              (f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
-               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
-               f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() +
-                     3 * cell.template dy<CoordType::SIM>() / 4) +
-               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() +
-                     3 * cell.template dy<CoordType::SIM>() / 4)) /
-              4;
+          value(0) = (f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
+                        cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
+                      f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
+                        cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
+                      f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
+                        cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4) +
+                      f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
+                        cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4)) /
+                     4;
         } else {
-          value =
-              (f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
-               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() + cell.template dy<CoordType::SIM>() / 4) +
-               f(cell.template x_min<CoordType::SIM>() + cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() +
-                     3 * cell.template dy<CoordType::SIM>() / 4) +
-               f(cell.template x_min<CoordType::SIM>() + 3 * cell.template dx<CoordType::SIM>() / 4,
-                 cell.template y_min<CoordType::SIM>() +
-                     3 * cell.template dy<CoordType::SIM>() / 4)) /
-              4;
+          value = (f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
+                     cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
+                   f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
+                     cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
+                   f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
+                     cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4) +
+                   f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
+                     cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4)) /
+                  4;
         }
       } else if (cell.is_cut()) {
         auto& cut_value = cell.get_cut();
 
         // Left side
         {
-          const auto corners = cell.template get_left_points<CoordType::SIM>();
+          const auto corners = cell.template get_left_points<SIM_C>();
           for (size_t j = 0; j < corners.size(); ++j) {
             auto point = SimCoord<Float>::Zero();
             for (size_t i = 0; i < corners.size(); ++i) {
@@ -285,7 +280,7 @@ class UniformGrid {
 
         // Right side
         {
-          const auto corners = cell.template get_right_points<CoordType::SIM>();
+          const auto corners = cell.template get_right_points<SIM_C>();
           for (size_t j = 0; j < corners.size(); ++j) {
             auto point = SimCoord<Float>::Zero();
             for (size_t i = 0; i < corners.size(); ++i) {
@@ -311,9 +306,7 @@ class UniformGrid {
   [[nodiscard]] constexpr auto classify_cut(const Cell<Float, DIM>& cell,
                                             PointType& cut1_point,
                                             PointType& cut2_point) const noexcept -> CutType {
-    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                         ? CoordType::SIM
-                                         : CoordType::GRID;
+    constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
     const int cut1_on_x =
         approx_eq(cell.template x_min<coord_type>(), cut1_point.x) * ON_MIN +
@@ -414,9 +407,7 @@ class UniformGrid {
       -> size_t {
     assert(point_in_cell(exit_point, cell));
 
-    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                         ? CoordType::SIM
-                                         : CoordType::GRID;
+    constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
     const int on_x = approx_eq(cell.template x_min<coord_type>(), exit_point.x) * ON_MIN +
                      approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
@@ -614,9 +605,7 @@ class UniformGrid {
     // https://stackoverflow.com/questions/13884200/getting-all-intersection-points-between-a-line-segment-and-a-2n-grid-in-intege
     // https://stackoverflow.com/questions/3270840/find-the-intersection-between-line-and-grid-in-a-fast-manner
 
-    constexpr CoordType coord_type =
-        std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<double>> ? CoordType::SIM
-                                                                         : CoordType::GRID;
+    constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
     // Remove points outside of grid
     std::erase_if(points, [this](const PointType& p) { return !point_in_grid(p); });
@@ -783,12 +772,12 @@ class UniformGrid {
       assert(cell.is_cut());
 
       const auto left_value   = cell.get_cut().left_value;
-      const auto left_polygon = cell.template get_cut_left_polygon<CoordType::SIM>();
+      const auto left_polygon = cell.template get_cut_left_polygon<SIM_C>();
 
       const auto right_value   = cell.get_cut().right_value;
-      const auto right_polygon = cell.template get_cut_right_polygon<CoordType::SIM>();
+      const auto right_polygon = cell.template get_cut_right_polygon<SIM_C>();
 
-      const auto cell_polygon = cell.template get_cartesian_polygon<CoordType::SIM>();
+      const auto cell_polygon = cell.template get_cartesian_polygon<SIM_C>();
 
       cell.value = CartesianValue<Float, DIM>{
           .value = (left_value * left_polygon.area() + right_value * right_polygon.area()) /
@@ -868,12 +857,12 @@ class UniformGrid {
 
     {
       const auto& cell = m_cells[m_cut_cell_idxs.front()];
-      curve_points[0]  = cell.template cut1<CoordType::SIM>();
+      curve_points[0]  = cell.template cut1<SIM_C>();
     }
 
     for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
       const auto& cell    = m_cells[m_cut_cell_idxs[i]];
-      curve_points[i + 1] = cell.template cut2<CoordType::SIM>();
+      curve_points[i + 1] = cell.template cut2<SIM_C>();
     }
 
     return curve_points;
@@ -943,9 +932,7 @@ class UniformGrid {
     if (cell.is_cartesian()) {
       return cell.get_cartesian().value;
     } else if (cell.is_cut()) {
-      constexpr CoordType coord_type =
-          std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>> ? CoordType::SIM
-                                                                          : CoordType::GRID;
+      constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
       const auto point_in_left =
           cell.template get_cut_left_polygon<coord_type>().point_in_polygon(point);

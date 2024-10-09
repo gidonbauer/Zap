@@ -144,9 +144,7 @@ class Solver {
       value -= (intersect_area / cell_area) * wave.value;
     };
 
-    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                         ? CoordType::SIM
-                                         : CoordType::GRID;
+    constexpr CoordType coord_type = PointType2CoordType<PointType>;
     if (cell.is_cartesian()) {
       update_value(cell.get_cartesian().value, cell.template get_cartesian_polygon<coord_type>());
     } else {
@@ -198,9 +196,7 @@ class Solver {
       -> FullInterface<Float, DIM, PointType> {
     assert(cell.is_cut());
 
-    constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                         ? CoordType::SIM
-                                         : CoordType::GRID;
+    constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
     return FullInterface<Float, DIM, PointType>{
         .left_value  = cell.get_cut().left_value,
@@ -342,15 +338,12 @@ class Solver {
 
         if (curr_cell.is_cut()) {
           // TODO: Change the type for one to SIM to see compilation error
-          const auto curr_cell_left_polygon =
-              curr_cell.template get_cut_left_polygon<CoordType::GRID>();
-          const auto curr_cell_right_polygon =
-              curr_cell.template get_cut_right_polygon<CoordType::GRID>();
+          const auto curr_cell_left_polygon  = curr_cell.template get_cut_left_polygon<GRID_C>();
+          const auto curr_cell_right_polygon = curr_cell.template get_cut_right_polygon<GRID_C>();
 
           // Left subcell
           {
-            const auto next_subcell_polygon =
-                next_cell.template get_cut_left_polygon<CoordType::GRID>();
+            const auto next_subcell_polygon = next_cell.template get_cut_left_polygon<GRID_C>();
             assert(next_subcell_polygon.area() > 0 ||
                    std::abs(next_subcell_polygon.area()) <= EPS<Float>);
             if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
@@ -370,8 +363,7 @@ class Solver {
 
           // Right subcell
           {
-            const auto next_subcell_polygon =
-                next_cell.template get_cut_right_polygon<CoordType::GRID>();
+            const auto next_subcell_polygon = next_cell.template get_cut_right_polygon<GRID_C>();
             assert(next_subcell_polygon.area() > 0 ||
                    std::abs(next_subcell_polygon.area()) <= EPS<Float>);
             if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {

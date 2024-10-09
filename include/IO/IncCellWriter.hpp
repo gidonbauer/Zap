@@ -134,10 +134,10 @@ class IncCellWriter {
 
     for (const auto& cell : grid) {
       // Extend of cell
-      const Float x_min = cell.template x_min<CellBased::CoordType::SIM>();
-      const Float y_min = cell.template y_min<CellBased::CoordType::SIM>();
-      const Float dx    = cell.template dx<CellBased::CoordType::SIM>();
-      const Float dy    = cell.template dy<CellBased::CoordType::SIM>();
+      const Float x_min = cell.template x_min<CellBased::SIM_C>();
+      const Float y_min = cell.template y_min<CellBased::SIM_C>();
+      const Float dx    = cell.template dx<CellBased::SIM_C>();
+      const Float dy    = cell.template dy<CellBased::SIM_C>();
 
       if (cell.is_cartesian()) {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -164,8 +164,8 @@ class IncCellWriter {
         const auto& cell_value = cell.get_cut();
         m_out.put(static_cast<char>(cell_value.type));
 
-        const auto cut1 = cell.template cut1<CellBased::CoordType::SIM>();
-        const auto cut2 = cell.template cut2<CellBased::CoordType::SIM>();
+        const auto cut1 = cell.template cut1<CellBased::SIM_C>();
+        const auto cut2 = cell.template cut2<CellBased::SIM_C>();
         m_out.write(reinterpret_cast<const char*>(&cut1.x), sizeof(cut1.x));
         m_out.write(reinterpret_cast<const char*>(&cut1.y), sizeof(cut1.y));
         m_out.write(reinterpret_cast<const char*>(&cut2.x), sizeof(cut2.x));

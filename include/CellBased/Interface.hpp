@@ -43,9 +43,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
 template <typename Float, size_t DIM, Point2D_c PointType>
 [[nodiscard]] constexpr auto get_outer_cell_interfaces(const Cell<Float, DIM>& cell) noexcept
     -> CellHalfInterfaces<Float, DIM, PointType> {
-  constexpr CoordType coord_type = std::is_same_v<std::remove_cvref_t<PointType>, SimCoord<Float>>
-                                       ? CoordType::SIM
-                                       : CoordType::GRID;
+  constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
   if (cell.is_cartesian()) {
     return CellHalfInterfaces<Float, DIM, PointType>{

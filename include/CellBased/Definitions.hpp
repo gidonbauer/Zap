@@ -106,6 +106,15 @@ concept Point2D_c = requires(PointType t) {
   }
 
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define DEFINE_TEMPLATE_CHECK(name)                                                                \
+  template <typename T>                                                                            \
+  struct is_##name : std::false_type {};                                                           \
+  template <typename T>                                                                            \
+  struct is_##name<name<T>> : std::true_type {};                                                   \
+  template <typename T>                                                                            \
+  constexpr bool is_##name##_v = is_##name<T>::value
+
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define DEF_POINT2D_FORMATTER(name)                                                                \
   template <typename T, typename CharT>                                                            \
   struct formatter<name<T>, CharT> {                                                               \
@@ -120,10 +129,21 @@ concept Point2D_c = requires(PointType t) {
   }
 
 DEF_POINT2D_TYPE(GridCoord);
+DEFINE_TEMPLATE_CHECK(GridCoord);
+
+DEF_POINT2D_TYPE(SimCoord);
+DEFINE_TEMPLATE_CHECK(SimCoord);
+
+static_assert(is_GridCoord_v<GridCoord<double>>,
+              "is_GridCoord_v must evaluate to true for GridCoord.");
+static_assert(!is_SimCoord_v<GridCoord<double>>,
+              "is_SimCoord_v must evaluate to false for GridCoord.");
 static_assert(Point2D_c<GridCoord<double>>,
               "GridCoord must fulfill the Point2D concepts requirements.");
 
-DEF_POINT2D_TYPE(SimCoord);
+static_assert(!is_GridCoord_v<SimCoord<double>>,
+              "is_GridCoord_v must evaluate to false for SimCoord.");
+static_assert(is_SimCoord_v<SimCoord<double>>, "is_SimCoord_v must evaluate to true for SimCoord.");
 static_assert(Point2D_c<SimCoord<double>>,
               "GridCoord must fulfill the Point2D concepts requirements.");
 }  // namespace Zap::CellBased
@@ -135,25 +155,31 @@ DEF_POINT2D_FORMATTER(Zap::CellBased::SimCoord);
 
 }  // namespace std
 
-namespace Zap::CellBased {
-
-enum class CoordType : uint8_t { GRID, SIM };
-
-template <typename Float, CoordType COORD_TYPE>
-using Coord_t =
-    std::conditional_t<COORD_TYPE == CoordType::GRID, GridCoord<Float>, SimCoord<Float>>;
-
 #undef DEF_POINT2D_TYPE
+#undef DEFINE_TEMPLATE_CHECK
 #undef DEF_POINT2D_FORMATTER
 
+namespace Zap::CellBased {
+
+enum class CoordType : uint8_t { GRID_C, SIM_C };
+using enum CoordType;
+
+template <typename Float, CoordType COORD_TYPE>
+using CoordType2PointType =
+    std::conditional_t<COORD_TYPE == GRID_C, GridCoord<Float>, SimCoord<Float>>;
+
+template <typename PointType>
+requires(is_GridCoord_v<PointType> || is_SimCoord_v<PointType>)
+constexpr CoordType PointType2CoordType = is_SimCoord_v<PointType> ? SIM_C : GRID_C;
+
 // - Generic 2D Point based on Eigen Vector --------------------------------------------------------
-enum : size_t { X, Y, POINT_SIZE };  // NOLINT
+enum : size_t { X, Y, POINT_SIZE };
 
 template <typename T>
 using Point = Eigen::Vector<T, POINT_SIZE>;
 
 // -------------------------------------------------------------------------------------------------
-enum Side : int {  // NOLINT
+enum Side : int {
   BOTTOM = 0b0001,
   RIGHT  = 0b0010,
   TOP    = 0b0100,
