@@ -18,8 +18,8 @@ struct ReducedCartesianValue {
 template <typename Float, size_t DIM>
 struct ReducedCutValue {
   CellBased::CutType type;
-  CellBased::Point<Float> cut1;
-  CellBased::Point<Float> cut2;
+  CellBased::GenCoord<Float> cut1;
+  CellBased::GenCoord<Float> cut2;
 
   Eigen::Vector<Float, DIM> left_value;
   Eigen::Vector<Float, DIM> right_value;
@@ -68,50 +68,50 @@ class ReducedCell {
 
   // -------------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto get_left_points() const noexcept
-      -> CellBased::SmallVector<CellBased::Point<Float>> {
+      -> CellBased::SmallVector<CellBased::GenCoord<Float>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CellBased::CutType::BOTTOM_LEFT:
         return {
-            CellBased::Point<Float>{x_min(), y_min()},
+            CellBased::GenCoord<Float>{x_min(), y_min()},
             cell_value.cut1,
             cell_value.cut2,
         };
       case CellBased::CutType::BOTTOM_RIGHT:
         return {
-            CellBased::Point<Float>{x_min(), y_min()},
+            CellBased::GenCoord<Float>{x_min(), y_min()},
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
-            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
         };
       case CellBased::CutType::TOP_RIGHT:
         return {
-            CellBased::Point<Float>{x_min(), y_min()},
-            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            CellBased::GenCoord<Float>{x_min(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
         };
       case CellBased::CutType::TOP_LEFT:
         return {
-            CellBased::Point<Float>{x_min(), y_min()},
-            CellBased::Point<Float>{x_min() + dx(), y_min()},
-            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
             cell_value.cut1,
             cell_value.cut2,
         };
       case CellBased::CutType::MIDDLE_HORI:
         return {
-            CellBased::Point<Float>{x_min(), y_min()},
-            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            CellBased::GenCoord<Float>{x_min(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
             cell_value.cut1,
             cell_value.cut2,
         };
       case CellBased::CutType::MIDDLE_VERT:
         return {
-            CellBased::Point<Float>{x_min(), y_min()},
-            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min()},
+            CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
             cell_value.cut1,
             cell_value.cut2,
         };
@@ -123,48 +123,48 @@ class ReducedCell {
 
   // -------------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto get_right_points() const noexcept
-      -> CellBased::SmallVector<CellBased::Point<Float>> {
+      -> CellBased::SmallVector<CellBased::GenCoord<Float>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CellBased::CutType::BOTTOM_LEFT:
         return {
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min(), y_min() + dy()},
-            CellBased::Point<Float>{x_min() + dx(), y_min()},
-            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
       case CellBased::CutType::BOTTOM_RIGHT:
         return {
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
         };
       case CellBased::CutType::TOP_RIGHT:
         return {
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
       case CellBased::CutType::TOP_LEFT:
         return {
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
         };
       case CellBased::CutType::MIDDLE_HORI:
         return {
             cell_value.cut1,
             cell_value.cut2,
-            CellBased::Point<Float>{x_min(), y_min() + dy()},
-            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
       case CellBased::CutType::MIDDLE_VERT:
         return {
             cell_value.cut1,
-            CellBased::Point<Float>{x_min() + dx(), y_min()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
             cell_value.cut2,
-            CellBased::Point<Float>{x_min() + dx(), y_min() + dy()},
+            CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
       default:
         Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
@@ -396,28 +396,28 @@ class IncCellReader {
               assert(cut_type >= 0 && cut_type < 7);
               cell.get_cut().type = static_cast<CellBased::CutType>(cut_type);
             }
-            if (!read_next_float(cell.get_cut().cut1(CellBased::X))) {
+            if (!read_next_float(cell.get_cut().cut1.x)) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read x1_cut from `{}`", m_filename);
                 if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.get_cut().cut1(CellBased::Y))) {
+            if (!read_next_float(cell.get_cut().cut1.y)) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read y1_cut from `{}`", m_filename);
                 if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.get_cut().cut2(CellBased::X))) {
+            if (!read_next_float(cell.get_cut().cut2.x)) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read x2_cut from `{}`", m_filename);
                 if (m_in.eof()) { Igor::Warn("Reached end of file."); }
               }
               return false;
             }
-            if (!read_next_float(cell.get_cut().cut2(CellBased::Y))) {
+            if (!read_next_float(cell.get_cut().cut2.y)) {
               if constexpr (WARN_END) {
                 Igor::Warn("Could not read y2_cut from `{}`", m_filename);
                 if (m_in.eof()) { Igor::Warn("Reached end of file."); }

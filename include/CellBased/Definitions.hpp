@@ -128,6 +128,8 @@ concept Point2D_c = requires(PointType t) {
     }                                                                                              \
   }
 
+DEF_POINT2D_TYPE(GenCoord);
+
 DEF_POINT2D_TYPE(GridCoord);
 DEFINE_TEMPLATE_CHECK(GridCoord);
 
@@ -150,6 +152,7 @@ static_assert(Point2D_c<SimCoord<double>>,
 
 namespace std {
 
+DEF_POINT2D_FORMATTER(Zap::CellBased::GenCoord);
 DEF_POINT2D_FORMATTER(Zap::CellBased::GridCoord);
 DEF_POINT2D_FORMATTER(Zap::CellBased::SimCoord);
 

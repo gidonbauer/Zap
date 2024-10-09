@@ -21,12 +21,13 @@ template <typename Float, size_t DIM, Point2D_c PointType>
   return ((approx_eq(p.x, cell.template x_min<coord_type>()) ||
            approx_eq(p.x, cell.template x_min<coord_type>() + cell.template dx<coord_type>())) &&
           (p.y - cell.template y_min<coord_type>() >= -EPS<Float> &&
-           p.y - cell.template y_min<coord_type>() + cell.template dy<coord_type>() <=
+           p.y - (cell.template y_min<coord_type>() + cell.template dy<coord_type>()) <=
                EPS<Float>)) ||
          ((approx_eq(p.y, cell.template y_min<coord_type>()) ||
            approx_eq(p.y, cell.template y_min<coord_type>() + cell.template dy<coord_type>())) &&
           (p.x - cell.template x_min<coord_type>() >= -EPS<Float> &&
-           p.x - cell.template x_min<coord_type>() + cell.template dx<coord_type>() <= EPS<Float>));
+           p.x - (cell.template x_min<coord_type>() + cell.template dx<coord_type>()) <=
+               EPS<Float>));
 };
 
 template <typename Float, size_t DIM, Point2D_c PointType>
@@ -34,9 +35,9 @@ template <typename Float, size_t DIM, Point2D_c PointType>
   constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
   return p.x - cell.template x_min<coord_type>() >= -EPS<Float> &&
-         p.x - cell.template x_min<coord_type>() + cell.template dx<coord_type>() <= EPS<Float> &&
+         p.x - (cell.template x_min<coord_type>() + cell.template dx<coord_type>()) <= EPS<Float> &&
          p.y - cell.template y_min<coord_type>() >= -EPS<Float> &&
-         p.y - cell.template y_min<coord_type>() + cell.template dy<coord_type>() <= EPS<Float>;
+         p.y - (cell.template y_min<coord_type>() + cell.template dy<coord_type>()) <= EPS<Float>;
 };
 
 }  // namespace Zap::CellBased
