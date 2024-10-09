@@ -225,8 +225,8 @@ template <typename FUNC>
   if (nx % 2 == 1) { nx += 1; }
   if (ny % 2 == 1) { ny += 1; }
 
-  Float dx = (x_max - x_min) / static_cast<Float>(nx);
-  Float dy = (y_max - y_min) / static_cast<Float>(ny);
+  const Float dx = (x_max - x_min) / static_cast<Float>(nx);
+  const Float dy = (y_max - y_min) / static_cast<Float>(ny);
 
   Float res = 0;
 #pragma omp parallel for reduction(+ : res)
