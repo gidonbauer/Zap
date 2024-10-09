@@ -14,6 +14,7 @@
 #define ZAP_PARALLEL_RENDERING
 
 // TODO: Fix rendering of cut cells, sometimes cell goes out of bounds
+// TODO: Display total mass -> can see if it is conservative
 
 namespace Rd = Zap::Renderer;
 
