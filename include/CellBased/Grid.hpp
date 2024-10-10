@@ -8,6 +8,8 @@
 #include "CellBased/GridHelper.hpp"
 #include "IO/Fwd.hpp"
 
+#include "Igor/TypeName.hpp"
+
 namespace Zap::CellBased {
 
 // IDEA: Introduce scaled grid
@@ -601,6 +603,12 @@ class UniformGrid {
   template <Point2D_c PointType>
   [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<PointType> points) noexcept
       -> bool {
+    if constexpr (!is_GridCoord_v<PointType>) {
+      Igor::Warn("Cutting should be done in grid-coordinates, like all other geometric operations. "
+                 "Using `{}` instead.",
+                 Igor::type_name<PointType>());
+    }
+
     // TODO: Do something smarter using the fact that the grid is equaly spaced with 1x1 cells.
     // https://stackoverflow.com/questions/13884200/getting-all-intersection-points-between-a-line-segment-and-a-2n-grid-in-intege
     // https://stackoverflow.com/questions/3270840/find-the-intersection-between-line-and-grid-in-a-fast-manner
@@ -968,6 +976,8 @@ class UniformGrid {
   [[nodiscard]] constexpr auto x_max() const noexcept -> Float { return m_x_max; }
   [[nodiscard]] constexpr auto y_min() const noexcept -> Float { return m_y_min; }
   [[nodiscard]] constexpr auto y_max() const noexcept -> Float { return m_y_max; }
+  [[nodiscard]] constexpr auto scale_x() const noexcept -> Float { return 1 / m_dx; }
+  [[nodiscard]] constexpr auto scale_y() const noexcept -> Float { return 1 / m_dy; }
   [[nodiscard]] constexpr auto cells() noexcept -> std::vector<Cell<Float, DIM>>& {
     return m_cells;
   }

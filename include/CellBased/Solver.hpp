@@ -73,7 +73,9 @@ class Solver {
   requires(DIM > 0)
   [[nodiscard]] constexpr auto
   calculate_interface(const FullInterface<Float, DIM, PointType>& interface,
-                      Float dt) const noexcept
+                      Float dt,
+                      Float scale_x,
+                      Float scale_y) const noexcept
       -> SmallVector<WaveProperties<Float, DIM, PointType>> {
     // Vector tangential to interface
     const PointType tangent_vector = (interface.end - interface.begin).normalized();
@@ -85,8 +87,13 @@ class Solver {
     if (tangent_vector.x > 0) { interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle; }
 
     // Vector normal to cut
-    const PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
+    PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
     assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
+    // Scale normal vector when operating in grid coordinates
+    if constexpr (is_GridCoord_v<PointType>) {
+      normal_vector.x *= scale_x;
+      normal_vector.y *= scale_y;
+    }
 
     const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
 
@@ -98,7 +105,6 @@ class Solver {
     Eigen::Matrix<Float, DIM, DIM> eig_vals;
     Eigen::Matrix<Float, DIM, DIM> eig_vecs;
     get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
-    // TODO: wave_lengths requires scaling if we are working in GRID Coordinates
     const Eigen::Matrix<Float, DIM, DIM> wave_lengths = eig_vals * dt;
 
     // Eigen expansion of jump; wave strength
@@ -168,7 +174,8 @@ class Solver {
       const auto interfaces =
           get_shared_interfaces<Float, DIM, GridCoord<Float>>(curr_cell, other_cell, side);
       for (const auto& interface : interfaces) {
-        const auto waves = calculate_interface(interface, dt);
+        const auto waves =
+            calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
         for (const auto& wave : waves) {
           update_cell(next_cell, wave);
         }
@@ -211,8 +218,8 @@ class Solver {
   [[nodiscard]] constexpr auto
   move_wave_front(const UniformGrid<Float, DIM>& curr_grid,
                   [[maybe_unused]] const UniformGrid<Float, DIM>& next_grid,
-                  Float dt) const noexcept -> std::optional<std::vector<SimCoord<Float>>> {
-    using PointType = SimCoord<Float>;
+                  Float dt) const noexcept -> std::optional<std::vector<GridCoord<Float>>> {
+    using PointType = GridCoord<Float>;
 
     // Move old cuts according to strongest wave
     std::vector<std::pair<PointType, PointType>> new_shock_points;
@@ -229,8 +236,13 @@ class Solver {
       if (tangent_vector.x > 0) {
         interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
       }
-      const PointType normal_vector{.x = std::cos(interface_angle), .y = std::sin(interface_angle)};
+      PointType normal_vector{.x = std::cos(interface_angle), .y = std::sin(interface_angle)};
       assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
+      // Scale normal vector when operating in grid coordinates
+      if constexpr (is_GridCoord_v<PointType>) {
+        normal_vector.x *= curr_grid.scale_x();
+        normal_vector.y *= curr_grid.scale_y();
+      }
 
       const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
 
@@ -412,8 +424,8 @@ class Solver {
         // - Handle internal interface -----------------------------------------------------------
         const auto internal_interface =
             get_internal_interface<Float, DIM, GridCoord<Float>>(curr_cell);
-        const auto internal_waves =
-            calculate_interface<Float, DIM, GridCoord<Float>>(internal_interface, dt);
+        const auto internal_waves = calculate_interface<Float, DIM, GridCoord<Float>>(
+            internal_interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
 
         const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
         for (const auto& wave : internal_waves) {
