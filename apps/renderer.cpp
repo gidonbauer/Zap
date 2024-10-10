@@ -36,6 +36,7 @@ struct Args {
   ImageFormat save_frame_images = NO_SAVE;
   size_t fps                    = 60;
   bool two_dim                  = false;
+  bool no_mass                  = false;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -43,10 +44,9 @@ template <Igor::detail::Level level>
 constexpr void usage(std::string_view prog) {
   Args args{};
 
-  std::cerr
-      << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--scale s] [--keep-range] [--same-range] [--save-frame-img <format>] [--fps f] [--2d] "
-         "<u input file> <t input file> <output file>\n";
+  std::cerr << Igor::detail::level_repr(level) << "Usage: " << prog
+            << " [--scale s] [--keep-range] [--same-range] [--save-frame-img <format>] [--fps f] "
+               "[--2d] [--no-mass] <u input file> <t input file> <output file>\n";
   std::cerr << "\t--scale           Number of pixels for single cell, default is " << args.scale
             << '\n';
   std::cerr << "\t--keep-range      Keep min and max value of first frame for colormap, default is "
@@ -60,6 +60,9 @@ constexpr void usage(std::string_view prog) {
   std::cerr
       << "\t--2d              Render solution of 2-dimensional solution (u in R^2), default is "
       << std::boolalpha << args.two_dim << '\n';
+  std::cerr << "\t--no-mass         Do not display the mass ||u||, this flag saves a lot of "
+               "computation time, default is "
+            << args.no_mass << '\n';
   std::cerr << "\tu input file      Solution field for each iteration\n";
   std::cerr << "\tt input file      Time for each iteration\n";
   std::cerr << "\toutput file       File for the rendered video\n";
@@ -147,6 +150,8 @@ constexpr void usage(std::string_view prog) {
       }
     } else if (*argv == "--2d"sv) {
       args.two_dim = true;
+    } else if (*argv == "--no-mass"sv) {
+      args.no_mass = true;
     } else if (args.u_input_file.empty()) {
       args.u_input_file = *argv;
     } else if (args.t_input_file.empty()) {
@@ -427,16 +432,10 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
     }
 
     Rd::Canvas canvas(graph_width + 4 * GRAPH_PADDING + COLORBAR_WIDTH, graph_height + TEXT_HEIGHT);
-    const Rd::Box time_text_box{
+    const Rd::Box text_box{
         .col    = 0,
         .row    = 0,
-        .width  = canvas.width() / 2,
-        .height = TEXT_HEIGHT,
-    };
-    const Rd::Box mass_text_box{
-        .col    = time_text_box.width,
-        .row    = 0,
-        .width  = canvas.width() / 2,
+        .width  = canvas.width(),
         .height = TEXT_HEIGHT,
     };
 
@@ -448,14 +447,14 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
 
     const Rd::Box graph_box{
         .col    = GRAPH_PADDING,
-        .row    = time_text_box.height,
+        .row    = text_box.height,
         .width  = graph_width,
         .height = graph_height,
     };
 
     const Rd::Box colorbar_box{
         .col    = graph_box.width + 3 * GRAPH_PADDING,
-        .row    = time_text_box.height,
+        .row    = text_box.height,
         .width  = COLORBAR_WIDTH,
         .height = graph_height,
     };
@@ -499,16 +498,20 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
       canvas.clear(BLACK);
 
       if (!canvas.set_font_size(16)) { return false; }
-      if (const std::string str = std::format("t = {:.6f}", t_reader(0, 0));
-          !canvas.draw_text(str, time_text_box, true)) {
-        Igor::Warn("Could not render string `{}` to canvas.", str);
-        return false;
-      }
-      if (const std::string str =
-              std::format("||u|| = {:.6f}", calculate_mass<Float, DIM>(u_reader)(0));
-          !canvas.draw_text(str, mass_text_box, true)) {
-        Igor::Warn("Could not render string `{}` to canvas.", str);
-        return false;
+      if (args.no_mass) {
+        if (const std::string str = std::format("t = {:.6f}", t_reader(0, 0));
+            !canvas.draw_text(str, text_box, true)) {
+          Igor::Warn("Could not render string `{}` to canvas.", str);
+          return false;
+        }
+      } else {
+        if (const std::string str = std::format("t = {:.6f}, ||u|| = {:.6f}",
+                                                t_reader(0, 0),
+                                                calculate_mass<Float, DIM>(u_reader)(0));
+            !canvas.draw_text(str, text_box, true)) {
+          Igor::Warn("Could not render string `{}` to canvas.", str);
+          return false;
+        }
       }
 
       if (std::holds_alternative<CellReader>(u_reader)) {
