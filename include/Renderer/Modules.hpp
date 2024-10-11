@@ -25,8 +25,9 @@ template <typename Float>
 template <typename Float>
 [[nodiscard]] constexpr auto
 to_pixel_coord(Float norm_value, size_t num_cells, size_t scale) noexcept -> size_t {
-  return static_cast<size_t>(std::round(std::clamp(norm_value, Float{0}, Float{1}) *
-                                        static_cast<Float>(num_cells * scale)));
+  return std::min(static_cast<size_t>(std::round(std::clamp(norm_value, Float{0}, Float{1}) *
+                                                 static_cast<Float>(num_cells * scale))),
+                  num_cells * scale - 1);
 }
 
 // -------------------------------------------------------------------------------------------------
