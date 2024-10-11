@@ -190,6 +190,43 @@ enum Side : int {
   ALL    = LEFT | RIGHT | BOTTOM | TOP,
 };
 
+}  // namespace Zap::CellBased
+
+namespace std {
+
+template <>
+struct formatter<Zap::CellBased::Side> {
+  template <typename ParseContext>
+  static constexpr auto parse(ParseContext& ctx) noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  static constexpr auto format(Zap::CellBased::Side side, FormatContext& ctx) noexcept {
+    if (side == Zap::CellBased::ALL) { return std::format_to(ctx.out(), "ALL"); }
+    if (side == 0) { return std::format_to(ctx.out(), "NONE"); }
+
+    std::string s;
+    if ((side & Zap::CellBased::BOTTOM) > 0) { s += "BOTTOM"; }
+    if ((side & Zap::CellBased::RIGHT) > 0) {
+      if (!s.empty()) { s += " | "; }
+      s += "RIGHT";
+    }
+    if ((side & Zap::CellBased::TOP) > 0) {
+      if (!s.empty()) { s += " | "; }
+      s += "TOP";
+    }
+    if ((side & Zap::CellBased::LEFT) > 0) {
+      if (!s.empty()) { s += " | "; }
+      s += "LEFT";
+    }
+    return std::format_to(ctx.out(), "{}", s);
+  }
+};
+
+}  // namespace std
+
+namespace Zap::CellBased {
+
 // - Tolerances for given floating point accuracy --------------------------------------------------
 template <std::floating_point Float>
 inline constexpr Float EPS;
