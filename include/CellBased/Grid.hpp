@@ -309,6 +309,16 @@ class UniformGrid {
                                             PointType& cut1_point,
                                             PointType& cut2_point) const noexcept -> CutType {
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
+    auto on_single_side            = [](Side side) -> bool {
+      return static_cast<int>((side & LEFT) > 0) + static_cast<int>((side & BOTTOM) > 0) +
+                 static_cast<int>((side & RIGHT) > 0) + static_cast<int>((side & TOP) > 0) ==
+             1;
+    };
+    auto remove_common = [](Side& side1, Side& side2) {
+      const Side common = static_cast<Side>(side1 & side2);
+      side1             = static_cast<Side>(side1 ^ common);
+      side2             = static_cast<Side>(side2 ^ common);
+    };
 
     const int cut1_on_x =
         approx_eq(cell.template x_min<coord_type>(), cut1_point.x) * ON_MIN +
@@ -321,12 +331,8 @@ class UniformGrid {
                   cut1_point.y) *
             ON_MAX;
     assert(cut1_on_x != NOT_ON || cut1_on_y != NOT_ON);
-    // NOLINTBEGIN
-    Side cut1_loc = cut1_on_x == ON_MIN   ? LEFT
-                    : cut1_on_y == ON_MIN ? BOTTOM
-                    : cut1_on_x == ON_MAX ? RIGHT
-                                          : TOP;
-    // NOLINTEND
+    Side cut1_loc = static_cast<Side>((cut1_on_x == ON_MIN) * LEFT | (cut1_on_x == ON_MAX) * RIGHT |
+                                      (cut1_on_y == ON_MIN) * BOTTOM | (cut1_on_y == ON_MAX) * TOP);
 
     const int cut2_on_x =
         approx_eq(cell.template x_min<coord_type>(), cut2_point.x) * ON_MIN +
@@ -339,23 +345,31 @@ class UniformGrid {
                   cut2_point.y) *
             ON_MAX;
     assert(cut2_on_x != NOT_ON || cut2_on_y != NOT_ON);
-    // NOLINTBEGIN
-    Side cut2_loc = cut2_on_x == ON_MIN   ? LEFT
-                    : cut2_on_y == ON_MIN ? BOTTOM
-                    : cut2_on_x == ON_MAX ? RIGHT
-                                          : TOP;
-    // NOLINTEND
+    Side cut2_loc = static_cast<Side>((cut2_on_x == ON_MIN) * LEFT | (cut2_on_x == ON_MAX) * RIGHT |
+                                      (cut2_on_y == ON_MIN) * BOTTOM | (cut2_on_y == ON_MAX) * TOP);
 
-    if (cut1_loc == cut2_loc) {
-      std::stringstream s{};
-      s << cell;
-      Igor::Debug("Cell to cut: {}", s.str());
-      Igor::Debug("cut1_loc = {}", static_cast<std::underlying_type_t<Side>>(cut1_loc));
-      Igor::Debug("cut2_loc = {}", static_cast<std::underlying_type_t<Side>>(cut2_loc));
-      IGOR_DEBUG_PRINT(cut1_point);
-      IGOR_DEBUG_PRINT(cut2_point);
-      Igor::Todo("Cut only on one side. I think we can just ignore then.");
-    }
+    IGOR_ASSERT(cut1_loc != cut2_loc,
+                "Expected the cuts to be at different sides of the cell, but both cuts are on "
+                "side {}. cut1_point = {}, cut2_point = {}. PointType = {}.",
+                cut1_loc,
+                cut1_point,
+                cut2_point,
+                Igor::type_name<PointType>());
+
+    remove_common(cut1_loc, cut2_loc);
+
+    IGOR_ASSERT(on_single_side(cut1_loc) && on_single_side(cut2_loc),
+                "Expected cut1 on cut2 to be on only one side after removing common sides, but "
+                "cut1_loc = {} and cut2_loc = {}.",
+                cut1_loc,
+                cut2_loc);
+
+    IGOR_ASSERT(cut1_loc != cut2_loc,
+                "Expected the cuts to be at different sides of the cell, but both cuts are on "
+                "side {} (== {}).",
+                cut1_loc,
+                cut2_loc);
+
     if (cut1_loc > cut2_loc) {
       std::swap(cut1_loc, cut2_loc);
       std::swap(cut1_point, cut2_point);
@@ -600,160 +614,186 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <Point2D_c PointType>
-  [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<PointType> points) noexcept
+  template <bool extend_ends = true>
+  [[nodiscard]] constexpr auto
+  cut_piecewise_linear(const std::vector<SimCoord<Float>>& points) noexcept -> bool {
+    std::vector<GridCoord<Float>> points_grid_coord(points.size());
+    std::transform(std::cbegin(points),
+                   std::cend(points),
+                   std::begin(points_grid_coord),
+                   [this](const SimCoord<Float>& p) { return to_grid_coord(p); });
+    return cut_piecewise_linear<extend_ends>(points_grid_coord);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  template <bool extend_ends = true>
+  [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<GridCoord<Float>> points) noexcept
       -> bool {
-    if constexpr (!is_GridCoord_v<PointType>) {
-      Igor::Warn("Cutting should be done in grid-coordinates, like all other geometric operations. "
-                 "Using `{}` instead.",
-                 Igor::type_name<PointType>());
-    }
-
-    // TODO: Do something smarter using the fact that the grid is equaly spaced with 1x1 cells.
-    // https://stackoverflow.com/questions/13884200/getting-all-intersection-points-between-a-line-segment-and-a-2n-grid-in-intege
-    // https://stackoverflow.com/questions/3270840/find-the-intersection-between-line-and-grid-in-a-fast-manner
-
-    constexpr CoordType coord_type = PointType2CoordType<PointType>;
-
-    // Remove points outside of grid
-    std::erase_if(points, [this](const PointType& p) { return !point_in_grid(p); });
-    assert(points.size() >= 2);
-
-    auto cell_idx = find_cell(points[0]);
-    assert(cell_idx != NULL_INDEX);
-
     if (!m_cut_cell_idxs.empty()) {
       Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
       return false;
     }
-    std::vector<PointType> entry_points{};
 
-    // - Handle first point; extend curve backwards to cut cell containing the first point ---------
-    {
-      const auto& cell = m_cells[cell_idx];
-      const auto& p0   = points[0];
-      const auto& p1   = points[1];
+    auto get_whole_min = [](Float x1, Float x2) -> int {
+      return static_cast<int>(std::ceil(std::min(x1, x2)));
+    };
+    auto get_whole_max = [](Float x1, Float x2) -> int {
+      return static_cast<int>(std::floor(std::max(x1, x2)));
+    };
 
-      const PointType s = p1 - p0;
-      const std::array<Float, 4> rs{
-          (cell.template x_min<coord_type>() - p0.x) / s.x,
-          (cell.template x_min<coord_type>() + cell.template dx<coord_type>() - p0.x) / s.x,
-          (cell.template y_min<coord_type>() - p0.y) / s.y,
-          (cell.template y_min<coord_type>() + cell.template dy<coord_type>() - p0.y) / s.y,
-      };
+    // Remove points outside of grid
+    std::erase_if(points, [this](const GridCoord<Float>& p) { return !point_in_grid(p); });
+    IGOR_ASSERT(points.size() >= 2,
+                "Only {} points inside of the grid, require at least 2.",
+                points.size());
 
-      Float r_entry = -std::numeric_limits<Float>::max();
-      for (Float r : rs) {
-        if (r < EPS<Float> && r > r_entry) { r_entry = r; }
-      }
-      if (!(r_entry != -std::numeric_limits<Float>::max())) {
-        IGOR_DEBUG_PRINT(s);
-        IGOR_DEBUG_PRINT(r_entry);
-        IGOR_DEBUG_PRINT(rs);
-        IGOR_DEBUG_PRINT(p0);
-        IGOR_DEBUG_PRINT(p1);
-      }
-      assert(r_entry != -std::numeric_limits<Float>::max());
+    // TODO: Add option to extend to nearest intersection point
+    // - Extend end points -------------------------------------------------------------------------
+    if constexpr (extend_ends) {
+      // - Handle first point; extend curve backwards to cut cell containing the first point -------
+      {
+        auto& p0       = points[0];
+        const auto& p1 = points[1];
 
-      entry_points.emplace_back(p0 + r_entry * s);
-      m_cut_cell_idxs.push_back(cell_idx);
-    }
-
-    // - Handle all point pairs --------------------------------------------------------------------
-    for (size_t point_idx = 0; point_idx < points.size() - 1; ++point_idx) {
-      auto p0        = points[point_idx];
-      const auto& p1 = points[point_idx + 1];
-
-      const PointType s = (p1 - p0).normalized();
-
-      while (!point_in_cell(p1, m_cells[cell_idx])) {
-        const auto& cell = m_cells[cell_idx];
-        if (!point_in_cell(p0, cell)) {
-          std::cout << "cell = " << cell << '\n';
-          IGOR_DEBUG_PRINT(p0);
-          IGOR_DEBUG_PRINT(p1);
-        }
-        assert(point_in_cell(p0, cell));
-
+        const GridCoord<Float> s = p1 - p0;
         const std::array<Float, 4> rs{
-            (cell.template x_min<coord_type>() - p0.x) / s.x,
-            (cell.template x_min<coord_type>() + cell.template dx<coord_type>() - p0.x) / s.x,
-            (cell.template y_min<coord_type>() - p0.y) / s.y,
-            (cell.template y_min<coord_type>() + cell.template dy<coord_type>() - p0.y) / s.y,
+            (std::floor(p0.x) - p0.x) / s.x,
+            (std::ceil(p0.x) - p0.x) / s.x,
+            (std::floor(p0.y) - p0.y) / s.y,
+            (std::ceil(p0.y) - p0.y) / s.y,
+        };
+
+        Float r_entry = -std::numeric_limits<Float>::max();
+        for (Float r : rs) {
+          if (r < EPS<Float> && r > r_entry) { r_entry = r; }
+        }
+        IGOR_ASSERT(r_entry != -std::numeric_limits<Float>::max(),
+                    "Could not find the extended intersection point for p0={} and p1={}. Potential "
+                    "r-values are rs={}",
+                    p0,
+                    p1,
+                    rs);
+        p0 += r_entry * s;
+      }
+
+      // - Handle last point; extend curve forwards to cut cell containing the last point ----------
+      {
+        const auto& p0 = points[points.size() - 2];
+        auto& p1       = points[points.size() - 1];
+
+        const GridCoord<Float> s = p1 - p0;
+        const std::array<Float, 4> rs{
+            (std::floor(p1.x) - p1.x) / s.x,
+            (std::ceil(p1.x) - p1.x) / s.x,
+            (std::floor(p1.y) - p1.y) / s.y,
+            (std::ceil(p1.y) - p1.y) / s.y,
         };
 
         Float r_exit = std::numeric_limits<Float>::max();
         for (Float r : rs) {
-          // TODO: Maybe r > -EPS<Float>; x-ramp example seems to only work like this.
-          // TODO: What if the points are on the grid lines? See x-ramp example.
-          if (r > EPS<Float> && r < r_exit) { r_exit = r; }
+          if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
         }
-        if (!(r_exit < std::numeric_limits<Float>::max())) {
-          IGOR_DEBUG_PRINT(s);
-          IGOR_DEBUG_PRINT(r_exit);
-          IGOR_DEBUG_PRINT(rs);
-          IGOR_DEBUG_PRINT(p0);
-          IGOR_DEBUG_PRINT(p1);
-        }
-        assert(r_exit < std::numeric_limits<Float>::max());
+        IGOR_ASSERT(r_exit != std::numeric_limits<Float>::max(),
+                    "Could not find the extended intersection point for p0={} and p1={}. Potential "
+                    "r-values are rs={}",
+                    p0,
+                    p1,
+                    rs);
 
-        const PointType p0_next = p0 + r_exit * s;
-        if (!point_in_cell(p0_next, cell)) {
-          std::cout << "cell = " << cell << '\n';
-          IGOR_DEBUG_PRINT(p0);
-          IGOR_DEBUG_PRINT(p0_next);
-          IGOR_DEBUG_PRINT(p1);
-          IGOR_DEBUG_PRINT(s);
-          IGOR_DEBUG_PRINT(r_exit);
-          IGOR_DEBUG_PRINT(entry_points);
-          IGOR_DEBUG_PRINT(m_cut_cell_idxs);
-          IGOR_DEBUG_PRINT(point_idx);
-          IGOR_DEBUG_PRINT(points.size());
-        }
-
-        p0 = p0_next;
-        entry_points.push_back(p0);
-        cell_idx = find_next_cell_to_cut(cell, entry_points.back());
-
-        if (std::find(m_cut_cell_idxs.cbegin(), m_cut_cell_idxs.cend(), cell_idx) !=
-            m_cut_cell_idxs.cend()) {
-          Igor::Todo("Went back to previous cell, {} is already contained in {}.",
-                     cell_idx,
-                     m_cut_cell_idxs);
-        }
-
-        m_cut_cell_idxs.push_back(cell_idx);
+        p1 += r_exit * s;
       }
     }
+    // - Extend end points -------------------------------------------------------------------------
 
-    // - Handle last point; extend curve forwards to cut cell containing the last point ------------
-    {
-      const auto& cell = m_cells[cell_idx];
-      const auto& p0   = points[points.size() - 2];
-      const auto& p1   = points[points.size() - 1];
+    std::vector<GridCoord<Float>> intersect_points{};
+    ptrdiff_t begin_points_idx = 0;
+    for (size_t i = 0; i < points.size() - 1; ++i) {
+      const auto& p0 = points[i];
+      const auto& p1 = points[i + 1];
 
-      const PointType s = p1 - p0;
-      const std::array<Float, 4> rs{
-          (cell.template x_min<coord_type>() - p1.x) / s.x,
-          (cell.template x_min<coord_type>() + cell.template dx<coord_type>() - p1.x) / s.x,
-          (cell.template y_min<coord_type>() - p1.y) / s.y,
-          (cell.template y_min<coord_type>() + cell.template dy<coord_type>() - p1.y) / s.y,
-      };
+      const auto slope = p1 - p0;
 
-      Float r_exit = std::numeric_limits<Float>::max();
-      for (Float r : rs) {
-        if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
+      const bool search_whole_x = !approx_eq(slope.x, static_cast<Float>(0));
+      const bool search_whole_y = !approx_eq(slope.y, static_cast<Float>(0));
+      if (!(search_whole_x || search_whole_y)) {
+        Igor::Warn("p0 = {} and p1 = {} are the same point.", p0, p1);
+        continue;
       }
-      assert(r_exit != std::numeric_limits<Float>::max());
 
-      entry_points.emplace_back(p1 + r_exit * s);
+      // Intersections where x in N
+      if (search_whole_x) {
+        for (int x = get_whole_min(p0.x, p1.x); x <= get_whole_max(p0.x, p1.x); ++x) {
+          const Float r = (static_cast<Float>(x) - p0.x) / slope.x;
+          const Float y = p0.y + r * slope.y;
+          intersect_points.emplace_back(static_cast<Float>(x), y);
+        }
+      }
+
+      // Intersections where y in N
+      if (search_whole_y) {
+        for (int y = get_whole_min(p0.y, p1.y); y <= get_whole_max(p0.y, p1.y); ++y) {
+          const Float r = (static_cast<Float>(y) - p0.y) / slope.y;
+          const Float x = p0.x + r * slope.x;
+
+          // If x is a whole number, the point was already added in the previous loop, can ignore it
+          if (search_whole_x && approx_eq(x, std::round(x))) { continue; }
+
+          intersect_points.emplace_back(x, static_cast<Float>(y));
+        }
+      }
+
+      std::sort(std::next(std::begin(intersect_points), begin_points_idx),
+                std::end(intersect_points),
+                [&p0](const GridCoord<Float>& lhs, const GridCoord<Float>& rhs) {
+                  const auto lhs_dist = (lhs - p0).norm();
+                  const auto rhs_dist = (rhs - p0).norm();
+                  return lhs_dist < rhs_dist;
+                });
+      begin_points_idx = static_cast<ptrdiff_t>(intersect_points.size());
     }
 
-    assert(m_cut_cell_idxs.size() + 1 == entry_points.size());
+    // Remove duplicate points
+    // TODO: Can we do this on the fly while filling intersect_points?
+    intersect_points.erase(
+        std::unique(intersect_points.begin(),
+                    intersect_points.end(),
+                    [](const GridCoord<Float>& lhs, const GridCoord<Float>& rhs) {
+                      return (lhs - rhs).norm() < EPS<Float>;
+                    }),
+        intersect_points.end());
+
+    m_cut_cell_idxs.resize(intersect_points.size() - 1);
+    for (size_t i = 0; i < intersect_points.size() - 1; ++i) {
+      const auto entry_point = intersect_points[i];
+      const auto exit_point  = intersect_points[i + 1];
+      if (approx_eq((entry_point - exit_point).norm(), static_cast<Float>(0))) {
+        Igor::Warn("entry_point {} and exit_point {} are the same point, ignore.",
+                   entry_point,
+                   exit_point);
+        continue;
+      }
+
+      const auto mid_point = (entry_point + exit_point) / 2;
+      const auto cell_idx  = find_cell(mid_point);
+      IGOR_ASSERT(cell_idx != NULL_INDEX,
+                  "Expected mid_point {} to be in grid [{}, {}]x[{}, {}], but is not.",
+                  mid_point,
+                  0,
+                  m_nx,
+                  0,
+                  m_ny);
+      m_cut_cell_idxs[i] = cell_idx;
+    }
+
+    IGOR_ASSERT(
+        m_cut_cell_idxs.size() + 1 == intersect_points.size(),
+        "Expected to find exactly one point more than cells, but found {} points and {} cells",
+        intersect_points.size(),
+        m_cut_cell_idxs.size());
     for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
       auto& cell_to_cut = m_cells[m_cut_cell_idxs[i]];
-      auto cut1_point   = entry_points[i];
-      auto cut2_point   = entry_points[i + 1];
+      auto cut1_point   = intersect_points[i];
+      auto cut2_point   = intersect_points[i + 1];
 
       const auto type = classify_cut(cell_to_cut, cut1_point, cut2_point);
 
