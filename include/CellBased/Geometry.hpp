@@ -140,7 +140,13 @@ template <Point2D_c PointType>
     Float c2 = a2 * c.x + b2 * c.y;
 
     Float determinant = a1 * b2 - a2 * b1;
-    assert(std::abs(determinant) >= EPS<Float>);
+    IGOR_ASSERT(std::abs(determinant) >= EPS<Float>,
+                "Cannot find intersection of lines {}->{} and {}->{}: determinant is {}.",
+                a,
+                b,
+                c,
+                d,
+                determinant);
 
     return {(b2 * c1 - b1 * c2) / determinant, (a1 * c2 - a2 * c1) / determinant};
   };

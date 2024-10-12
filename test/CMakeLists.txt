@@ -4,6 +4,7 @@ set(executables
         test_geometry_polygon
         test_small_vector
         test_cell_geometry
+        test_cut_grid
 )
 
 include(GoogleTest)

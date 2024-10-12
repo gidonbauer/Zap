@@ -64,7 +64,8 @@ auto run_cell_based(size_t nx, size_t ny, Float tend) noexcept
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
   grid.fill_four_point(u0);
 
-  Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+  auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::MAX>(
+      Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
 
   const std::string u_filename =
       OUTPUT_DIR "u_cell_based_" + std::to_string(nx) + "_" + std::to_string(ny) + ".grid";
@@ -73,7 +74,7 @@ auto run_cell_based(size_t nx, size_t ny, Float tend) noexcept
       OUTPUT_DIR "t_cell_based_" + std::to_string(nx) + "_" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
 
-  return solver.solve(grid, tend, u_writer, t_writer);
+  return solver.solve(grid, tend, u_writer, t_writer, 0.1);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -386,7 +387,11 @@ auto main(int argc, char** argv) -> int {
       81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
   };
 #else
-  constexpr std::array ns = {3UZ, 5UZ, 7UZ, 9UZ, 11UZ, 15UZ, 21UZ, 31UZ, 41UZ, 51UZ};
+  constexpr std::array ns = {
+      3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
+      81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+  };
+  // constexpr std::array ns = {3UZ, 5UZ, 7UZ, 9UZ, 11UZ, 15UZ, 21UZ, 31UZ, 41UZ, 51UZ};
 #endif  // ZAP_STATIC_CUT
 
   const auto hr_nx  = 800;
@@ -405,7 +410,12 @@ auto main(int argc, char** argv) -> int {
 
   for (size_t n : ns) {
     const auto success = compare(n, n, tend, *hr_res, L1_hr, out);
-    all_success        = all_success && success;
+    if (success) {
+      Igor::Info("Solver for {}x{}-grid finished successfully.", n, n);
+    } else {
+      Igor::Warn("Solver for {}x{}-grid failed.", n, n);
+    }
+    all_success = all_success && success;
   }
 
   Igor::Info("Saved errors to `{}`.", output_file);

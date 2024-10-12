@@ -208,8 +208,9 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("Solver finished successfully.");
 #else
   IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
-    const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.25);
+    auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
+        Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+    const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.1);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;

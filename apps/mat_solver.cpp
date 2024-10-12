@@ -89,10 +89,15 @@ auto main(int argc, char** argv) -> int {
       //                                     std::pow(y(yi) - (y_min + y_max) / 2, 2) <=
       //                                 1.0 * 1.0);
 
-      // = Quater circle ===========================================================================
-      u0(yi, xi) =
-          (x(xi) + y(yi)) * static_cast<Float>((x(xi) * x(xi) + y(yi) * y(yi)) <=
-                                               std::pow((x_min + x_max + y_min + y_max) / 4, 2));
+      // = Quater circle - Version 1 ===============================================================
+      // u0(yi, xi) =
+      //     (x(xi) + y(yi)) * static_cast<Float>((x(xi) * x(xi) + y(yi) * y(yi)) <=
+      //                                          std::pow((x_min + x_max + y_min + y_max) / 4, 2));
+
+      // = Quater circle - Version 2 ===============================================================
+      u0(yi, xi) = (std::pow(x(xi) - x_min, 2) + std::pow(y(yi) - y_min, 2)) *
+                   static_cast<Float>((std::pow(x(xi) - x_min, 2) + std::pow(y(yi) - y_min, 2)) <=
+                                      std::pow((x_min + x_max + y_min + y_max) / 4, 2));
 
       // = X-ramp ==================================================================================
       // u0(yi, xi) = x(xi) * static_cast<Float>(x(xi) <= (x_min + x_max) / 2);

@@ -536,7 +536,7 @@ class UniformGrid {
     while (t < 1) {
       const auto& cell = m_cells[cell_idx];
       Float t_lower    = t;
-      Float t_upper    = std::min(Float{1}, t + 0.5);
+      Float t_upper    = std::min(Float{1}, t + Float{0.5});
 
       bool found_exit = false;
       while (!found_exit) {
@@ -614,7 +614,7 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <bool extend_ends = true>
+  template <ExtendType extend_type = ExtendType::MAX>
   [[nodiscard]] constexpr auto
   cut_piecewise_linear(const std::vector<SimCoord<Float>>& points) noexcept -> bool {
     std::vector<GridCoord<Float>> points_grid_coord(points.size());
@@ -622,11 +622,11 @@ class UniformGrid {
                    std::cend(points),
                    std::begin(points_grid_coord),
                    [this](const SimCoord<Float>& p) { return to_grid_coord(p); });
-    return cut_piecewise_linear<extend_ends>(points_grid_coord);
+    return cut_piecewise_linear<extend_type>(points_grid_coord);
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <bool extend_ends = true>
+  template <ExtendType extend_type = ExtendType::MAX>
   [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<GridCoord<Float>> points) noexcept
       -> bool {
     if (!m_cut_cell_idxs.empty()) {
@@ -649,7 +649,7 @@ class UniformGrid {
 
     // TODO: Add option to extend to nearest intersection point
     // - Extend end points -------------------------------------------------------------------------
-    if constexpr (extend_ends) {
+    if constexpr (extend_type != ExtendType::NONE) {
       // - Handle first point; extend curve backwards to cut cell containing the first point -------
       {
         auto& p0       = points[0];
@@ -665,7 +665,11 @@ class UniformGrid {
 
         Float r_entry = -std::numeric_limits<Float>::max();
         for (Float r : rs) {
-          if (r < EPS<Float> && r > r_entry) { r_entry = r; }
+          if constexpr (extend_type == ExtendType::MAX) {
+            if (r < EPS<Float> && r > r_entry) { r_entry = r; }
+          } else {
+            if (std::abs(r) < std::abs(r_entry)) { r_entry = r; }
+          }
         }
         IGOR_ASSERT(r_entry != -std::numeric_limits<Float>::max(),
                     "Could not find the extended intersection point for p0={} and p1={}. Potential "
@@ -691,7 +695,11 @@ class UniformGrid {
 
         Float r_exit = std::numeric_limits<Float>::max();
         for (Float r : rs) {
-          if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
+          if constexpr (extend_type == ExtendType::MAX) {
+            if (r > -EPS<Float> && r < r_exit) { r_exit = r; }
+          } else {
+            if (std::abs(r) < std::abs(r_exit)) { r_exit = r; }
+          }
         }
         IGOR_ASSERT(r_exit != std::numeric_limits<Float>::max(),
                     "Could not find the extended intersection point for p0={} and p1={}. Potential "

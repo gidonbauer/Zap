@@ -161,14 +161,15 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
   };
   grid.fill_four_point(u0);
 
-  const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "_" + std::to_string(ny) + ".grid";
+  const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
   Zap::IO::IncCellWriter<Float, DIM> grid_writer{u_file, grid};
 
-  const auto t_file = OUTPUT_DIR "t_1d_" + std::to_string(nx) + "_" + std::to_string(ny) + ".mat";
+  const auto t_file = OUTPUT_DIR "t_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  Zap::CellBased::Solver solver(Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
-  const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.5);
+  auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::MAX>(
+      Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+  const auto res = solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.25);
   if (!res.has_value()) {
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);
     return false;
@@ -215,10 +216,14 @@ auto main(int argc, char** argv) -> int {
     Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
   }
 
-  bool all_success        = true;
+  bool all_success = true;
+  // constexpr std::array ns = {
+  //     3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
+  //     81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+  // };
   constexpr std::array ns = {
-      3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
-      81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+      3UZ,  5UZ,   7UZ,   9UZ,   21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,  81UZ,
+      91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
   };
   for (size_t n : ns) {
     const auto success = run(n, n, tend, out);

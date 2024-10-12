@@ -7,7 +7,17 @@
 
 #include <Eigen/Core>
 
+#include "Igor/Logging.hpp"
+
 namespace Zap::CellBased {
+
+// - Tolerances for given floating point accuracy --------------------------------------------------
+template <std::floating_point Float>
+inline constexpr Float EPS;
+template <>
+inline constexpr float EPS<float> = 1e-6f;
+template <>
+inline constexpr double EPS<double> = 1e-8;
 
 // - Points in grid and simulation coordinates -----------------------------------------------------
 template <typename PointType>
@@ -49,7 +59,11 @@ concept Point2D_c = requires(PointType t) {
       return std::sqrt(x * x + y * y);                                                             \
     }                                                                                              \
                                                                                                    \
-    [[nodiscard]] constexpr auto normalized() const noexcept -> name { return *this / norm(); }    \
+    [[nodiscard]] constexpr auto normalized() const noexcept -> name {                             \
+      const auto n = norm();                                                                       \
+      IGOR_ASSERT(std::abs(n) >= EPS<Scalar>, "Cannot normalize null vector.");                    \
+      return *this / norm();                                                                       \
+    }                                                                                              \
                                                                                                    \
     [[nodiscard]] constexpr auto dot(const name& other) const noexcept -> Scalar {                 \
       return x * other.x + y * other.y;                                                            \
@@ -227,13 +241,7 @@ struct formatter<Zap::CellBased::Side> {
 
 namespace Zap::CellBased {
 
-// - Tolerances for given floating point accuracy --------------------------------------------------
-template <std::floating_point Float>
-inline constexpr Float EPS;
-template <>
-inline constexpr float EPS<float> = 1e-6f;
-template <>
-inline constexpr double EPS<double> = 1e-8;
+enum class ExtendType : uint8_t { NONE, NEAREST, MAX };
 
 }  // namespace Zap::CellBased
 

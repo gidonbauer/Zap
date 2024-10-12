@@ -32,7 +32,7 @@ constexpr void get_eigen_decomp(const Eigen::Matrix<Float, DIM, DIM>& mat,
   }
 }
 
-template <typename A, typename B>
+template <ExtendType extend_type, typename A, typename B>
 class Solver {
   A m_A;
   B m_B;
@@ -77,8 +77,15 @@ class Solver {
                       Float scale_x,
                       Float scale_y) const noexcept
       -> SmallVector<WaveProperties<Float, DIM, PointType>> {
+    if ((interface.end - interface.begin).norm() < EPS<Float>) { return {}; }
+
     // Vector tangential to interface
     const PointType tangent_vector = (interface.end - interface.begin).normalized();
+    // IGOR_ASSERT(!std::isnan(tangent_vector.x) && !std::isnan(tangent_vector.y),
+    //             "tangent_vector {} has NaN values, interface begin = {}, interface end = {}",
+    //             tangent_vector,
+    //             interface.begin,
+    //             interface.end);
 
     // Angle between cut_vector and y-axis (0, 1)
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
@@ -88,7 +95,12 @@ class Solver {
 
     // Vector normal to cut
     PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
-    assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
+    IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<Float>,
+                "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
+                "normal_vector = {}",
+                tangent_vector,
+                normal_vector,
+                tangent_vector.dot(normal_vector));
     // Scale normal vector when operating in grid coordinates
     if constexpr (is_GridCoord_v<PointType>) {
       normal_vector.x *= scale_x;
@@ -237,7 +249,12 @@ class Solver {
         interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
       }
       PointType normal_vector{.x = std::cos(interface_angle), .y = std::sin(interface_angle)};
-      assert(std::abs(tangent_vector.dot(normal_vector)) <= 1e-8);
+      IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<Float>,
+                  "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
+                  "normal_vector = {}",
+                  tangent_vector,
+                  normal_vector,
+                  tangent_vector.dot(normal_vector));
       // Scale normal vector when operating in grid coordinates
       if constexpr (is_GridCoord_v<PointType>) {
         normal_vector.x *= curr_grid.scale_x();
@@ -331,7 +348,8 @@ class Solver {
         auto avg_new_shock_points = move_wave_front(curr_grid, next_grid, dt);
         if (!avg_new_shock_points.has_value()) { return std::nullopt; }
 
-        if (!next_grid.cut_piecewise_linear(std::move(*avg_new_shock_points))) {
+        if (!next_grid.template cut_piecewise_linear<extend_type>(
+                std::move(*avg_new_shock_points))) {
           Igor::Warn("Could not cut on new shock curve.");
           return std::nullopt;
         }
@@ -826,6 +844,12 @@ class Solver {
   }
 #endif  // USE_FLUX_FOR_CARTESIAN
 };
+
+// -------------------------------------------------------------------------------------------------
+template <ExtendType extend_type, typename A, typename B>
+[[nodiscard]] constexpr auto make_solver(A&& a, B&& b) noexcept -> Solver<extend_type, A, B> {
+  return Solver<extend_type, A, B>(std::forward<A>(a), std::forward<B>(b));
+}
 
 }  // namespace Zap::CellBased
 
