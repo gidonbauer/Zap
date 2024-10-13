@@ -339,7 +339,7 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
 
     Eigen::Vector<Float, DIM> res = Eigen::Vector<Float, DIM>::Zero();
     simpsons_rule_2d(eval_at, res, x_min, x_max, y_min, y_max, nx, ny);
-    return res;
+    return res / ((x_max - x_min) * (y_max - y_min));
   } else {
     IGOR_ASSERT(DIM == 1,
                 "The matrix reader only supports one-dimensional output and not {}-dimensional, "
@@ -400,6 +400,8 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
     using Readers      = std::variant<CellReader, MatrixReader>;
 
     MatrixReader t_reader(args.t_input_file);
+    Igor::Info("#frames      = {}", t_reader.num_elem());
+
     auto u_reader = [&args]() -> Readers {
       if (args.u_input_file.ends_with(".grid")) {
         return CellReader(args.u_input_file);
@@ -595,6 +597,8 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
 
   try {
     Zap::IO::IncMatrixReader<Float> t_reader(args.t_input_file);
+    Igor::Info("#frames      = {}", t_reader.num_elem());
+
     Zap::IO::IncCellReader<Float, DIM> u_reader(args.u_input_file);
 
     constexpr size_t TEXT_HEIGHT    = 100UZ;
