@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <iomanip>
+#include <optional>
 
 // #define USE_FLUX_FOR_CARTESIAN
 
@@ -12,6 +13,8 @@
 #include "Igor/Macros.hpp"
 #include "Igor/Timer.hpp"
 
+#include "Common.hpp"
+
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "example_x_ramp/"
 
 // - Setup -----------------------------------------------------------------------------------------
@@ -22,29 +25,78 @@ constexpr Float X_MAX = 2.0;
 constexpr Float Y_MIN = 0.0;
 constexpr Float Y_MAX = 2.0;
 
-// -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto parse_size_t(const char* cstr) -> size_t {
-  char* end        = nullptr;
-  const size_t val = std::strtoul(cstr, &end, 10);
-  if (end != cstr + std::strlen(cstr)) {  // NOLINT
-    Igor::Panic("String `{}` contains non-digits.", cstr);
-  }
-  if (val == 0UL) { Igor::Panic("Could not parse string `{}` to size_t.", cstr); }
-  if (val == std::numeric_limits<unsigned long>::max()) {
-    Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
-  }
-  return val;
+// - Available command line options ----------------------------------------------------------------
+struct Args {
+  bool run_benchmark = false;
+  size_t nx          = 25;
+  size_t ny          = 25;
+  Float tend         = 1.0;
+};
+
+// - Print usage -----------------------------------------------------------------------------------
+template <Igor::detail::Level level>
+void usage(std::string_view prog, std::ostream& out) noexcept {
+  Args args{};
+
+  out << Igor::detail::level_repr(level) << "Usage: " << prog
+      << " [--run-benchmark] [--nx nx] [--ny ny] [--tend tend]\n";
+  out << "\t--run-benchmark   Run the solver for different grid sizes and compare result against "
+         "high-resolution Godunov solver, default is "
+      << std::boolalpha << args.run_benchmark << '\n';
+  out << "\t--nx              Number of cells in x-direction, default is " << args.nx << '\n';
+  out << "\t--ny              Number of cells in y-direction, default is " << args.ny << '\n';
+  out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
 }
 
-// -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto parse_double(const char* cstr) -> double {
-  char* end        = nullptr;
-  const double val = std::strtod(cstr, &end);
-  if (val == HUGE_VAL) {
-    Igor::Panic("Could not parse string `{}` to double: Out of range.", cstr);
+// - Parse command line arguments ------------------------------------------------------------------
+[[nodiscard]] auto parse_args(int& argc, char**& argv) noexcept -> std::optional<Args> {
+  Args args{};
+
+  const auto prog = next_arg(argc, argv);
+  IGOR_ASSERT(prog.has_value(), "Could not get program name from command line arguments.");
+
+  for (auto arg = next_arg(argc, argv); arg.has_value(); arg = next_arg(argc, argv)) {
+    using namespace std::string_view_literals;
+    if (arg == "--run-benchmark"sv) {
+      args.run_benchmark = true;
+    } else if (arg == "--nx"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --nx.\n";
+        return std::nullopt;
+      }
+      args.nx = parse_size_t(*arg);
+    } else if (arg == "--ny"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --ny.\n";
+        return std::nullopt;
+      }
+      args.ny = parse_size_t(*arg);
+    } else if (arg == "--tend"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --tend.\n";
+        return std::nullopt;
+      }
+      args.tend = parse_double(*arg);
+    } else if (arg == "-h"sv || arg == "--help"sv) {
+      usage<Igor::detail::Level::INFO>(*prog, std::cout);
+      return std::nullopt;
+    } else {
+      usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+      std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC) << "Unknown argument `"
+                << *arg << "`.\n";
+      return std::nullopt;
+    }
   }
-  if (cstr == end) { Igor::Panic("Could not parse string `{}` to double.", cstr); }
-  return val;
+  return args;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -186,10 +238,8 @@ void print_solution_error(const Zap::CellBased::UniformGrid<Float, DIM>& numeric
 
 // -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  if (argc < 2) {
-    Igor::Warn("Usage: {} <tend>", *argv);
-    return 1;
-  }
+  const auto args = parse_args(argc, argv);
+  if (!args.has_value()) { return 1; }
 
   {
     std::error_code ec;
@@ -200,36 +250,42 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  const auto tend = static_cast<Float>(parse_double(argv[1]));  // NOLINT
-
-  if (tend <= 0.0) {
-    Igor::Warn("tend must be larger than 0, but is {}.", tend);
+  if (args->tend <= 0.0) {
+    Igor::Warn("tend must be larger than 0, but is {}.", args->tend);
     return 1;
   }
 
-  Igor::Info("tend = {}", tend);
+  Igor::Info("run-benchmark = {}", args->run_benchmark);
+  Igor::Info("nx            = {}", args->nx);
+  Igor::Info("ny            = {}", args->ny);
+  Igor::Info("tend          = {}", args->tend);
   Igor::Info("Save results in `" OUTPUT_DIR "`.");
 
-  constexpr auto output_file = "./x_ramp_results.txt";
-  std::ofstream out(output_file);
-  if (!out) {
-    Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
-  }
+  if (args->run_benchmark) {
+    constexpr auto output_file = "./x_ramp_results.txt";
+    std::ofstream out(output_file);
+    if (!out) {
+      Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
+    }
 
-  bool all_success = true;
-  // constexpr std::array ns = {
-  //     3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
-  //     81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
-  // };
-  constexpr std::array ns = {
-      3UZ,  5UZ,   7UZ,   9UZ,   21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,  81UZ,
-      91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
-  };
-  for (size_t n : ns) {
-    const auto success = run(n, n, tend, out);
-    all_success        = all_success && success;
-  }
+    bool all_success = true;
+    // constexpr std::array ns = {
+    //     3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
+    //     81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+    // };
+    constexpr std::array ns = {
+        3UZ,  5UZ,   7UZ,   9UZ,   21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,  81UZ,
+        91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+    };
+    for (size_t n : ns) {
+      const auto success = run(n, n, args->tend, out);
+      all_success        = all_success && success;
+    }
 
-  Igor::Info("Saved errors to `{}`.", output_file);
-  return all_success ? 0 : 1;
+    Igor::Info("Saved errors to `{}`.", output_file);
+    return all_success ? 0 : 1;
+  } else {
+    const auto success = run(args->nx, args->ny, args->tend, std::cout);
+    return success ? 0 : 1;
+  }
 }
