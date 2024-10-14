@@ -49,9 +49,7 @@ namespace detail {
 
   size_t counter = 0;
   for (char c : std::ranges::reverse_view(full_path)) {
-    if (c == separator) {
-      break;
-    }
+    if (c == separator) { break; }
     ++counter;
   }
 
@@ -90,33 +88,24 @@ enum class Level : std::uint8_t {
 consteval auto level_stream(Level level) noexcept -> std::ostream& {
   switch (level) {
     case Level::INFO:
-    case Level::TIME:
-      return std::cout;
+    case Level::TIME:   return std::cout;
     case Level::WARN:
     case Level::TODO:
     case Level::PANIC:
     case Level::DEBUG:
-    case Level::ASSERT:
-      return std::cerr;
+    case Level::ASSERT: return std::cerr;
   }
 }
 
 consteval auto level_repr(Level level) noexcept {
   switch (level) {
-    case Level::INFO:
-      return "\033[32m[INFO]\033[0m ";
-    case Level::WARN:
-      return "\033[33m[WARN]\033[0m ";
-    case Level::TODO:
-      return "\033[35m[TODO]\033[0m ";
-    case Level::PANIC:
-      return "\033[31m[ERROR]\033[0m ";
-    case Level::DEBUG:
-      return "\033[94m[DEBUG]\033[0m ";
-    case Level::TIME:
-      return "\033[94m[TIME]\033[0m ";
-    case Level::ASSERT:
-      return "\033[31m[ASSERT]\033[0m ";
+    case Level::INFO:   return "\033[32m[INFO]\033[0m ";
+    case Level::WARN:   return "\033[33m[WARN]\033[0m ";
+    case Level::TODO:   return "\033[35m[TODO]\033[0m ";
+    case Level::PANIC:  return "\033[31m[ERROR]\033[0m ";
+    case Level::DEBUG:  return "\033[94m[DEBUG]\033[0m ";
+    case Level::TIME:   return "\033[94m[TIME]\033[0m ";
+    case Level::ASSERT: return "\033[31m[ASSERT]\033[0m ";
   }
 }
 
@@ -126,9 +115,7 @@ class Print {
   constexpr Print(std::format_string<Args...> fmt, Args&&... args) noexcept {
     auto& out = level_stream(level);
     out << level_repr(level) << std::format(fmt, std::forward<Args>(args)...) << '\n';
-    if constexpr (exit_code != ExitCode::NO_EARLY_EXIT) {
-      std::exit(static_cast<int>(exit_code));
-    }
+    if constexpr (exit_code != ExitCode::NO_EARLY_EXIT) { std::exit(static_cast<int>(exit_code)); }
   }
 
   constexpr Print(const std::source_location loc,
@@ -137,9 +124,7 @@ class Print {
     auto& out = level_stream(level);
     out << level_repr(level) << error_loc(loc) << ": "
         << std::format(fmt, std::forward<Args>(args)...) << '\n';
-    if constexpr (exit_code != ExitCode::NO_EARLY_EXIT) {
-      std::exit(static_cast<int>(exit_code));
-    }
+    if constexpr (exit_code != ExitCode::NO_EARLY_EXIT) { std::exit(static_cast<int>(exit_code)); }
   }
 };
 
@@ -247,7 +232,7 @@ Assert(std::format_string<Args...>, Args&&...) -> Assert<Args...>;
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define IGOR_ASSERT(cond, ...)                                                                     \
   do {                                                                                             \
-    if (!(cond)) {                                                                                 \
+    if (!(cond)) [[unlikely]] {                                                                    \
       using t = decltype(std::make_tuple(__VA_ARGS__));                                            \
       static_assert(std::tuple_size_v<t> > 0,                                                      \
                     "`IGOR_ASSERT` requires an error message, please provide a format string and " \
