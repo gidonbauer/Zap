@@ -9,44 +9,45 @@ namespace Zap::CellBased {
 
 // TODO: Fix interfaces
 
-template <typename Float, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
 struct HalfInterface {
-  Eigen::Vector<Float, DIM> value;
+  Eigen::Vector<ActiveFloat, DIM> value;
   PointType begin;
   PointType end;
 };
 
-template <typename Float, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
 struct FullInterface {
-  Eigen::Vector<Float, DIM> left_value;
-  Eigen::Vector<Float, DIM> right_value;
+  Eigen::Vector<ActiveFloat, DIM> left_value;
+  Eigen::Vector<ActiveFloat, DIM> right_value;
   PointType begin;
   PointType end;
 };
 
-template <typename Float, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
 struct CellHalfInterfaces {
-  SmallVector<HalfInterface<Float, DIM, PointType>> left;
-  SmallVector<HalfInterface<Float, DIM, PointType>> right;
-  SmallVector<HalfInterface<Float, DIM, PointType>> bottom;
-  SmallVector<HalfInterface<Float, DIM, PointType>> top;
+  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> left;
+  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> right;
+  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> bottom;
+  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> top;
 };
 
-template <typename Float, size_t DIM, Point2D_c PointType>
-[[nodiscard]] constexpr auto same_interface(const HalfInterface<Float, DIM, PointType>& i1,
-                                            const HalfInterface<Float, DIM, PointType>& i2) noexcept
-    -> bool {
-  constexpr Float tol = 1e-6;
-  return (i1.begin - i2.begin).norm() <= tol && (i1.end - i2.end).norm() <= tol;
+template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
+[[nodiscard]] constexpr auto
+same_interface(const HalfInterface<ActiveFloat, DIM, PointType>& i1,
+               const HalfInterface<ActiveFloat, DIM, PointType>& i2) noexcept -> bool {
+  return (i1.begin - i2.begin).norm() <= EPS<ActiveFloat> &&
+         (i1.end - i2.end).norm() <= EPS<ActiveFloat>;
 }
 
-template <typename Float, size_t DIM, Point2D_c PointType>
-[[nodiscard]] constexpr auto get_outer_cell_interfaces(const Cell<Float, DIM>& cell) noexcept
-    -> CellHalfInterfaces<Float, DIM, PointType> {
+template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
+[[nodiscard]] constexpr auto
+get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noexcept
+    -> CellHalfInterfaces<ActiveFloat, DIM, PointType> {
   constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
   if (cell.is_cartesian()) {
-    return CellHalfInterfaces<Float, DIM, PointType>{
+    return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
         .left =
             {
                 {
@@ -89,7 +90,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
   } else if (cell.is_cut()) {
     switch (cell.get_cut().type) {
       case CutType::BOTTOM_LEFT:
-        return CellHalfInterfaces<Float, DIM, PointType>{
+        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
             .left =
                 {
                     {
@@ -149,7 +150,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
         };
 
       case CutType::BOTTOM_RIGHT:
-        return CellHalfInterfaces<Float, DIM, PointType>{
+        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
             .left =
                 {
                     {
@@ -210,7 +211,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
         };
 
       case CutType::TOP_RIGHT:
-        return CellHalfInterfaces<Float, DIM, PointType>{
+        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
             .left =
                 {
                     {
@@ -272,7 +273,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
         };
 
       case CutType::TOP_LEFT:
-        return CellHalfInterfaces<Float, DIM, PointType>{
+        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
             .left =
                 {
                     {
@@ -333,7 +334,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
         };
 
       case CutType::MIDDLE_HORI:
-        return CellHalfInterfaces<Float, DIM, PointType>{
+        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
             .left =
                 {
                     {
@@ -394,7 +395,7 @@ template <typename Float, size_t DIM, Point2D_c PointType>
         };
 
       case CutType::MIDDLE_VERT:
-        return CellHalfInterfaces<Float, DIM, PointType>{
+        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
             .left =
                 {
                     {
@@ -466,16 +467,19 @@ template <typename Float, size_t DIM, Point2D_c PointType>
   }
 }
 
-template <typename Float, size_t DIM, Point2D_c PointType>
-[[nodiscard]] constexpr auto get_shared_interfaces(const Cell<Float, DIM>& center_cell,
-                                                   const Cell<Float, DIM>& other_cell,
-                                                   Side side) noexcept
-    -> SmallVector<FullInterface<Float, DIM, PointType>> {
-  const auto center_interfaces = get_outer_cell_interfaces<Float, DIM, PointType>(center_cell);
-  const auto other_interfaces  = get_outer_cell_interfaces<Float, DIM, PointType>(other_cell);
+template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
+[[nodiscard]] constexpr auto
+get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& center_cell,
+                      const Cell<ActiveFloat, PassiveFloat, DIM>& other_cell,
+                      Side side) noexcept
+    -> SmallVector<FullInterface<ActiveFloat, DIM, PointType>> {
+  const auto center_interfaces =
+      get_outer_cell_interfaces<ActiveFloat, PassiveFloat, DIM, PointType>(center_cell);
+  const auto other_interfaces =
+      get_outer_cell_interfaces<ActiveFloat, PassiveFloat, DIM, PointType>(other_cell);
 
-  SmallVector<HalfInterface<Float, DIM, PointType>> left_side{};
-  SmallVector<HalfInterface<Float, DIM, PointType>> right_side{};
+  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> left_side{};
+  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> right_side{};
   bool left_is_center;
   switch (side) {
     case LEFT:
@@ -514,11 +518,11 @@ template <typename Float, size_t DIM, Point2D_c PointType>
 
   if (left_side.size() == right_side.size()) {
     const auto n = left_side.size();
-    SmallVector<FullInterface<Float, DIM, PointType>> interfaces(n);
+    SmallVector<FullInterface<ActiveFloat, DIM, PointType>> interfaces(n);
     for (size_t i = 0; i < n; ++i) {
       // TODO: Is this necessary?
       // assert(same_interface(left_side[i], right_side[i]));
-      interfaces[i] = FullInterface<Float, DIM, PointType>{
+      interfaces[i] = FullInterface<ActiveFloat, DIM, PointType>{
           .left_value  = left_side[i].value,
           .right_value = right_side[i].value,
           // TODO: Is this necessary?
@@ -529,9 +533,9 @@ template <typename Float, size_t DIM, Point2D_c PointType>
     return interfaces;
   } else {
     if (left_side.size() == 1) {
-      SmallVector<FullInterface<Float, DIM, PointType>> interfaces(right_side.size());
+      SmallVector<FullInterface<ActiveFloat, DIM, PointType>> interfaces(right_side.size());
       for (size_t i = 0; i < right_side.size(); ++i) {
-        interfaces[i] = FullInterface<Float, DIM, PointType>{
+        interfaces[i] = FullInterface<ActiveFloat, DIM, PointType>{
             .left_value  = left_side[0].value,
             .right_value = right_side[i].value,
             .begin       = right_side[i].begin,
@@ -540,9 +544,9 @@ template <typename Float, size_t DIM, Point2D_c PointType>
       }
       return interfaces;
     } else if (right_side.size() == 1) {
-      SmallVector<FullInterface<Float, DIM, PointType>> interfaces(left_side.size());
+      SmallVector<FullInterface<ActiveFloat, DIM, PointType>> interfaces(left_side.size());
       for (size_t i = 0; i < left_side.size(); ++i) {
-        interfaces[i] = FullInterface<Float, DIM, PointType>{
+        interfaces[i] = FullInterface<ActiveFloat, DIM, PointType>{
             .left_value  = left_side[i].value,
             .right_value = right_side[0].value,
             .begin       = left_side[i].begin,

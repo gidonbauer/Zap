@@ -1,3 +1,5 @@
+#if 0
+
 #ifndef ZAP_IO_BASED_VTK_WRITER_HPP_
 #define ZAP_IO_BASED_VTK_WRITER_HPP_
 
@@ -5,6 +7,7 @@
 #include <string_view>
 
 #include "CellBased/Grid.hpp"
+#include "IO/Fwd.hpp"
 
 namespace Zap::IO {
 
@@ -18,19 +21,20 @@ class VTKWriter {
       : m_output_prefix(output_prefix) {}
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, std::size_t DIM>
+  template <typename ActiveFloat, typename PassiveFloat, std::size_t DIM>
   [[nodiscard]] constexpr auto
-  write_data(const CellBased::UniformGrid<Float, DIM>& grid) noexcept -> bool {
+  write_data(const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid) noexcept -> bool {
     const std::string filename = std::format("{}_{}.vtk", m_output_prefix, m_counter);
     m_counter += 1;
     return to_vtk(filename, grid);
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, std::size_t DIM>
+  template <typename ActiveFloat, typename PassiveFloat, std::size_t DIM>
   [[nodiscard]] constexpr auto
   to_vtk(const std::string& filename,
-         const CellBased::UniformGrid<Float, DIM>& grid) const noexcept -> bool {
+         const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid) const noexcept
+      -> bool {
     static_assert(std::is_floating_point_v<std::remove_cvref_t<Float>>);
     std::string datatype{};
     if constexpr (std::is_same_v<double, std::remove_cvref_t<Float>>) {
@@ -183,3 +187,4 @@ class VTKWriter {
 }  // namespace Zap::IO
 
 #endif  // ZAP_CELL_BASED_VTK_WRITER_HPP_
+#endif

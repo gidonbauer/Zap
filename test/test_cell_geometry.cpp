@@ -9,7 +9,7 @@ using Float          = double;
 constexpr size_t DIM = 2;
 
 TEST(CellGeometry, AreaBottomLeft) {
-  const Cell<Float, DIM> cell{
+  const Cell<Float, Float, DIM> cell{
       .value =
           CutValue<Float, DIM>{
               .left_value  = Eigen::Vector<Float, DIM>::Zero(),
@@ -48,7 +48,7 @@ TEST(CellGeometry, AreaBottomLeft) {
 }
 
 TEST(CellGeometry, AreaBottomRight) {
-  const Cell<Float, DIM> cell{
+  const Cell<Float, Float, DIM> cell{
       .value =
           CutValue<Float, DIM>{
               .left_value  = Eigen::Vector<Float, DIM>::Zero(),
@@ -88,7 +88,7 @@ TEST(CellGeometry, AreaBottomRight) {
 }
 
 TEST(CellGeometry, AreaTopRight) {
-  const Cell<Float, DIM> cell{
+  const Cell<Float, Float, DIM> cell{
       .value =
           CutValue<Float, DIM>{
               .left_value  = Eigen::Vector<Float, DIM>::Zero(),
@@ -133,7 +133,7 @@ TEST(CellGeometry, AreaTopRight) {
 }
 
 TEST(CellGeometry, AreaTopLeft) {
-  const Cell<Float, DIM> cell{
+  const Cell<Float, Float, DIM> cell{
       .value =
           CutValue<Float, DIM>{
               .left_value  = Eigen::Vector<Float, DIM>::Zero(),
@@ -178,7 +178,7 @@ TEST(CellGeometry, AreaTopLeft) {
 }
 
 TEST(CellGeometry, AreaMiddleHori) {
-  const Cell<Float, DIM> cell{
+  const Cell<Float, Float, DIM> cell{
       .value =
           CutValue<Float, DIM>{
               .left_value  = Eigen::Vector<Float, DIM>::Zero(),
@@ -213,7 +213,7 @@ TEST(CellGeometry, AreaMiddleHori) {
 }
 
 TEST(CellGeometry, AreaMiddleVert) {
-  const Cell<Float, DIM> cell{
+  const Cell<Float, Float, DIM> cell{
       .value =
           CutValue<Float, DIM>{
               .left_value  = Eigen::Vector<Float, DIM>::Zero(),

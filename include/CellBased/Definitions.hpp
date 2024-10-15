@@ -196,7 +196,7 @@ template <typename T>
 using Point = Eigen::Vector<T, POINT_SIZE>;
 
 // -------------------------------------------------------------------------------------------------
-enum Side : int {
+enum Side : unsigned int {
   BOTTOM = 0b0001,
   RIGHT  = 0b0010,
   TOP    = 0b0100,

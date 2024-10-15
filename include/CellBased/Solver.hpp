@@ -2,6 +2,7 @@
 #define ZAP_CELL_BASED_SOLVER_HPP_
 
 #include <numbers>
+#include <numeric>
 
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
@@ -38,15 +39,16 @@ class Solver {
   B m_B;
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
-  [[nodiscard]] constexpr auto cfl_factor(const UniformGrid<Float, DIM>& grid) const noexcept
-      -> Float {
+  template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+  [[nodiscard]] constexpr auto
+  cfl_factor(const UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid) const noexcept
+      -> ActiveFloat {
     return std::transform_reduce(
         std::cbegin(grid.cells()),
         std::cend(grid.cells()),
-        Float{0},
-        [](const Float a, const Float b) { return std::max(a, b); },
-        [this](const Cell<Float, DIM>& cell) {
+        ActiveFloat{0},
+        [](const auto& a, const auto& b) { return std::max(a, b); },
+        [this](const Cell<ActiveFloat, PassiveFloat, DIM>& cell) {
           assert(cell.is_cartesian() || cell.is_cut());
           if (cell.is_cartesian()) {
             return std::max(m_A.max_abs_eig_val(cell.get_cartesian().value),
@@ -61,41 +63,38 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM, Point2D_c PointType>
+  template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
   requires(DIM > 0)
   struct WaveProperties {
-    Eigen::Vector<Float, DIM> value;
+    Eigen::Vector<ActiveFloat, DIM> value;
     Geometry::Polygon<PointType> polygon;
   };
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM, Point2D_c PointType>
+  template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
   requires(DIM > 0)
   [[nodiscard]] constexpr auto
-  calculate_interface(const FullInterface<Float, DIM, PointType>& interface,
-                      Float dt,
-                      Float scale_x,
-                      Float scale_y) const noexcept
-      -> SmallVector<WaveProperties<Float, DIM, PointType>> {
-    if ((interface.end - interface.begin).norm() < EPS<Float>) { return {}; }
+  calculate_interface(const FullInterface<ActiveFloat, DIM, PointType>& interface,
+                      ActiveFloat dt,
+                      PassiveFloat scale_x,
+                      PassiveFloat scale_y) const noexcept
+      -> SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> {
+    if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return {}; }
 
     // Vector tangential to interface
     const PointType tangent_vector = (interface.end - interface.begin).normalized();
-    // IGOR_ASSERT(!std::isnan(tangent_vector.x) && !std::isnan(tangent_vector.y),
-    //             "tangent_vector {} has NaN values, interface begin = {}, interface end = {}",
-    //             tangent_vector,
-    //             interface.begin,
-    //             interface.end);
 
     // Angle between cut_vector and y-axis (0, 1)
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
     // <=> cut_angle = arccos(cut_vector_1 / ||cut_vector||)
     auto interface_angle = std::acos(tangent_vector.y);
-    if (tangent_vector.x > 0) { interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle; }
+    if (tangent_vector.x > 0) {
+      interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
+    }
 
     // Vector normal to cut
     PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
-    IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<Float>,
+    IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
                 "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
                 "normal_vector = {}",
                 tangent_vector,
@@ -107,23 +106,23 @@ class Solver {
       normal_vector.y *= scale_y;
     }
 
-    const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
+    const auto u_mid = ((interface.left_value + interface.right_value) / 2).eval();
 
     // Matrix for rotated PDE in normal direction to cut
     // TODO: Why cos(interface_angle) * A + sin(interface_angle) * B and not -?
-    const Eigen::Matrix<Float, DIM, DIM> eta_mat =
-        std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+    const auto eta_mat =
+        (std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid))
+            .eval();
 
-    Eigen::Matrix<Float, DIM, DIM> eig_vals;
-    Eigen::Matrix<Float, DIM, DIM> eig_vecs;
+    Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals;
+    Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs;
     get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
-    const Eigen::Matrix<Float, DIM, DIM> wave_lengths = eig_vals * dt;
+    const auto wave_lengths = (eig_vals * dt).eval();
 
     // Eigen expansion of jump; wave strength
-    const Eigen::Vector<Float, DIM> alpha =
-        eig_vecs.inverse() * (interface.right_value - interface.left_value);
+    const auto alpha = (eig_vecs.inverse() * (interface.right_value - interface.left_value)).eval();
 
-    SmallVector<WaveProperties<Float, DIM, PointType>> waves(DIM);
+    SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> waves(DIM);
 
     for (Eigen::Index p = 0; p < static_cast<Eigen::Index>(DIM); ++p) {
       auto& wave = waves[static_cast<size_t>(p)];
@@ -142,22 +141,27 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM, Point2D_c PointType>
-  constexpr void update_cell(Cell<Float, DIM>& cell,
-                             const WaveProperties<Float, DIM, PointType>& wave) {
+  template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
+  constexpr void update_cell(Cell<ActiveFloat, PassiveFloat, DIM>& cell,
+                             const WaveProperties<ActiveFloat, DIM, PointType>& wave) {
     // TODO: Do something about periodic boundary conditions
     assert(cell.is_cartesian() || cell.is_cut());
-    auto update_value = [&](Eigen::Vector<Float, DIM>& value,
+    auto update_value = [&](Eigen::Vector<ActiveFloat, DIM>& value,
                             const Geometry::Polygon<PointType>& cell_polygon) {
       const auto cell_area = cell_polygon.area();
-      assert(cell_area > 0 || std::abs(cell_area) <= EPS<Float>);
-      if (std::abs(cell_area) <= EPS<Float>) { return; }
+      assert(cell_area > 0 || std::abs(cell_area) <= EPS<PassiveFloat>);
+      if (std::abs(cell_area) <= EPS<PassiveFloat>) { return; }
 
       const auto intersect      = Geometry::intersection(cell_polygon, wave.polygon);
       const auto intersect_area = intersect.area();
-      assert(intersect_area >= 0 || std::abs(intersect_area) < 1e-8);
-      assert(intersect_area <= cell_area &&
-             "Something went wrong in the calculation of the intersection.");
+      assert(intersect_area >= 0 || std::abs(intersect_area) < EPS<PassiveFloat>);
+      IGOR_ASSERT(intersect_area - cell_area <= EPS<PassiveFloat>,
+                  "Expected area intersection of intersection to be smaller or equal to the area "
+                  "of the cell, but intersection area is {} and cell area is {}, intersection area "
+                  "is {} larger than cell area",
+                  intersect_area,
+                  cell_area,
+                  intersect_area - cell_area);
 
       value -= (intersect_area / cell_area) * wave.value;
     };
@@ -174,17 +178,18 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
-  constexpr void apply_side_interfaces(const UniformGrid<Float, DIM>& curr_grid,
-                                       Cell<Float, DIM>& next_cell,
-                                       const Cell<Float, DIM>& curr_cell,
+  template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+  constexpr void apply_side_interfaces(const UniformGrid<ActiveFloat, PassiveFloat, DIM>& curr_grid,
+                                       Cell<ActiveFloat, PassiveFloat, DIM>& next_cell,
+                                       const Cell<ActiveFloat, PassiveFloat, DIM>& curr_cell,
                                        size_t idx,
                                        Side side,
-                                       Float dt) {
+                                       ActiveFloat dt) {
     if (curr_grid.is_cell(idx)) {
       const auto& other_cell = curr_grid[idx];
       const auto interfaces =
-          get_shared_interfaces<Float, DIM, GridCoord<Float>>(curr_cell, other_cell, side);
+          get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+              curr_cell, other_cell, side);
       for (const auto& interface : interfaces) {
         const auto waves =
             calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
@@ -210,14 +215,15 @@ class Solver {
   };
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM, Point2D_c PointType>
-  [[nodiscard]] constexpr auto get_internal_interface(const Cell<Float, DIM>& cell) const noexcept
-      -> FullInterface<Float, DIM, PointType> {
+  template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
+  [[nodiscard]] constexpr auto
+  get_internal_interface(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) const noexcept
+      -> FullInterface<ActiveFloat, DIM, PointType> {
     assert(cell.is_cut());
 
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
-    return FullInterface<Float, DIM, PointType>{
+    return FullInterface<ActiveFloat, DIM, PointType>{
         .left_value  = cell.get_cut().left_value,
         .right_value = cell.get_cut().right_value,
         .begin       = cell.template cut1<coord_type>(),
@@ -226,12 +232,13 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM>
+  template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
   [[nodiscard]] constexpr auto
-  move_wave_front(const UniformGrid<Float, DIM>& curr_grid,
-                  [[maybe_unused]] const UniformGrid<Float, DIM>& next_grid,
-                  Float dt) const noexcept -> std::optional<std::vector<GridCoord<Float>>> {
-    using PointType = GridCoord<Float>;
+  move_wave_front(const UniformGrid<ActiveFloat, PassiveFloat, DIM>& curr_grid,
+                  [[maybe_unused]] const UniformGrid<ActiveFloat, PassiveFloat, DIM>& next_grid,
+                  ActiveFloat dt) const noexcept
+      -> std::optional<std::vector<GridCoord<ActiveFloat>>> {
+    using PointType = GridCoord<ActiveFloat>;
 
     // Move old cuts according to strongest wave
     std::vector<std::pair<PointType, PointType>> new_shock_points;
@@ -239,17 +246,18 @@ class Solver {
       const auto& curr_cell = curr_grid[cell_idx];
       assert(curr_cell.is_cut());
 
-      const auto interface = get_internal_interface<Float, DIM, PointType>(curr_cell);
+      const auto interface =
+          get_internal_interface<ActiveFloat, PassiveFloat, DIM, PointType>(curr_cell);
 
       const auto tangent_vector = (interface.end - interface.begin).normalized();
       assert(std::abs(tangent_vector.norm() - 1) <= 1e-8);
 
       auto interface_angle = std::acos(tangent_vector.y);
       if (tangent_vector.x > 0) {
-        interface_angle = 2 * std::numbers::pi_v<Float> - interface_angle;
+        interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
       }
       PointType normal_vector{.x = std::cos(interface_angle), .y = std::sin(interface_angle)};
-      IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<Float>,
+      IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
                   "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
                   "normal_vector = {}",
                   tangent_vector,
@@ -261,18 +269,19 @@ class Solver {
         normal_vector.y *= curr_grid.scale_y();
       }
 
-      const Eigen::Vector<Float, DIM> u_mid = (interface.left_value + interface.right_value) / 2;
+      const auto u_mid = ((interface.left_value + interface.right_value) / 2).eval();
 
-      const Eigen::Matrix<Float, DIM, DIM> eta_mat =
-          std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+      const auto eta_mat =
+          (std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid))
+              .eval();
 
-      Eigen::Matrix<Float, DIM, DIM> eig_vals;
-      Eigen::Matrix<Float, DIM, DIM> eig_vecs;
+      Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals;
+      Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs;
       get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
 
       // Wave strength
-      const Eigen::Vector<Float, DIM> alpha =
-          eig_vecs.inverse() * (interface.right_value - interface.left_value);
+      const auto alpha =
+          (eig_vecs.inverse() * (interface.right_value - interface.left_value)).eval();
 
       Eigen::Index strong_wave_idx = 0;
       for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
@@ -313,13 +322,17 @@ class Solver {
         m_B(std::move(b)) {}
 
   // -----------------------------------------------------------------------------------------------
-  template <typename Float, size_t DIM, typename GridWriter, typename TimeWriter>
-  [[nodiscard]] auto solve(UniformGrid<Float, DIM> grid,
-                           Float tend,
+  template <typename ActiveFloat,
+            typename PassiveFloat,
+            size_t DIM,
+            typename GridWriter,
+            typename TimeWriter>
+  [[nodiscard]] auto solve(UniformGrid<ActiveFloat, PassiveFloat, DIM> grid,
+                           PassiveFloat tend,
                            GridWriter& grid_writer,
                            TimeWriter& time_writer,
-                           Float CFL_safety_factor = 0.5) noexcept
-      -> std::optional<UniformGrid<Float, DIM>> {
+                           PassiveFloat CFL_safety_factor = 0.5) noexcept
+      -> std::optional<UniformGrid<ActiveFloat, PassiveFloat, DIM>> {
     if (!(CFL_safety_factor > 0 && CFL_safety_factor <= 1)) {
       Igor::Warn("CFL_safety_factor must be in (0, 1], is {}", CFL_safety_factor);
       return std::nullopt;
@@ -327,18 +340,19 @@ class Solver {
     auto& curr_grid = grid;
     auto next_grid  = grid;
 
-    if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(Float{0})) {
+    if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(PassiveFloat{0})) {
       return std::nullopt;
     }
 
-    for (Float t = 0.0; t < tend;) {
-      const Float CFL_factor = cfl_factor(curr_grid);
+    for (PassiveFloat t = 0.0; t < tend;) {
+      const PassiveFloat CFL_factor = cfl_factor(curr_grid);
 
       if (std::isnan(CFL_factor) || std::isinf(CFL_factor)) {
         Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
         return std::nullopt;
       }
-      const Float dt = std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
+      const ActiveFloat dt =
+          std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
       next_grid = curr_grid;
 #ifndef ZAP_STATIC_CUT
@@ -375,8 +389,8 @@ class Solver {
           {
             const auto next_subcell_polygon = next_cell.template get_cut_left_polygon<GRID_C>();
             assert(next_subcell_polygon.area() > 0 ||
-                   std::abs(next_subcell_polygon.area()) <= EPS<Float>);
-            if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
+                   std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>);
+            if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>) {
               const auto left_intersect_area =
                   Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
               const auto right_intersect_area =
@@ -395,8 +409,8 @@ class Solver {
           {
             const auto next_subcell_polygon = next_cell.template get_cut_right_polygon<GRID_C>();
             assert(next_subcell_polygon.area() > 0 ||
-                   std::abs(next_subcell_polygon.area()) <= EPS<Float>);
-            if (std::abs(next_subcell_polygon.area()) > EPS<Float>) {
+                   std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>);
+            if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>) {
               const auto left_intersect_area =
                   Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
               const auto right_intersect_area =
@@ -441,9 +455,11 @@ class Solver {
 
         // - Handle internal interface -----------------------------------------------------------
         const auto internal_interface =
-            get_internal_interface<Float, DIM, GridCoord<Float>>(curr_cell);
-        const auto internal_waves = calculate_interface<Float, DIM, GridCoord<Float>>(
-            internal_interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
+            get_internal_interface<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+                curr_cell);
+        const auto internal_waves =
+            calculate_interface<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+                internal_interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
 
         const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
         for (const auto& wave : internal_waves) {

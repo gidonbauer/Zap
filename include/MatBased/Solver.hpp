@@ -31,18 +31,21 @@ template <typename Float>
 //  | (0,0) (0,1) (0,2) ... (0,n)
 //  .------ x ---->
 template <typename Float, typename BoundaryCondition, typename UWriter, typename TWriter>
-[[nodiscard]] auto solve_2d_burgers(const Vector<Float>& x,      // x-grid
-                                    const Vector<Float>& y,      // y-grid
-                                    const Matrix<Float>& u0,     // initial value
-                                    Float tend,                  // Final time
-                                    BoundaryCondition boundary,  // Type of boundaries
-                                    UWriter& u_writer,           // Save intermediate u in file
-                                    TWriter& t_writer            // Save intermediate t in file
-                                    ) -> std::optional<Matrix<Float>> {
+[[nodiscard]] auto solve_2d_burgers(
+    const Vector<Float>& x,        // x-grid
+    const Vector<Float>& y,        // y-grid
+    const Matrix<Float>& u0,       // initial value
+    Float tend,                    // Final time
+    BoundaryCondition boundary,    // Type of boundaries
+    UWriter& u_writer,             // Save intermediate u in file
+    TWriter& t_writer,             // Save intermediate t in file
+    Float CFL_safety_factor = 0.5  // Safety factor for CFL condition, must be in (0, 1)
+    ) -> std::optional<Matrix<Float>> {
   assert(y.size() == u0.rows());
   assert(x.size() == u0.cols());
   assert(x.size() >= 2);
   assert(y.size() >= 2);
+  assert(CFL_safety_factor > 0 && CFL_safety_factor < 1);
 
   // -----------------------------------------------------------------------------------------------
 
@@ -99,7 +102,7 @@ template <typename Float, typename BoundaryCondition, typename UWriter, typename
       Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
       return std::nullopt;
     }
-    const Float dt = std::min(0.5 * std::min(dx, dy) / CFL_factor, tend - t);
+    const Float dt = std::min(CFL_safety_factor * std::min(dx, dy) / CFL_factor, tend - t);
 
     // Solve for interior points
 #pragma omp parallel for

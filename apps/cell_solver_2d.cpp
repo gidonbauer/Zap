@@ -40,7 +40,8 @@
 
 // -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  using Float          = double;
+  using ActiveFloat    = double;
+  using PassiveFloat   = double;
   constexpr size_t DIM = 2;
 
   if (argc < 4) {
@@ -72,12 +73,13 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("ny = {}", ny);
   Igor::Info("tend = {}", tend);
 
-  const Float x_min = 0.0;
-  const Float x_max = 5.0;
-  const Float y_min = 0.0;
-  const Float y_max = 5.0;
+  const PassiveFloat x_min = 0.0;
+  const PassiveFloat x_max = 5.0;
+  const PassiveFloat y_min = 0.0;
+  const PassiveFloat y_max = 5.0;
 
-  Zap::CellBased::UniformGrid<Float, DIM> grid(x_min, x_max, nx, y_min, y_max, ny);
+  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(
+      x_min, x_max, nx, y_min, y_max, ny);
   grid.same_value_boundary();
   // grid.periodic_boundary();
 
@@ -85,18 +87,18 @@ auto main(int argc, char** argv) -> int {
 #define QUARTER_CIRCLE
 // #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
-  auto u0 = [=](Float x, Float y) -> Eigen::Vector<Float, DIM> {
+  auto u0 = [=](PassiveFloat x, PassiveFloat y) -> Eigen::Vector<ActiveFloat, DIM> {
     static_assert(DIM == 2);
-    return Eigen::Vector<Float, DIM>{
+    return Eigen::Vector<ActiveFloat, DIM>{
         (std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) *
-            static_cast<Float>((std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) <=
-                               std::pow((x_min + x_max + y_min + y_max) / 4, 2)),
+            static_cast<ActiveFloat>((std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) <=
+                                     std::pow((x_min + x_max + y_min + y_max) / 4, 2)),
         // (std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) *
         //     static_cast<Float>((std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) <=
         //                        std::pow((x_min + x_max + y_min + y_max) / 4, 2)),
         (std::pow(x - x_max, 2) + std::pow(y - y_min, 2)) *
-            static_cast<Float>((std::pow(x - x_max, 2) + std::pow(y - y_min, 2)) <=
-                               std::pow((x_min + x_max + y_min + y_max) / 4, 2)),
+            static_cast<ActiveFloat>((std::pow(x - x_max, 2) + std::pow(y - y_min, 2)) <=
+                                     std::pow((x_min + x_max + y_min + y_max) / 4, 2)),
     };
   };
 
@@ -104,8 +106,8 @@ auto main(int argc, char** argv) -> int {
     // assert(t >= 0 && t <= 1);
     const auto r = (x_min + x_max + y_min + y_max) / 4;
     return Eigen::Vector<T, 2>{
-        r * std::cos(std::numbers::pi_v<Float> / 2 * t),
-        r * std::sin(std::numbers::pi_v<Float> / 2 * t),
+        r * std::cos(std::numbers::pi_v<PassiveFloat> / 2 * t),
+        r * std::sin(std::numbers::pi_v<PassiveFloat> / 2 * t),
     };
   };
 #elif defined(FULL_CIRCLE)
@@ -182,12 +184,12 @@ auto main(int argc, char** argv) -> int {
   // Zap::IO::VTKWriter<Zap::IO::VTKFormat::UNSTRUCTURED_GRID> grid_writer{OUTPUT_DIR "u_grid"};
 
   constexpr auto u_file = OUTPUT_DIR "u_2d.grid";
-  Zap::IO::IncCellWriter<Float, DIM> grid_writer{u_file, grid};
+  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
 
   // Zap::IO::NoopWriter t_writer{};
 
   constexpr auto t_file = OUTPUT_DIR "t_2d.mat";
-  Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
+  Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
 #if 0
   if (!grid_writer.write_data(grid)) { return 1; }
@@ -199,7 +201,8 @@ auto main(int argc, char** argv) -> int {
 
     // auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
     //     Zap::CellBased::ExtendedSystem::A{}, Zap::CellBased::ExtendedSystem::B{});
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer, 0.25).has_value()) {
+    if (!solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25)
+             .has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
     }

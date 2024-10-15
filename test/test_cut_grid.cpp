@@ -14,7 +14,7 @@ TEST(CutGrid, CurveQuarterCircle) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   auto quarter_circle = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
     assert(t >= 0 && t <= 1);
@@ -29,7 +29,7 @@ TEST(CutGrid, CurveQuarterCircle) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expected exactly five cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 2UZ);
   EXPECT_EQ(cut_idxs[1], 7UZ);
@@ -52,7 +52,7 @@ TEST(CutGrid, PiecewiseLinearSingleLine) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
       {.x = 0.7, .y = 0.0},
@@ -62,7 +62,7 @@ TEST(CutGrid, PiecewiseLinearSingleLine) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 6UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 6UZ) << "Expected exactly six cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 3UZ);
   EXPECT_EQ(cut_idxs[1], 2UZ);
@@ -87,7 +87,7 @@ TEST(CutGrid, PiecewiseLinearVertLineOnGrid) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
       {.x = 0.8, .y = 0.0},
@@ -97,7 +97,7 @@ TEST(CutGrid, PiecewiseLinearVertLineOnGrid) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expected exactly five cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 4UZ);
   EXPECT_EQ(cut_idxs[1], 9UZ);
@@ -120,7 +120,7 @@ TEST(CutGrid, PiecewiseLinearHoriLineOnGrid) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
       {.x = 0.0, .y = 0.8},
@@ -130,7 +130,7 @@ TEST(CutGrid, PiecewiseLinearHoriLineOnGrid) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expected exactly five cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 20UZ);
   EXPECT_EQ(cut_idxs[1], 21UZ);
@@ -153,7 +153,7 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsNoExtend) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
       {.x = 0.85, .y = 0.35},
@@ -164,7 +164,7 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsNoExtend) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 5UZ) << "Expected exactly five cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 8UZ);
   EXPECT_EQ(cut_idxs[1], 13UZ);
@@ -187,7 +187,7 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendMax) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
       {.x = 0.85, .y = 0.35},
@@ -198,7 +198,7 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendMax) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 7UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 7UZ) << "Expected exactly seven cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 9UZ);
   EXPECT_EQ(cut_idxs[1], 8UZ);
@@ -225,7 +225,7 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendNearest) {
   const Float y_min = 0.0;
   const Float y_max = 1.0;
 
-  UniformGrid<Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
       {.x = 0.85, .y = 0.35},
@@ -236,7 +236,7 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendNearest) {
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
 
   const auto cut_idxs = grid.cut_cell_idxs();
-  ASSERT_EQ(cut_idxs.size(), 6UZ) << "Expect exactly five cut cells.";
+  ASSERT_EQ(cut_idxs.size(), 6UZ) << "Expected exactly six cut cells.";
 
   EXPECT_EQ(cut_idxs[0], 8UZ);
   EXPECT_EQ(cut_idxs[1], 13UZ);
@@ -251,4 +251,85 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendNearest) {
   EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::TOP_RIGHT);
   EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::MIDDLE_VERT);
   EXPECT_EQ(grid[cut_idxs[5]].get_cut().type, CutType::MIDDLE_VERT);
+}
+
+TEST(CutGrid, CutOnCorner) {
+  using Float = double;
+
+  const Float x_min = 0.0;
+  const Float x_max = 1.0;
+  const Float y_min = 0.0;
+  const Float y_max = 1.0;
+
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+
+  std::vector<SimCoord<Float>> points = {
+      {.x = 0.8, .y = 0.2},
+      {.x = 0.4, .y = 0.4},
+      {.x = 0.0, .y = 0.8},
+  };
+  const auto success = grid.cut_piecewise_linear<ExtendType::NEAREST>(points);
+  ASSERT_TRUE(success) << "Could not cut the grid successfully.";
+
+  const auto cut_idxs = grid.cut_cell_idxs();
+  ASSERT_EQ(cut_idxs.size(), 4UZ) << "Expected exactly four cut cells.";
+
+  EXPECT_EQ(cut_idxs[0], 8UZ);
+  EXPECT_EQ(cut_idxs[1], 7UZ);
+  EXPECT_EQ(cut_idxs[2], 11UZ);
+  EXPECT_EQ(cut_idxs[3], 15UZ);
+
+  // Multiple acceptable cut types
+  EXPECT_TRUE(grid[cut_idxs[0]].get_cut().type == CutType::BOTTOM_LEFT ||
+              grid[cut_idxs[0]].get_cut().type == CutType::MIDDLE_HORI);
+  EXPECT_TRUE(grid[cut_idxs[1]].get_cut().type == CutType::TOP_RIGHT ||
+              grid[cut_idxs[1]].get_cut().type == CutType::MIDDLE_HORI);
+  EXPECT_TRUE(grid[cut_idxs[2]].get_cut().type == CutType::BOTTOM_LEFT ||
+              grid[cut_idxs[2]].get_cut().type == CutType::TOP_RIGHT ||
+              grid[cut_idxs[2]].get_cut().type == CutType::MIDDLE_VERT ||
+              grid[cut_idxs[2]].get_cut().type == CutType::MIDDLE_HORI);
+  EXPECT_TRUE(grid[cut_idxs[3]].get_cut().type == CutType::BOTTOM_LEFT ||
+              grid[cut_idxs[3]].get_cut().type == CutType::TOP_RIGHT ||
+              grid[cut_idxs[3]].get_cut().type == CutType::MIDDLE_VERT ||
+              grid[cut_idxs[3]].get_cut().type == CutType::MIDDLE_HORI);
+}
+
+TEST(CutGrid, PointsFullyInside) {
+  using Float = double;
+
+  const Float x_min = 0.0;
+  const Float x_max = 1.0;
+  const Float y_min = 0.0;
+  const Float y_max = 1.0;
+
+  UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+
+  std::vector<SimCoord<Float>> points = {
+      {.x = 0.85, .y = 0.35},
+      {.x = 0.55, .y = 0.5},
+      {.x = 0.45, .y = 0.5},
+      {.x = 0.4, .y = 0.5},
+      {.x = 0.25, .y = 0.91},
+  };
+  const auto success = grid.cut_piecewise_linear<ExtendType::MAX>(points);
+  ASSERT_TRUE(success) << "Could not cut the grid successfully.";
+
+  const auto cut_idxs = grid.cut_cell_idxs();
+  ASSERT_EQ(cut_idxs.size(), 7UZ) << "Expected exactly seven cut cells.";
+
+  EXPECT_EQ(cut_idxs[0], 9UZ);
+  EXPECT_EQ(cut_idxs[1], 8UZ);
+  EXPECT_EQ(cut_idxs[2], 13UZ);
+  EXPECT_EQ(cut_idxs[3], 12UZ);
+  EXPECT_EQ(cut_idxs[4], 11UZ);
+  EXPECT_EQ(cut_idxs[5], 16UZ);
+  EXPECT_EQ(cut_idxs[6], 21UZ);
+
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_HORI);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::TOP_RIGHT);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::BOTTOM_LEFT);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::MIDDLE_HORI);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::TOP_RIGHT);
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().type, CutType::MIDDLE_VERT);
+  EXPECT_EQ(grid[cut_idxs[6]].get_cut().type, CutType::MIDDLE_VERT);
 }

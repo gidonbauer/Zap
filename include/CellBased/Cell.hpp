@@ -34,39 +34,39 @@ enum class CutType : char {
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
+template <typename ActiveFloat, size_t DIM>
 struct CartesianValue {
   static_assert(DIM > 0, "Dimension must be at least 1.");
-  Eigen::Vector<Float, DIM> value = Eigen::Vector<Float, DIM>::Zero();
+  Eigen::Vector<ActiveFloat, DIM> value = Eigen::Vector<ActiveFloat, DIM>::Zero();
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
+template <typename ActiveFloat, size_t DIM>
 struct CutValue {
   static_assert(DIM > 0, "Dimension must be at least 1.");
-  Eigen::Vector<Float, DIM> left_value  = Eigen::Vector<Float, DIM>::Zero();
-  Eigen::Vector<Float, DIM> right_value = Eigen::Vector<Float, DIM>::Zero();
+  Eigen::Vector<ActiveFloat, DIM> left_value  = Eigen::Vector<ActiveFloat, DIM>::Zero();
+  Eigen::Vector<ActiveFloat, DIM> right_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
 
   // Linear cut
   CutType type{};
-  Point<Float> rel_cut1{};  // Entry point
-  Point<Float> rel_cut2{};  // Exit point
+  Point<ActiveFloat> rel_cut1{};  // Entry point
+  Point<ActiveFloat> rel_cut2{};  // Exit point
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
+template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
 struct Cell {
   static_assert(DIM > 0, "Dimension must be at least 1.");
 
   // Cell value
-  std::variant<CartesianValue<Float, DIM>, CutValue<Float, DIM>> value =
-      CartesianValue<Float, DIM>{};
+  std::variant<CartesianValue<ActiveFloat, DIM>, CutValue<ActiveFloat, DIM>> value =
+      CartesianValue<ActiveFloat, DIM>{};
 
   // Copy the cell dimension from grid; same for all cells
-  Float m_x_min;
-  Float m_y_min;
-  Float m_dx;
-  Float m_dy;
+  PassiveFloat m_x_min;
+  PassiveFloat m_y_min;
+  PassiveFloat m_dx;
+  PassiveFloat m_dy;
 
   // Grid index
   size_t x_idx{};
@@ -80,25 +80,25 @@ struct Cell {
 
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto x_min() const noexcept -> Float {
+  [[nodiscard]] constexpr auto x_min() const noexcept -> PassiveFloat {
     if constexpr (COORD_TYPE == SIM_C) {
-      return m_x_min + static_cast<Float>(x_idx) * m_dx;
+      return m_x_min + static_cast<PassiveFloat>(x_idx) * m_dx;
     } else {
-      return static_cast<Float>(x_idx);
+      return static_cast<PassiveFloat>(x_idx);
     }
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto y_min() const noexcept -> Float {
+  [[nodiscard]] constexpr auto y_min() const noexcept -> PassiveFloat {
     if constexpr (COORD_TYPE == SIM_C) {
-      return m_y_min + static_cast<Float>(y_idx) * m_dy;
+      return m_y_min + static_cast<PassiveFloat>(y_idx) * m_dy;
     } else {
-      return static_cast<Float>(y_idx);
+      return static_cast<PassiveFloat>(y_idx);
     }
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto dx() const noexcept -> Float {
+  [[nodiscard]] constexpr auto dx() const noexcept -> PassiveFloat {
     if constexpr (COORD_TYPE == SIM_C) {
       return m_dx;
     } else {
@@ -107,7 +107,7 @@ struct Cell {
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto dy() const noexcept -> Float {
+  [[nodiscard]] constexpr auto dy() const noexcept -> PassiveFloat {
     if constexpr (COORD_TYPE == SIM_C) {
       return m_dy;
     } else {
@@ -116,20 +116,22 @@ struct Cell {
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto cut1() const noexcept -> CoordType2PointType<Float, COORD_TYPE> {
+  [[nodiscard]] constexpr auto cut1() const noexcept
+      -> CoordType2PointType<ActiveFloat, COORD_TYPE> {
     assert(is_cut());
 
-    return CoordType2PointType<Float, COORD_TYPE>{
+    return CoordType2PointType<ActiveFloat, COORD_TYPE>{
         .x = get_cut().rel_cut1(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
         .y = get_cut().rel_cut1(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto cut2() const noexcept -> CoordType2PointType<Float, COORD_TYPE> {
+  [[nodiscard]] constexpr auto cut2() const noexcept
+      -> CoordType2PointType<ActiveFloat, COORD_TYPE> {
     assert(is_cut());
 
-    return CoordType2PointType<Float, COORD_TYPE>{
+    return CoordType2PointType<ActiveFloat, COORD_TYPE>{
         .x = get_cut().rel_cut2(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
         .y = get_cut().rel_cut2(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
@@ -137,33 +139,34 @@ struct Cell {
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto is_cartesian() const noexcept -> bool {
-    return std::holds_alternative<CartesianValue<Float, DIM>>(value);
+    return std::holds_alternative<CartesianValue<ActiveFloat, DIM>>(value);
   }
   [[nodiscard]] constexpr auto is_cut() const noexcept -> bool {
-    return std::holds_alternative<CutValue<Float, DIM>>(value);
+    return std::holds_alternative<CutValue<ActiveFloat, DIM>>(value);
   }
-  [[nodiscard]] constexpr auto get_cartesian() noexcept -> CartesianValue<Float, DIM>& {
+  [[nodiscard]] constexpr auto get_cartesian() noexcept -> CartesianValue<ActiveFloat, DIM>& {
     assert(is_cartesian());
-    return std::get<CartesianValue<Float, DIM>>(value);
+    return std::get<CartesianValue<ActiveFloat, DIM>>(value);
   }
-  [[nodiscard]] constexpr auto get_cartesian() const noexcept -> const CartesianValue<Float, DIM>& {
+  [[nodiscard]] constexpr auto get_cartesian() const noexcept
+      -> const CartesianValue<ActiveFloat, DIM>& {
     assert(is_cartesian());
-    return std::get<CartesianValue<Float, DIM>>(value);
+    return std::get<CartesianValue<ActiveFloat, DIM>>(value);
   }
-  [[nodiscard]] constexpr auto get_cut() noexcept -> CutValue<Float, DIM>& {
+  [[nodiscard]] constexpr auto get_cut() noexcept -> CutValue<ActiveFloat, DIM>& {
     assert(is_cut());
-    return std::get<CutValue<Float, DIM>>(value);
+    return std::get<CutValue<ActiveFloat, DIM>>(value);
   }
-  [[nodiscard]] constexpr auto get_cut() const noexcept -> const CutValue<Float, DIM>& {
+  [[nodiscard]] constexpr auto get_cut() const noexcept -> const CutValue<ActiveFloat, DIM>& {
     assert(is_cut());
-    return std::get<CutValue<Float, DIM>>(value);
+    return std::get<CutValue<ActiveFloat, DIM>>(value);
   }
 
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept
-      -> Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>> {
-    return Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>>{{
+      -> Geometry::Polygon<CoordType2PointType<PassiveFloat, COORD_TYPE>> {
+    return Geometry::Polygon<CoordType2PointType<PassiveFloat, COORD_TYPE>>{{
         {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
         {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
         {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
@@ -173,23 +176,24 @@ struct Cell {
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cut_left_polygon() const noexcept
-      -> Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>> {
+      -> Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
     assert(is_cut());
-    return Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>>{get_left_points<COORD_TYPE>()};
+    return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{
+        get_left_points<COORD_TYPE>()};
   }
 
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cut_right_polygon() const noexcept
-      -> Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>> {
+      -> Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
     assert(is_cut());
-    return Geometry::Polygon<CoordType2PointType<Float, COORD_TYPE>>{
+    return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{
         get_right_points<COORD_TYPE>()};
   }
 
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_left_points() const noexcept
-      -> SmallVector<CoordType2PointType<Float, COORD_TYPE>> {
+      -> SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CutType::BOTTOM_LEFT:
@@ -245,7 +249,7 @@ struct Cell {
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_right_points() const noexcept
-      -> SmallVector<CoordType2PointType<Float, COORD_TYPE>> {
+      -> SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
       case CutType::BOTTOM_LEFT:
@@ -296,8 +300,8 @@ struct Cell {
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-auto operator<<(std::ostream& out, const CartesianValue<Float, DIM>& cart_value) noexcept
+template <typename ActiveFloat, size_t DIM>
+auto operator<<(std::ostream& out, const CartesianValue<ActiveFloat, DIM>& cart_value) noexcept
     -> std::ostream& {
   constexpr auto end_char      = '\n';
   constexpr auto single_indent = "  ";
@@ -318,8 +322,8 @@ auto operator<<(std::ostream& out, const CartesianValue<Float, DIM>& cart_value)
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-auto operator<<(std::ostream& out, const CutValue<Float, DIM>& cut_value) noexcept
+template <typename ActiveFloat, size_t DIM>
+auto operator<<(std::ostream& out, const CutValue<ActiveFloat, DIM>& cut_value) noexcept
     -> std::ostream& {
   constexpr auto end_char      = '\n';
   constexpr auto single_indent = "  ";
@@ -363,8 +367,9 @@ auto operator<<(std::ostream& out, const CutValue<Float, DIM>& cut_value) noexce
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename Float, size_t DIM>
-auto operator<<(std::ostream& out, const Cell<Float, DIM>& cell) noexcept -> std::ostream& {
+template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+auto operator<<(std::ostream& out, const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noexcept
+    -> std::ostream& {
   constexpr auto end_char = '\n';
   constexpr auto indent   = "  ";
 
@@ -445,14 +450,14 @@ auto operator<<(std::ostream& out, const Cell<Float, DIM>& cell) noexcept -> std
 
 namespace std {
 
-template <typename Float, size_t DIM>
-struct formatter<Zap::CellBased::Cell<Float, DIM>> {
+template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+struct formatter<Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();
   }
   template <typename FormatContext>
-  static constexpr auto format(const Zap::CellBased::Cell<Float, DIM>& cell,
+  static constexpr auto format(const Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>& cell,
                                FormatContext& ctx) noexcept {
     std::stringstream s;
     s << cell;

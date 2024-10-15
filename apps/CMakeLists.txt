@@ -8,7 +8,7 @@ set(executables
   
   mat_solver
   
-  example_static_shock
+  example_quarter_circle
   example_x_ramp
 )
 
