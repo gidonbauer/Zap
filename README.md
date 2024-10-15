@@ -1,41 +1,44 @@
 # Zap - Differentiating Shocks in the two-dimensional Burgers equation
 
-This repository contains a Finite Volume solver for the two-dimensional Burgers equation
+This repository contains a Shock-Tracking Finite Volume solver for the two-dimensional Burgers equation
+
 $$\partial_t u + \partial_x \frac{1}{2} u^2 + \partial_y \frac{1}{2} u^2 = 0$$
+
 $$\Leftrightarrow{} \partial_t u + u \partial_x u + u \partial_y u = 0$$
+
 with given initial- and boundary conditions.
 
 ## Quickstart
-TODO: This is very outdated!
 
-Building and running the solver (an appropriate value for nx and ny is 400)
+Building and running the examples:
 ```console
 $ cmake -Bbuild
 $ cd bin
 $ make -j
-$ ./run_solver <nx> <ny>
+$ ./example_quarter_circle
+$ ./example_x_ramp
 ```
 
-The solution is written to the output directory in the files `u.dat` and `t.dat`.
-It can be rendered to a video using the provided (recommended) renderer
+The examples can be run with different parameters, to see all options run the example with the `--help` flag.
+
+The solution is written to the directory `output/<executable name>/` in the files `u*.grid` and `t*.mat`.
+It can be rendered to a video using the provided renderer
 ```console
-$ ./renderer ../output/u.dat ../output/t.dat solution.mp4
-```
-or the (not recommended) legacy renderer
-```console
-$ ./legacy_renderer ../output/u.dat solution.mp4
+$ ./renderer ../output/<executable name>/<u file>.grid ../output/<executable name>/<t file>.dat solution.mp4
 ```
 
-The legacy renderer (`legacy_renderer.cpp`) does not depend on `FreeType`, but does not have all the functions of the recommended renderer.
+The renderer depends on the library _FreeType_ and _FFmpeg_.
+Those dependencies must be installed to compile the renderer.
 If you do not want to install the dependencies for the renderer, you can disable building it by setting the cmake-option `ZAP_BUILD_RENDERER` to `OFF`.
-Not installing FFmpeg will only create problems at runtime.
-Both renderers depend on Unix functions and will only work on Unix compliant operating systems (`pipe`, `write`, ...), e.g. MacOS or Linux (only tested on MacOS).
+Not installing _FFmpeg_ will only create problems at runtime.
+The renderer depends on Unix functions (`pipe`, `write`, ...) and will only work on Unix compliant operating systems, e.g. MacOS or Linux (only tested on MacOS).
 
 ## Dependencies
 
+- [AD.hpp](https://www.stce.rwth-aachen.de/): For algorithmic differentiation.
 - [Eigen](https://eigen.tuxfamily.org/): For all matrix operations.
 - [FFmpeg](https://ffmpeg.org/): For rendering the solution.
 - [FreeType](https://freetype.org/): For rendering text.
-- [stb_image_write](https://github.com/nothings/stb/): For saving the canvas in .jpeg format.
+- [stb_image_write](https://github.com/nothings/stb/): For saving the canvas in jpeg-format.
 
-FFmpeg and FreeType must be installed by the user, Eigen and stb\_image\_write are provided in the `ThirdParty` folder.
+_FFmpeg_ and _FreeType_ must be installed by the user, _AD.hpp_, _Eigen_, and _stb\_image\_write_ are provided in the `ThirdParty` folder.
