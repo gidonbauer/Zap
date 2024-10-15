@@ -35,6 +35,8 @@ struct Args {
   size_t ny                      = 25;
   PassiveFloat tend              = 1.0;
   PassiveFloat CFL_safety_factor = 0.5;
+  size_t ref_nx                  = 800;
+  size_t ref_ny                  = 800;
 };
 
 // - Print usage -----------------------------------------------------------------------------------
@@ -43,12 +45,19 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   Args args{};
 
   out << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--run-benchmark] [--nx nx] [--ny ny] [--tend tend] [--CFL CFL-safety-factor]\n";
+      << " [--run-benchmark] [--nx nx] [--ny ny] [--ref-nx ref-nx] [--ref-ny ref-ny] [--tend tend] "
+         "[--CFL CFL-safety-factor]\n";
   out << "\t--run-benchmark   Run the solver for different grid sizes and compare result against "
          "high-resolution Godunov solver, default is "
       << std::boolalpha << args.run_benchmark << '\n';
   out << "\t--nx              Number of cells in x-direction, default is " << args.nx << '\n';
   out << "\t--ny              Number of cells in y-direction, default is " << args.ny << '\n';
+  out << "\t--ref-nx          Number of cells in x-direction for the high-resolution Godunov "
+         "solver used as reference, default is "
+      << args.ref_nx << '\n';
+  out << "\t--ref-ny          Number of cells in y-direction for the high-resolution Godunov "
+         "solver used as reference, default is "
+      << args.ref_ny << '\n';
   out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
   out << "\t--CFL             Safety factor for CFL condition, must be in (0, 1], default is "
       << args.CFL_safety_factor << '\n';
@@ -83,6 +92,24 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
         return std::nullopt;
       }
       args.ny = parse_size_t(*arg);
+    } else if (arg == "--ref-nx"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --ref-nx.\n";
+        return std::nullopt;
+      }
+      args.ref_nx = parse_size_t(*arg);
+    } else if (arg == "--ref-ny"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --ref-ny.\n";
+        return std::nullopt;
+      }
+      args.ref_ny = parse_size_t(*arg);
     } else if (arg == "--tend"sv) {
       arg = next_arg(argc, argv);
       if (!arg.has_value()) {
@@ -103,7 +130,7 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
       args.CFL_safety_factor = parse_double(*arg);
     } else if (arg == "-h"sv || arg == "--help"sv) {
       usage<Igor::detail::Level::INFO>(*prog, std::cout);
-      return std::nullopt;
+      std::exit(0);
     } else {
       usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
       std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC) << "Unknown argument `"
@@ -457,13 +484,14 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("run-benchmark     = {}", args->run_benchmark);
   Igor::Info("tend              = {}", args->tend);
   Igor::Info("CFL-safety-factor = {}", args->CFL_safety_factor);
+  Igor::Info("High-res-nx       = {}", args->ref_nx);
+  Igor::Info("High-res-ny       = {}", args->ref_ny);
 
   // - Run high-resolution Godunov solver ----------------------------------------------------------
-  const auto hr_nx  = 800;
-  const auto hr_ny  = 800;
-  const auto hr_res = run_mat_based(hr_nx, hr_ny, args->tend, args->CFL_safety_factor);
+  const auto hr_res =
+      run_mat_based(args->ref_nx, args->ref_ny, args->tend, args->CFL_safety_factor);
   if (!hr_res.has_value()) {
-    Igor::Warn("High-resultion ({}x{}) solver failed.", hr_nx, hr_ny);
+    Igor::Warn("High-resultion ({}x{}) solver failed.", args->ref_nx, args->ref_ny);
     return 1;
   }
 
