@@ -13,9 +13,6 @@
 
 #define ZAP_PARALLEL_RENDERING
 
-// TODO: Fix rendering of cut cells, sometimes cell goes out of bounds
-// TODO: Display total mass -> can see if it is conservative
-
 namespace Rd = Zap::Renderer;
 
 [[maybe_unused]] constexpr Rd::RGB BLACK  = {.r = 0x00, .g = 0x00, .b = 0x00};
@@ -241,53 +238,12 @@ min_max_cell_value(const std::vector<Zap::IO::ReducedCell<Float, DIM>>& cells) n
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename ResultType, typename FUNC, typename Float>
-void simpsons_rule_2d(FUNC f,
-                      ResultType& res,
-                      Float x_min,
-                      Float x_max,
-                      Float y_min,
-                      Float y_max,
-                      size_t nx,
-                      size_t ny) noexcept {
-  auto get_w = [](size_t idx, size_t end_idx) -> Float {
-    if (idx == 0 || idx == end_idx) {
-      return 1;
-    } else {
-      if (idx % 2 == 1) {
-        return 4;
-      } else {
-        return 2;
-      }
-    }
-  };
-
-  if (nx % 2 == 1) { nx += 1; }
-  if (ny % 2 == 1) { ny += 1; }
-
-  const Float dx = (x_max - x_min) / static_cast<Float>(nx);
-  const Float dy = (y_max - y_min) / static_cast<Float>(ny);
-
-#pragma omp parallel for reduction(+ : res)
-  for (size_t i = 0; i < (nx + 1) * (ny + 1); ++i) {
-    const size_t ix = i / (nx + 1);
-    const size_t iy = i % (nx + 1);
-    const Float x   = x_min + static_cast<Float>(ix) * dx;
-    const Float y   = y_min + static_cast<Float>(iy) * dy;
-    const Float wx  = get_w(ix, nx);
-    const Float wy  = get_w(iy, ny);
-    res += wx * wy * f(x, y);
-  }
-  res *= dx * dy / 9;
-}
-
-// -------------------------------------------------------------------------------------------------
 template <typename Float, size_t DIM>
-[[nodiscard]] constexpr auto
-calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
-                                  Zap::IO::IncMatrixReader<Float>>& u_reader,
-               size_t nx = 1000,
-               size_t ny = 1000) noexcept -> Eigen::Vector<Float, DIM> {
+[[nodiscard]] constexpr auto calculate_mass(
+    const std::variant<Zap::IO::IncCellReader<Float, DIM>, Zap::IO::IncMatrixReader<Float>>&
+        u_reader) noexcept -> Eigen::Vector<Float, DIM> {
+  // Note: We are doing a piecewise constant reconstruction of u, therefore the rectangle rule is
+  //       appropriate
   const bool is_cell_reader = std::holds_alternative<Zap::IO::IncCellReader<Float, DIM>>(u_reader);
 
   if (is_cell_reader) {
@@ -297,49 +253,20 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
     const Float y_min       = cell_reader.y_min();
     const Float y_max       = cell_reader.y_max();
 
-    auto eval_at = [&](Float x, Float y) -> Eigen::Vector<Float, DIM> {
-      const auto& cells = cell_reader.cells();
-
-      auto cell_contains_xy = [x, y](const auto& cell) {
-        constexpr Float eps = std::is_same_v<std::remove_cvref_t<Float>, float> ? 1e-6f : 1e-8;
-        return x - cell.x_min() >= -eps && x - (cell.x_min() + cell.dx()) <= eps &&
-               y - cell.y_min() >= -eps && y - (cell.y_min() + cell.dy()) <= eps;
-      };
-
-      const auto cell_it = std::find_if(std::cbegin(cells), std::cend(cells), cell_contains_xy);
-      IGOR_ASSERT(cell_it != std::cend(cells),
-                  "Point {{ .x={}, .y={} }} is not in grid [{}, {}]x[{}, {}]",
-                  x,
-                  y,
-                  x_min,
-                  x_max,
-                  y_min,
-                  y_max);
-
-      if (cell_it->is_cartesian()) {
-        return cell_it->get_cartesian().value;
-      } else if (cell_it->is_cut()) {
-        const auto point_in_left = Zap::CellBased::Geometry::Polygon(cell_it->get_left_points())
-                                       .point_in_polygon({.x = x, .y = y});
-        const auto point_in_right = Zap::CellBased::Geometry::Polygon(cell_it->get_right_points())
-                                        .point_in_polygon({.x = x, .y = y});
-
-        if (point_in_left) {
-          return cell_it->get_cut().left_value;
-        } else if (point_in_right) {
-          return cell_it->get_cut().right_value;
-        } else {
-          return (cell_it->get_cut().left_value + cell_it->get_cut().right_value) / 2;
-        }
+    Eigen::Vector<Float, DIM> mass = Eigen::Vector<Float, DIM>::Zero();
+    for (const auto& cell : cell_reader.cells()) {
+      assert(cell.is_cartesian() || cell.is_cut());
+      if (cell.is_cartesian()) {
+        mass += cell.get_cartesian().value * cell.dx() * cell.dy();
       } else {
-        Igor::Panic("Unknown cell type with variant index {}", cell_it->value.index());
-        std::unreachable();
+        const auto left_area  = Zap::CellBased::Geometry::Polygon(cell.get_left_points()).area();
+        const auto right_area = Zap::CellBased::Geometry::Polygon(cell.get_right_points()).area();
+        mass += cell.get_cut().left_value * left_area + cell.get_cut().right_value * right_area;
       }
-    };
+    }
 
-    Eigen::Vector<Float, DIM> res = Eigen::Vector<Float, DIM>::Zero();
-    simpsons_rule_2d(eval_at, res, x_min, x_max, y_min, y_max, nx, ny);
-    return res / ((x_max - x_min) * (y_max - y_min));
+    // Scale down to 1x1 domain to compare against the matrix-based solution
+    return mass / ((x_max - x_min) * (y_max - y_min));
   } else {
     IGOR_ASSERT(DIM == 1,
                 "The matrix reader only supports one-dimensional output and not {}-dimensional, "
@@ -347,42 +274,14 @@ calculate_mass(const std::variant<Zap::IO::IncCellReader<Float, DIM>,
                 DIM);
 
     const auto& mat_reader = std::get<Zap::IO::IncMatrixReader<Float>>(u_reader);
-    const auto x_min       = static_cast<Float>(0);
-    const auto x_max       = static_cast<Float>(mat_reader.cols());
-    const auto y_min       = static_cast<Float>(0);
-    const auto y_max       = static_cast<Float>(mat_reader.rows());
 
-    auto eval_at = [&](Float x, Float y) -> Eigen::Vector<Float, DIM> {
-      constexpr Float eps = std::is_same_v<std::remove_cvref_t<Float>, float> ? 1e-6f : 1e-8;
-      const int64_t xi    = [&] {
-        if (std::abs(x - static_cast<Float>(mat_reader.cols())) <= eps) {
-          return mat_reader.cols() - 1;
-        } else {
-          return static_cast<int64_t>(std::floor(x));
-        }
-      }();
-      const int64_t yi = [&] {
-        if (std::abs(y - static_cast<Float>(mat_reader.rows())) <= eps) {
-          return mat_reader.rows() - 1;
-        } else {
-          return static_cast<int64_t>(std::floor(y));
-        }
-      }();
+    Eigen::Vector<Float, DIM> mass = Eigen::Vector<Float, DIM>::Zero();
+    for (const auto& value : mat_reader.data()) {
+      mass(0) += value;
+    }
 
-      IGOR_ASSERT(xi >= 0 && xi < mat_reader.cols(),
-                  "xi={} is out of bounds must be in [0, {})",
-                  xi,
-                  mat_reader.cols());
-      IGOR_ASSERT(yi >= 0 && yi < mat_reader.rows(),
-                  "yi={} is out of bounds must be in [0, {})",
-                  yi,
-                  mat_reader.rows());
-      return Eigen::Vector<Float, DIM>{mat_reader(yi, xi)};
-    };
-
-    Eigen::Vector<Float, DIM> res = Eigen::Vector<Float, DIM>::Zero();
-    simpsons_rule_2d(eval_at, res, x_min, x_max, y_min, y_max, nx, ny);
-    return res / (mat_reader.rows() * mat_reader.cols());
+    // Scale down to 1x1 domain
+    return mass / (mat_reader.rows() * mat_reader.cols());
   }
   Igor::Panic("Unreachable");
   std::unreachable();
