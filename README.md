@@ -24,7 +24,7 @@ The examples can be run with different parameters, to see all options run the ex
 The solution is written to the directory `output/<executable name>/` in the files `u*.grid` and `t*.mat`.
 It can be rendered to a video using the provided renderer
 ```console
-$ ./renderer ../output/<executable name>/<u file>.grid ../output/<executable name>/<t file>.dat solution.mp4
+$ ./renderer ../output/<executable name>/<u file>.grid ../output/<executable name>/<t file>.mat solution.mp4
 ```
 
 The renderer depends on the library _FreeType_ and _FFmpeg_.
