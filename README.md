@@ -22,9 +22,9 @@ $ ./example_x_ramp
 The examples can be run with different parameters, to see all options run the example with the `--help` flag.
 
 The solution is written to the directory `output/<executable name>/` in the files `u*.grid` and `t*.mat`.
-It can be rendered to a video using the provided renderer
+It can be rendered to a video using the provided renderer, for example the default quarter circle example can be rendered like with the command
 ```console
-$ ./renderer ../output/<executable name>/<u file>.grid ../output/<executable name>/<t file>.mat solution.mp4
+$ ./renderer --scale 50 ../output/example_quarter_circle/u_cell_based_25x25.grid ../output/example_quarter_circle/t_cell_based_25x25.mat solution.mp4
 ```
 
 The renderer depends on the library _FreeType_ and _FFmpeg_.

@@ -57,7 +57,7 @@ constexpr void usage(std::string_view prog) {
   std::cerr
       << "\t--2d              Render solution of 2-dimensional solution (u in R^2), default is "
       << std::boolalpha << args.two_dim << '\n';
-  std::cerr << "\t--no-mass         Do not display the mass ||u||, this flag saves a lot of "
+  std::cerr << "\t--no-mass         Do not display the mass ||u||, this flag saves some "
                "computation time, default is "
             << args.no_mass << '\n';
   std::cerr << "\tu input file      Solution field for each iteration\n";
