@@ -628,10 +628,8 @@ struct ad_fabs {
   template <class T>
   static inline const AD_TAPE_REAL calc_partial(const AD_TAPE_REAL& _value, const T& arg1) {
     (void)_value;
-    if (arg1._value() < 0)
-      return static_cast<AD_TAPE_REAL>(-1.0);
-    else
-      return static_cast<AD_TAPE_REAL>(1.0);
+    if (arg1._value() < 0) return static_cast<AD_TAPE_REAL>(-1.0);
+    else return static_cast<AD_TAPE_REAL>(1.0);
   }
 };
 template <class AD_TAPE_REAL>
@@ -709,10 +707,8 @@ struct ad_pow_aa {
   static inline const AD_TAPE_REAL
   calc_partial2(const AD_TAPE_REAL _value, const T1& arg1, const T2& arg2) {
     (void)_value;
-    if (arg1 <= 0)
-      return static_cast<AD_TAPE_REAL>(0.0);
-    else
-      return log(arg1._value()) * pow(arg1._value(), arg2._value());
+    if (arg1 <= 0) return static_cast<AD_TAPE_REAL>(0.0);
+    else return log(arg1._value()) * pow(arg1._value(), arg2._value());
   }
 };
 template <class AD_TAPE_REAL>
@@ -9308,10 +9304,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>>::type
     max(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1>
 static inline
@@ -9319,10 +9313,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>>::type
     min(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T, class A2_OP>
 static inline
@@ -9330,10 +9322,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     max(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T, class A2_OP>
 static inline
@@ -9341,10 +9331,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     min(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9352,10 +9340,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 max(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9363,10 +9349,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 min(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9374,10 +9358,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 max(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9385,10 +9367,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 min(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9396,10 +9376,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 max(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9407,10 +9385,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 min(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class DATA_HANDLER_2>
 static inline
@@ -9418,10 +9394,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
     max(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class DATA_HANDLER_2>
 static inline
@@ -9429,10 +9403,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
     min(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T, class A2_OP>
 static inline
@@ -9440,10 +9412,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     max(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T, class A2_OP>
 static inline
@@ -9451,10 +9421,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     min(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9462,10 +9430,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 max(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9473,10 +9439,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 min(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9484,10 +9448,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 max(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9495,10 +9457,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 min(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9506,10 +9466,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 max(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9517,10 +9475,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 min(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class DATA_HANDLER_2>
 static inline typename min_max_return_type<
@@ -9528,10 +9484,8 @@ static inline typename min_max_return_type<
     ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
 max(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class DATA_HANDLER_2>
 static inline typename min_max_return_type<
@@ -9539,10 +9493,8 @@ static inline typename min_max_return_type<
     ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
 min(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class A2_T, class A2_OP>
 static inline typename min_max_return_type<
@@ -9550,10 +9502,8 @@ static inline typename min_max_return_type<
     ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
 max(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class A2_T, class A2_OP>
 static inline typename min_max_return_type<
@@ -9561,10 +9511,8 @@ static inline typename min_max_return_type<
     ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
 min(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL,
           class A1_T1,
@@ -9578,10 +9526,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 max(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL,
           class A1_T1,
@@ -9595,10 +9541,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 min(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9606,10 +9550,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 max(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9617,10 +9559,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 min(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9628,10 +9568,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 max(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9639,10 +9577,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 min(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class DATA_HANDLER_2>
 static inline
@@ -9650,10 +9586,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
     max(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class DATA_HANDLER_2>
 static inline
@@ -9661,10 +9595,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
     min(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T, class A2_OP>
 static inline
@@ -9672,10 +9604,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     max(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T, class A2_OP>
 static inline
@@ -9683,10 +9613,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     min(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9694,10 +9622,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 max(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9705,10 +9631,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 min(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9716,10 +9640,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 max(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9727,10 +9649,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 min(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9738,10 +9658,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 max(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9749,10 +9667,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 min(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class DATA_HANDLER_2>
 static inline
@@ -9760,10 +9676,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
     max(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class DATA_HANDLER_2>
 static inline
@@ -9771,10 +9685,8 @@ static inline
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>>::type
     min(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
         const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_2>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T, class A2_OP>
 static inline
@@ -9782,10 +9694,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     max(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T, class A2_OP>
 static inline
@@ -9793,10 +9703,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>>::type
     min(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A2_T, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9804,10 +9712,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 max(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T1, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9815,10 +9721,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>>::type
 min(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A2_T1, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9826,10 +9730,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 max(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T1, class A2_OP>
 static inline typename min_max_return_type<
@@ -9837,10 +9739,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>>::type
 min(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A2_T1, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9848,10 +9748,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 max(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP, class A2_T2, class A2_OP>
 static inline typename min_max_return_type<
@@ -9859,28 +9757,22 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>>::type
 min(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A2_T2, A2_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1>
 static inline typename min_max_return_type<ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>,
                                            AD_TAPE_REAL>::type
 max(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a, const AD_TAPE_REAL& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1>
 static inline typename min_max_return_type<ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>,
                                            AD_TAPE_REAL>::type
 min(const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& a, const AD_TAPE_REAL& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP>
 static inline
@@ -9888,10 +9780,8 @@ static inline
                                  AD_TAPE_REAL>::type
     max(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
         const AD_TAPE_REAL& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP>
 static inline
@@ -9899,10 +9789,8 @@ static inline
                                  AD_TAPE_REAL>::type
     min(const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& a,
         const AD_TAPE_REAL& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP>
 static inline typename min_max_return_type<
@@ -9910,10 +9798,8 @@ static inline typename min_max_return_type<
     AD_TAPE_REAL>::type
 max(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const AD_TAPE_REAL& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP>
 static inline typename min_max_return_type<
@@ -9921,10 +9807,8 @@ static inline typename min_max_return_type<
     AD_TAPE_REAL>::type
 min(const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& a,
     const AD_TAPE_REAL& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP>
 static inline
@@ -9932,10 +9816,8 @@ static inline
                                  AD_TAPE_REAL>::type
     max(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
         const AD_TAPE_REAL& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP>
 static inline
@@ -9943,10 +9825,8 @@ static inline
                                  AD_TAPE_REAL>::type
     min(const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& a,
         const AD_TAPE_REAL& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP>
 static inline
@@ -9954,10 +9834,8 @@ static inline
                                  AD_TAPE_REAL>::type
     max(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
         const AD_TAPE_REAL& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP>
 static inline
@@ -9965,30 +9843,24 @@ static inline
                                  AD_TAPE_REAL>::type
     min(const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& a,
         const AD_TAPE_REAL& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1>
 static inline
     typename min_max_return_type<AD_TAPE_REAL,
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>>::type
     max(const AD_TAPE_REAL& a, const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class DATA_HANDLER_1>
 static inline
     typename min_max_return_type<AD_TAPE_REAL,
                                  ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>>::type
     min(const AD_TAPE_REAL& a, const ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP>
 static inline
@@ -9996,10 +9868,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>>::type
     max(const AD_TAPE_REAL& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T, class A1_OP>
 static inline
@@ -10007,10 +9877,8 @@ static inline
                                  ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>>::type
     min(const AD_TAPE_REAL& a,
         const ad::internal::unary_intermediate<AD_TAPE_REAL, A1_T, A1_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP>
 static inline typename min_max_return_type<
@@ -10018,10 +9886,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>>::type
 max(const AD_TAPE_REAL& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_T2, class A1_OP>
 static inline typename min_max_return_type<
@@ -10029,10 +9895,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>>::type
 min(const AD_TAPE_REAL& a,
     const ad::internal::binary_intermediate_aa<AD_TAPE_REAL, A1_T1, A1_T2, A1_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP>
 static inline typename min_max_return_type<
@@ -10040,10 +9904,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>>::type
 max(const AD_TAPE_REAL& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T1, class A1_OP>
 static inline typename min_max_return_type<
@@ -10051,10 +9913,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>>::type
 min(const AD_TAPE_REAL& a,
     const ad::internal::binary_intermediate_ap<AD_TAPE_REAL, A1_T1, A1_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP>
 static inline typename min_max_return_type<
@@ -10062,10 +9922,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>>::type
 max(const AD_TAPE_REAL& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& b) {
-  if (a > b)
-    return a;
-  else
-    return b;
+  if (a > b) return a;
+  else return b;
 }
 template <class AD_TAPE_REAL, class A1_T2, class A1_OP>
 static inline typename min_max_return_type<
@@ -10073,10 +9931,8 @@ static inline typename min_max_return_type<
     ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>>::type
 min(const AD_TAPE_REAL& a,
     const ad::internal::binary_intermediate_pa<AD_TAPE_REAL, A1_T2, A1_OP>& b) {
-  if (a < b)
-    return a;
-  else
-    return b;
+  if (a < b) return a;
+  else return b;
 }
 }  // namespace internal
 
@@ -10166,8 +10022,7 @@ class exception {
   static std_exception create(std::string error, std::string file = "", int line = 0) {
     std::stringstream S;
     S << "--- ad/c++ --- " << error;
-    if (file != "")
-      S << " --- " << file << ":" << line << ".";
+    if (file != "") S << " --- " << file << ":" << line << ".";
     std::cout << "EXCEPTION thrown: " << S.str() << std::endl;
     return std_exception(S.str());
   }
@@ -10215,10 +10070,8 @@ class callback_object_base {
 
  public:
   inline void set_tape(AD_TAPE* t) {
-    if (registered_tape != 0)
-      return;
-    else
-      registered_tape = t;
+    if (registered_tape != 0) return;
+    else registered_tape = t;
   }
   inline AD_TAPE* get_tape() { return registered_tape; }
   inline callback_object_base()
@@ -10230,7 +10083,7 @@ class userdata_object_base : public callback_object_base<AD_TAPE> {
  private:
   class template_base_class {
    public:
-    virtual ~template_base_class(){};
+    virtual ~template_base_class() {};
     virtual double size() = 0;
   };
   template <typename X>
@@ -10304,8 +10157,7 @@ class userdata_object_base : public callback_object_base<AD_TAPE> {
   inline const X& read_data() {
     const X& cp = static_cast<templated_base_class<X>*>(checkpoint[cp_count])->get_data();
     ++cp_count;
-    if (static_cast<size_t>(cp_count) == checkpoint.size())
-      cp_count = 0;
+    if (static_cast<size_t>(cp_count) == checkpoint.size()) cp_count = 0;
     return cp;
   }
 };
@@ -10448,8 +10300,7 @@ class external_adjoint_object_base : public userdata_object_base<AD_TYPE, AD_TAP
   inline typename AD_TYPE::VALUE_TYPE get_output_adjoint() {
     AD_TAPE_INT idx = outputs_count;
     outputs_count++;
-    if (static_cast<size_t>(outputs_count) == outputs.size())
-      outputs_count = 0;
+    if (static_cast<size_t>(outputs_count) == outputs.size()) outputs_count = 0;
     typename AD_TYPE::VALUE_TYPE back = 0;
     back = this->registered_tape->_adjointEx(outputs[static_cast<size_t>(idx)]);
     return back;
@@ -10461,8 +10312,7 @@ class external_adjoint_object_base : public userdata_object_base<AD_TYPE, AD_TAP
       idx++;
     }
     outputs_count += n;
-    if (static_cast<size_t>(outputs_count) == outputs.size())
-      outputs_count = 0;
+    if (static_cast<size_t>(outputs_count) == outputs.size()) outputs_count = 0;
   }
   inline void get_output_adjoint(std::vector<typename AD_TYPE::VALUE_TYPE>& buffer) {
     assert(buffer.size());
@@ -10473,30 +10323,24 @@ class external_adjoint_object_base : public userdata_object_base<AD_TYPE, AD_TAP
       this->registered_tape->_adjoint(inputs[inputs_count + i]) += adj[i];
     }
     inputs_count += n;
-    if (static_cast<size_t>(inputs_count) == inputs.size())
-      inputs_count = 0;
+    if (static_cast<size_t>(inputs_count) == inputs.size()) inputs_count = 0;
   }
   inline void increment_input_adjoint(const std::vector<typename AD_TYPE::VALUE_TYPE>& adj) {
     assert(adj.size() != 0);
     increment_input_adjoint(&(adj[0]), adj.size());
   }
   inline bool all_adjoints_written() {
-    if (inputs_count == 0)
-      return true;
-    else
-      return false;
+    if (inputs_count == 0) return true;
+    else return false;
   }
   inline bool all_adjoints_read() {
-    if (outputs_count == 0)
-      return true;
-    else
-      return false;
+    if (outputs_count == 0) return true;
+    else return false;
   }
   inline void increment_input_adjoint(const typename AD_TYPE::VALUE_TYPE& adj) {
     AD_TAPE_INT idx = inputs_count;
     inputs_count++;
-    if (static_cast<size_t>(inputs_count) == inputs.size())
-      inputs_count = 0;
+    if (static_cast<size_t>(inputs_count) == inputs.size()) inputs_count = 0;
     this->registered_tape->_adjointEx(inputs[static_cast<size_t>(idx)]) += adj;
   }
 };
@@ -11041,8 +10885,7 @@ struct blob_tape {
     _interpret_chunk(start, end, progvaridx, settings);
   }
   inline void _zero_adjoints_internal(const position_t& from, const position_t& to) {
-    if (_adjoints == 0)
-      return;
+    if (_adjoints == 0) return;
     for (AD_TAPE_INT i = from._progvarcounter(); i > to._progvarcounter(); --i) {
       _adjoints[i] = 0;
     }
@@ -11066,10 +10909,8 @@ struct blob_tape {
     typedef typename AD_ACTIVE::DATA_TYPE AD_DATA;
     for (i = 0; i < n; ++i) {
       entries[i].arg = 0;
-      if (values)
-        actives[i] = values[i];
-      if (outs)
-        outs[i] = startidx + i;
+      if (values) actives[i] = values[i];
+      if (outs) outs[i] = startidx + i;
       AD_DATA& data = const_cast<AD_DATA&>(actives[i]._data());
       data.register_variable(startidx + i, this);
     }
@@ -11120,8 +10961,7 @@ struct blob_tape {
     return create(options.tapesize());
   }
   static blob_tape* create(AD_TAPE_INT size, AD_TAPE_INT progvarcounter = 0) {
-    if (progvarcounter == 0)
-      progvarcounter = size / 2;
+    if (progvarcounter == 0) progvarcounter = size / 2;
     blob_tape* ret = new blob_tape();
     // must use malloc instead of new, such that memory is not initialized
     ret->_stack      = (TAPE_ENTRY*)malloc((size + 1) * sizeof(TAPE_ENTRY));
@@ -11139,8 +10979,7 @@ struct blob_tape {
     return ret;
   }
   static void remove(blob_tape*& tape) {
-    if (tape == 0)
-      return;
+    if (tape == 0) return;
     delete tape;
     tape = 0;
   }
@@ -11170,7 +11009,7 @@ struct blob_tape {
     virtual void run_callback(AD_TAPE_CLASS& caller,
                               const interpretation_settings& s,
                               callback_object_t* userdata) = 0;
-    virtual ~CALLBACK_FCN_HANDLER_BASE(){};
+    virtual ~CALLBACK_FCN_HANDLER_BASE() {};
   };
   template <typename EXT_DATA>
   class CALLBACK_FCN_HANDLER : public CALLBACK_FCN_HANDLER_BASE {
@@ -11200,18 +11039,10 @@ struct blob_tape {
                       callback_object_t* userdata) {
       EXT_DATA* casted_userdata = static_cast<EXT_DATA*>(userdata);
       switch (fcn_type_id) {
-        case 0:
-          fcn.fcn(casted_userdata);
-          break;
-        case 1:
-          fcn.fcn_w_tape(caller, casted_userdata);
-          break;
-        case 2:
-          fcn.fcn_w_all(caller, s, casted_userdata);
-          break;
-        default:
-          throw ad::exception::create<std::runtime_error>("unknown callback to run.");
-          break;
+        case 0:  fcn.fcn(casted_userdata); break;
+        case 1:  fcn.fcn_w_tape(caller, casted_userdata); break;
+        case 2:  fcn.fcn_w_all(caller, s, casted_userdata); break;
+        default: throw ad::exception::create<std::runtime_error>("unknown callback to run."); break;
       }
     }
     ~CALLBACK_FCN_HANDLER() {}
@@ -11235,13 +11066,11 @@ struct blob_tape {
     callback_object_t*& _userdata() { return userdata; }
     void free_userdata() {
       delete userdata;
-      if (callback_handler)
-        delete callback_handler;
+      if (callback_handler) delete callback_handler;
     }
     position_t& _position() { return position; }
     void run_callback(AD_TAPE_CLASS& caller, const interpretation_settings& s) {
-      if (callback_handler)
-        callback_handler->run_callback(caller, s, userdata);
+      if (callback_handler) callback_handler->run_callback(caller, s, userdata);
     }
   };
   std::vector<tape_callback> tape_callbacks;
@@ -11302,8 +11131,7 @@ struct blob_tape {
       size_t offset = static_cast<size_t>(i);
       if ((tape_callbacks[offset]._position()._progvarcounter() <= from._progvarcounter()) &&
           (tape_callbacks[offset]._position()._progvarcounter() >= to._progvarcounter())) {
-        if (external_first == -1)
-          external_first = i;
+        if (external_first == -1) external_first = i;
         ++external_count;
       }
     }
@@ -11334,12 +11162,10 @@ struct blob_tape {
  public:
   inline bool is_active() { return _isactive; }
   inline void switch_to_active() {
-    if (!_isactive)
-      _isactive = true;
+    if (!_isactive) _isactive = true;
   }
   inline void switch_to_passive() {
-    if (_isactive)
-      _isactive = false;
+    if (_isactive) _isactive = false;
   }
   template <class DATA_HANDLER_1>
   inline void register_variable(ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>& x) {
@@ -11368,16 +11194,14 @@ struct blob_tape {
       ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>* x,
       const int n,
       const typename ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>::VALUE_TYPE* const v) {
-    if (n == 0)
-      return;
+    if (n == 0) return;
     for (int i = 0; i < n; ++i)
       register_variable(x[i], v[i]);
   }
   template <class DATA_HANDLER_1>
   inline void register_variable(ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>* x,
                                 const size_t n) {
-    if (n == 0)
-      return;
+    if (n == 0) return;
     for (size_t i = 0; i < n; ++i)
       register_variable(x[i]);
   }
@@ -11388,8 +11212,7 @@ struct blob_tape {
   template <class DATA_HANDLER_1>
   inline void register_output_variable(ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>* x,
                                        const size_t n) {
-    if (n == 0)
-      return;
+    if (n == 0) return;
     for (size_t i = 0; i < n; ++i)
       x[i] = static_cast<ad::internal::active_type<AD_TAPE_REAL, DATA_HANDLER_1>>(1.0) * x[i];
   }
@@ -11416,8 +11239,7 @@ struct blob_tape {
           "adjoint interpretation: from < to.",
           "../build_files//../src/ad//ad_tape_interface_inc.hpp",
           241);
-    else
-      _interpret_adjoint_internal(get_position(), to, settings);
+    else _interpret_adjoint_internal(get_position(), to, settings);
   }
   inline void interpret_adjoint_from(const position_t& from) {
     position_t to;
@@ -11432,8 +11254,7 @@ struct blob_tape {
           "adjoint interpretation: from < to.",
           "../build_files//../src/ad//ad_tape_interface_inc.hpp",
           264);
-    else
-      _interpret_adjoint_internal(from, to, settings);
+    else _interpret_adjoint_internal(from, to, settings);
   }
   inline void interpret_adjoint_and_reset_to(const position_t& to) {
     position_t from(get_position());
@@ -11600,9 +11421,7 @@ struct blob_tape {
         AD_TAPE_INT newTapeIndex;
         typename AD_TAPE_CLASS::TAPE_ENTRY* ins_ptr =
             global_tape->_get_insert_ptr(edgecount + 1, newTapeIndex);
-        if (ins_ptr != 0) {
-          typename handler_base::tapehandler tmp(ins_ptr, edgecount, vneu);
-        }
+        if (ins_ptr != 0) { typename handler_base::tapehandler tmp(ins_ptr, edgecount, vneu); }
         single_tape_data& data = const_cast<single_tape_data&>(target._data());
         data._tape_index_      = newTapeIndex;
       } else {
@@ -11702,5 +11521,9 @@ using gt1s = tangent<T>;
 #ifdef AD_INTEROP_EIGEN
 #include "./ad_interoperability_eigen.hpp"
 #endif  // AD_INTEROP_EIGEN
+
+#ifdef AD_FORMATTING
+#include "./ad_formatting.hpp"
+#endif  // AD_FORMATTING
 
 #endif
