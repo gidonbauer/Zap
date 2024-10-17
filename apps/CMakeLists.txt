@@ -10,6 +10,7 @@ set(executables
   
   example_quarter_circle
   example_x_ramp
+  example_x_ramp_fd
 )
 
 foreach(exec ${executables})

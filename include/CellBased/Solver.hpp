@@ -560,7 +560,6 @@ class Solver {
       if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
         return std::nullopt;
       }
-      break;
     }
 
     return curr_grid;
