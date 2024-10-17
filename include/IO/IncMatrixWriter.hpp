@@ -125,12 +125,6 @@ class IncMatrixWriter {
   }
 };
 
-// -------------------------------------------------------------------------------------------------
-class NoopWriter {
- public:
-  [[nodiscard]] constexpr auto write_data(const auto& /*ignored*/) noexcept -> bool { return true; }
-};
-
 }  // namespace Zap::IO
 
 #endif  // ZAP_IO_INC_MATRIX_WRITER_HPP_
