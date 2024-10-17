@@ -5,6 +5,8 @@
 
 #include <Eigen/Dense>
 
+#include <AD/ad.hpp>
+
 #include "CellBased/Definitions.hpp"
 #include "CellBased/SmallVector.hpp"
 
@@ -15,7 +17,10 @@ class Polygon {
   static_assert(
       std::is_same_v<decltype(std::declval<PointType>().x), decltype(std::declval<PointType>().y)>,
       "Expect x- and y-component of PointType to have the same type.");
-  using Float = decltype(std::declval<PointType>().x);
+  using ActiveFloat  = decltype(std::declval<PointType>().x);
+  using PassiveFloat = std::conditional_t<ad::mode<ActiveFloat>::is_ad_type,
+                                          typename ad::mode<ActiveFloat>::passive_t,
+                                          ActiveFloat>;
 
   SmallVector<PointType> m_points{};
 
@@ -35,7 +40,7 @@ class Polygon {
     for (const auto& p : m_points) {
       center += p;
     }
-    center /= static_cast<Float>(m_points.size());
+    center /= static_cast<PassiveFloat>(m_points.size());
 
     // Sort points in counter clockwise order
     std::sort(std::begin(m_points),
@@ -51,14 +56,14 @@ class Polygon {
   constexpr void remove_duplicate_points() noexcept {
     const auto first_duplicate = std::unique(
         std::begin(m_points), std::end(m_points), [](const PointType& p1, const PointType& p2) {
-          return (p1 - p2).norm() < EPS<Float>;
+          return (p1 - p2).norm() < EPS<PassiveFloat>;
         });
     m_points.erase(first_duplicate, std::end(m_points));
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto area() const noexcept -> Float {
-    Float double_area{0};
+  [[nodiscard]] constexpr auto area() const noexcept -> ActiveFloat {
+    ActiveFloat double_area{0};
     for (size_t i = 0; i < m_points.size(); ++i) {
       const auto& p1 = m_points[i];
       const auto& p2 = m_points[(i + 1) % m_points.size()];

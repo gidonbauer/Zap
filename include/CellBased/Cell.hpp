@@ -121,8 +121,8 @@ struct Cell {
     assert(is_cut());
 
     return CoordType2PointType<ActiveFloat, COORD_TYPE>{
-        .x = get_cut().rel_cut1(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
-        .y = get_cut().rel_cut1(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
+        get_cut().rel_cut1(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
+        get_cut().rel_cut1(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
@@ -132,8 +132,8 @@ struct Cell {
     assert(is_cut());
 
     return CoordType2PointType<ActiveFloat, COORD_TYPE>{
-        .x = get_cut().rel_cut2(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
-        .y = get_cut().rel_cut2(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
+        get_cut().rel_cut2(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
+        get_cut().rel_cut2(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
@@ -165,8 +165,8 @@ struct Cell {
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept
-      -> Geometry::Polygon<CoordType2PointType<PassiveFloat, COORD_TYPE>> {
-    return Geometry::Polygon<CoordType2PointType<PassiveFloat, COORD_TYPE>>{{
+      -> Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
+    return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{{
         {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
         {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
         {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},

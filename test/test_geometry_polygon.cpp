@@ -12,23 +12,23 @@ TEST(GeometryPolygon, AddPoint) {
   EXPECT_EQ(polygon.size(), 0);
   EXPECT_DOUBLE_EQ(polygon.area(), 0.0);
 
-  polygon.add_point(GenCoord<Float>{.x = 0.0, .y = 0.0});
+  polygon.add_point(GenCoord<Float>{0.0, 0.0});
   EXPECT_EQ(polygon.size(), 1);
   EXPECT_DOUBLE_EQ(polygon.area(), 0.0);
 
-  polygon.add_point(GenCoord<Float>{.x = 0.0, .y = 1.0});
+  polygon.add_point(GenCoord<Float>{0.0, 1.0});
   EXPECT_EQ(polygon.size(), 2);
   EXPECT_DOUBLE_EQ(polygon.area(), 0.0);
 
-  polygon.add_point(GenCoord<Float>{.x = 1.0, .y = 0.0});
+  polygon.add_point(GenCoord<Float>{1.0, 0.0});
   EXPECT_EQ(polygon.size(), 3);
   EXPECT_DOUBLE_EQ(polygon.area(), 0.5);
 
-  polygon.add_point(GenCoord<Float>{.x = 1.0, .y = 1.0});
+  polygon.add_point(GenCoord<Float>{1.0, 1.0});
   EXPECT_EQ(polygon.size(), 4);
   EXPECT_DOUBLE_EQ(polygon.area(), 1.0);
 
-  polygon.add_point(GenCoord<Float>{.x = 1.0, .y = 1.0});
+  polygon.add_point(GenCoord<Float>{1.0, 1.0});
   EXPECT_EQ(polygon.size(), 4);
   EXPECT_DOUBLE_EQ(polygon.area(), 1.0);
 }
@@ -37,11 +37,11 @@ TEST(GeometryPolygon, Area) {
   {
     using Float = float;
     const SmallVector<GenCoord<Float>> points{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
+        {1.0, 1.0},
     };
 
     const Geo::Polygon polygon{points};
@@ -53,11 +53,11 @@ TEST(GeometryPolygon, Area) {
   {
     using Float = double;
     const SmallVector<GenCoord<Float>> points{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
+        {1.0, 1.0},
     };
 
     const Geo::Polygon polygon{points};
@@ -69,9 +69,9 @@ TEST(GeometryPolygon, Area) {
   {
     using Float = double;
     const SmallVector<GenCoord<Float>> points{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 1.0},
     };
 
     const Geo::Polygon polygon{points};
@@ -82,11 +82,11 @@ TEST(GeometryPolygon, Area) {
   {
     using Float = double;
     const SmallVector<GenCoord<Float>> points{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
-        {.x = 1.5, .y = 0.5},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
+        {1.5, 0.5},
     };
 
     const Geo::Polygon polygon{points};
@@ -98,10 +98,10 @@ TEST(GeometryPolygon, Area) {
 TEST(GeometryPolygon, Intersect) {
   {
     const Geo::Polygon<GenCoord<double>> poly1{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
     }};
 
     const Geo::Polygon<GenCoord<double>> poly2{{}};
@@ -118,16 +118,16 @@ TEST(GeometryPolygon, Intersect) {
 
   {
     const Geo::Polygon<GenCoord<double>> poly1{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
     }};
 
     const Geo::Polygon<GenCoord<double>> poly2{{
-        {.x = 2.0, .y = 0.0},
-        {.x = 2.0, .y = 1.0},
-        {.x = 3.0, .y = 0.0},
+        {2.0, 0.0},
+        {2.0, 1.0},
+        {3.0, 0.0},
     }};
 
     const auto intersect1 = Geo::intersection(poly1, poly2);
@@ -142,16 +142,16 @@ TEST(GeometryPolygon, Intersect) {
 
   {
     const Geo::Polygon<GenCoord<double>> poly1{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
     }};
 
     const Geo::Polygon<GenCoord<double>> poly2{{
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
-        {.x = 3.0, .y = 0.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
+        {3.0, 0.0},
     }};
 
     const auto intersect1 = Geo::intersection(poly1, poly2);
@@ -166,16 +166,16 @@ TEST(GeometryPolygon, Intersect) {
 
   {
     const Geo::Polygon<GenCoord<double>> poly1{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
     }};
 
     const Geo::Polygon<GenCoord<double>> poly2{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
     }};
 
     const auto intersect1 = Geo::intersection(poly1, poly2);
@@ -195,18 +195,18 @@ TEST(GeometryPolygon, Intersect) {
 
   {
     const Geo::Polygon<GenCoord<double>> poly1{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
-        {.x = 1.5, .y = 0.5},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
+        {1.5, 0.5},
     }};
 
     const Geo::Polygon<GenCoord<double>> poly2{{
-        {.x = 0.0, .y = 0.0},
-        {.x = 0.0, .y = 1.0},
-        {.x = 1.0, .y = 0.0},
-        {.x = 1.0, .y = 1.0},
+        {0.0, 0.0},
+        {0.0, 1.0},
+        {1.0, 0.0},
+        {1.0, 1.0},
     }};
 
     const auto intersect1 = Geo::intersection(poly1, poly2);
@@ -228,16 +228,16 @@ TEST(GeometryPolygon, Intersect) {
 // TEST(GeometryPolygon, IntersectRoundingBugFloat) {
 //   // TODO: float tolerance seems to be wrong for this bug
 //   const Geo::Polygon<GenCoord<float>> p1{{
-//       {.x = 1.8633899774085183f, .y = 1.6666666709613775f},
-//       {.x = 1.6666666709613778f, .y = 1.8633899774085183f},
-//       {.x = 1.6666666666666665f, .y = 1.6666666666666665f},
+//       {1.8633899774085183f, 1.6666666709613775f},
+//       {1.6666666709613778f, 1.8633899774085183f},
+//       {1.6666666666666665f, 1.6666666666666665f},
 //   }};
 //
 //   const Geo::Polygon<GenCoord<float>> p2{{
-//       {.x = 1.8251895692700746f, .y = 1.6666666666666665f},
-//       {.x = 1.8251895692700746f, .y = 1.8633899774085183f},
-//       {.x = 1.6666666666666665f, .y = 1.8633899774085183f},
-//       {.x = 1.6666666666666665f, .y = 1.6666666666666665f},
+//       {1.8251895692700746f, 1.6666666666666665f},
+//       {1.8251895692700746f, 1.8633899774085183f},
+//       {1.6666666666666665f, 1.8633899774085183f},
+//       {1.6666666666666665f, 1.6666666666666665f},
 //   }};
 //
 //   const auto intersect_12 = Geo::intersection(p1, p2);
@@ -258,16 +258,16 @@ TEST(GeometryPolygon, Intersect) {
 
 TEST(GeometryPolygon, IntersectRoundingBugDouble) {
   const Geo::Polygon<GenCoord<double>> p1{{
-      {.x = 1.8633899774085183, .y = 1.6666666709613775},
-      {.x = 1.6666666709613778, .y = 1.8633899774085183},
-      {.x = 1.6666666666666665, .y = 1.6666666666666665},
+      {1.8633899774085183, 1.6666666709613775},
+      {1.6666666709613778, 1.8633899774085183},
+      {1.6666666666666665, 1.6666666666666665},
   }};
 
   const Geo::Polygon<GenCoord<double>> p2{{
-      {.x = 1.8251895692700746, .y = 1.6666666666666665},
-      {.x = 1.8251895692700746, .y = 1.8633899774085183},
-      {.x = 1.6666666666666665, .y = 1.8633899774085183},
-      {.x = 1.6666666666666665, .y = 1.6666666666666665},
+      {1.8251895692700746, 1.6666666666666665},
+      {1.8251895692700746, 1.8633899774085183},
+      {1.6666666666666665, 1.8633899774085183},
+      {1.6666666666666665, 1.6666666666666665},
   }};
 
   const auto intersect_12 = Geo::intersection(p1, p2);
@@ -288,10 +288,10 @@ TEST(GeometryPolygon, IntersectRoundingBugDouble) {
 
 TEST(GeometryPolygon, PointInPolygon) {
   Geo::Polygon<GenCoord<double>> polygon({
-      {.x = 0.0, .y = 0.0},
-      {.x = 1.0, .y = 0.0},
-      {.x = 0.0, .y = 1.0},
-      {.x = 1.0, .y = 1.0},
+      {0.0, 0.0},
+      {1.0, 0.0},
+      {0.0, 1.0},
+      {1.0, 1.0},
   });
 
   EXPECT_TRUE(polygon.point_in_polygon(GenCoord<double>{0.5, 0.5}));
@@ -307,16 +307,16 @@ TEST(GeometryPolygon, PointInPolygon) {
 
 TEST(GeometryPolygon, ScalingAndRelativeSizes) {
   Geo::Polygon<GenCoord<double>> polygon_A({
-      {.x = 0.2, .y = 0.4},
-      {.x = 0.4, .y = 0.2},
-      {.x = 0.55, .y = 0.6},
+      {0.2, 0.4},
+      {0.4, 0.2},
+      {0.55, 0.6},
   });
 
   Geo::Polygon<GenCoord<double>> polygon_B({
-      {.x = 0.8, .y = 0.35},
-      {.x = 0.75, .y = 0.8},
-      {.x = 0.25, .y = 0.8},
-      {.x = 0.4, .y = 0.45},
+      {0.8, 0.35},
+      {0.75, 0.8},
+      {0.25, 0.8},
+      {0.4, 0.45},
   });
 
   const auto intersect_AB = Geo::intersection(polygon_A, polygon_B);
@@ -326,12 +326,12 @@ TEST(GeometryPolygon, ScalingAndRelativeSizes) {
 
   Geo::Polygon<GenCoord<double>> scaled_polygon_A;
   for (const auto& p : polygon_A.points()) {
-    scaled_polygon_A.add_point({.x = scale_x * p.x, .y = scale_y * p.y});
+    scaled_polygon_A.add_point({scale_x * p.x, scale_y * p.y});
   }
 
   Geo::Polygon<GenCoord<double>> scaled_polygon_B;
   for (const auto& p : polygon_B.points()) {
-    scaled_polygon_B.add_point({.x = scale_x * p.x, .y = scale_y * p.y});
+    scaled_polygon_B.add_point({scale_x * p.x, scale_y * p.y});
   }
 
   const auto scaled_intersect_AB = Geo::intersection(scaled_polygon_A, scaled_polygon_B);

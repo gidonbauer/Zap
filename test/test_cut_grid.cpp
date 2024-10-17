@@ -55,8 +55,8 @@ TEST(CutGrid, PiecewiseLinearSingleLine) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.7, .y = 0.0},
-      {.x = 0.0, .y = 0.5},
+      {0.7, 0.0},
+      {0.0, 0.5},
   };
   const auto success = grid.cut_piecewise_linear(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -90,8 +90,8 @@ TEST(CutGrid, PiecewiseLinearVertLineOnGrid) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.8, .y = 0.0},
-      {.x = 0.8, .y = 1.0},
+      {0.8, 0.0},
+      {0.8, 1.0},
   };
   const auto success = grid.cut_piecewise_linear(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -123,8 +123,8 @@ TEST(CutGrid, PiecewiseLinearHoriLineOnGrid) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.0, .y = 0.8},
-      {.x = 1.0, .y = 0.8},
+      {0.0, 0.8},
+      {1.0, 0.8},
   };
   const auto success = grid.cut_piecewise_linear(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -156,9 +156,9 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsNoExtend) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.85, .y = 0.35},
-      {.x = 0.4, .y = 0.5},
-      {.x = 0.25, .y = 0.9},
+      {0.85, 0.35},
+      {0.4, 0.5},
+      {0.25, 0.9},
   };
   const auto success = grid.cut_piecewise_linear<ExtendType::NONE>(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -190,9 +190,9 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendMax) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.85, .y = 0.35},
-      {.x = 0.4, .y = 0.5},
-      {.x = 0.25, .y = 0.9},
+      {0.85, 0.35},
+      {0.4, 0.5},
+      {0.25, 0.9},
   };
   const auto success = grid.cut_piecewise_linear<ExtendType::MAX>(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -228,9 +228,9 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendNearest) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.85, .y = 0.35},
-      {.x = 0.4, .y = 0.5},
-      {.x = 0.25, .y = 0.91},
+      {0.85, 0.35},
+      {0.4, 0.5},
+      {0.25, 0.91},
   };
   const auto success = grid.cut_piecewise_linear<ExtendType::NEAREST>(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -264,9 +264,9 @@ TEST(CutGrid, CutOnCorner) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.8, .y = 0.2},
-      {.x = 0.4, .y = 0.4},
-      {.x = 0.0, .y = 0.8},
+      {0.8, 0.2},
+      {0.4, 0.4},
+      {0.0, 0.8},
   };
   const auto success = grid.cut_piecewise_linear<ExtendType::NEAREST>(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";
@@ -305,11 +305,11 @@ TEST(CutGrid, PointsFullyInside) {
   UniformGrid<Float, Float, 1> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
 
   std::vector<SimCoord<Float>> points = {
-      {.x = 0.85, .y = 0.35},
-      {.x = 0.55, .y = 0.5},
-      {.x = 0.45, .y = 0.5},
-      {.x = 0.4, .y = 0.5},
-      {.x = 0.25, .y = 0.91},
+      {0.85, 0.35},
+      {0.55, 0.5},
+      {0.45, 0.5},
+      {0.4, 0.5},
+      {0.25, 0.91},
   };
   const auto success = grid.cut_piecewise_linear<ExtendType::MAX>(points);
   ASSERT_TRUE(success) << "Could not cut the grid successfully.";

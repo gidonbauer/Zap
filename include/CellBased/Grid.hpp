@@ -46,8 +46,8 @@ class UniformGrid {
   [[nodiscard]] constexpr auto to_grid_coord(const SimCoord<T>& simulation_coord) const noexcept
       -> GridCoord<T> {
     return {
-        .x = (simulation_coord.x - m_x_min) / m_dx,
-        .y = (simulation_coord.y - m_y_min) / m_dy,
+        (simulation_coord.x - m_x_min) / m_dx,
+        (simulation_coord.y - m_y_min) / m_dy,
     };
   }
 
@@ -56,8 +56,8 @@ class UniformGrid {
   [[nodiscard]] constexpr auto to_sim_coord(const GridCoord<T>& grid_coord) const noexcept
       -> SimCoord<T> {
     return {
-        .x = grid_coord.x * m_dx + m_x_min,
-        .y = grid_coord.y * m_dy + m_y_min,
+        grid_coord.x * m_dx + m_x_min,
+        grid_coord.y * m_dy + m_y_min,
     };
   }
 
@@ -273,7 +273,7 @@ class UniformGrid {
           for (size_t j = 0; j < corners.size(); ++j) {
             auto point = SimCoord<ActiveFloat>::Zero();
             for (size_t i = 0; i < corners.size(); ++i) {
-              point += (1 + (i == j)) * corners[i] / static_cast<ActiveFloat>(corners.size() + 1);
+              point += (1 + (i == j)) * corners[i] / static_cast<PassiveFloat>(corners.size() + 1);
             }
 
             if constexpr (DIM == 1) {
@@ -282,7 +282,7 @@ class UniformGrid {
               cut_value.left_value += f(point.x, point.y);
             }
           }
-          cut_value.left_value /= static_cast<ActiveFloat>(corners.size());
+          cut_value.left_value /= static_cast<PassiveFloat>(corners.size());
         }
 
         // Right side
@@ -291,7 +291,7 @@ class UniformGrid {
           for (size_t j = 0; j < corners.size(); ++j) {
             auto point = SimCoord<ActiveFloat>::Zero();
             for (size_t i = 0; i < corners.size(); ++i) {
-              point += (1 + (i == j)) * corners[i] / static_cast<ActiveFloat>(corners.size() + 1);
+              point += (1 + (i == j)) * corners[i] / static_cast<PassiveFloat>(corners.size() + 1);
             }
 
             if constexpr (DIM == 1) {
@@ -300,7 +300,7 @@ class UniformGrid {
               cut_value.right_value += f(point.x, point.y);
             }
           }
-          cut_value.right_value /= static_cast<ActiveFloat>(corners.size());
+          cut_value.right_value /= static_cast<PassiveFloat>(corners.size());
         }
       } else {
         Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
@@ -321,14 +321,14 @@ class UniformGrid {
         point_in_cell(cut2_point, cell), "Cut2-point {} is not in cell {}.", cut2_point, cell);
 
     auto find_sides = [&cell](const PointType& p) -> Side {
-      const int on_x =
-          approx_eq(cell.template x_min<coord_type>(), p.x) * ON_MIN +
-          approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(), p.x) *
-              ON_MAX;
-      const int on_y =
-          approx_eq(cell.template y_min<coord_type>(), p.y) * ON_MIN +
-          approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(), p.y) *
-              ON_MAX;
+      const int on_x = approx_eq(cell.template x_min<coord_type>(), ad::value(p.x)) * ON_MIN +
+                       approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                                 ad::value(p.x)) *
+                           ON_MAX;
+      const int on_y = approx_eq(cell.template y_min<coord_type>(), ad::value(p.y)) * ON_MIN +
+                       approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
+                                 ad::value(p.y)) *
+                           ON_MAX;
       IGOR_ASSERT(on_x != NOT_ON || on_y != NOT_ON,
                   "Point {} is not on a edge in x-direction or in y-direction of cell {}.",
                   p,
@@ -631,8 +631,7 @@ class UniformGrid {
 
   // -----------------------------------------------------------------------------------------------
   template <ExtendType extend_type = ExtendType::MAX, typename T>
-  [[nodiscard]] constexpr auto cut_piecewise_linear(const std::vector<SimCoord<T>>& points) noexcept
-      -> bool {
+  [[nodiscard]] auto cut_piecewise_linear(const std::vector<SimCoord<T>>& points) noexcept -> bool {
     std::vector<GridCoord<T>> points_grid_coord(points.size());
     std::transform(std::cbegin(points),
                    std::cend(points),
@@ -643,8 +642,7 @@ class UniformGrid {
 
   // -----------------------------------------------------------------------------------------------
   template <ExtendType extend_type = ExtendType::MAX, typename T>
-  [[nodiscard]] constexpr auto cut_piecewise_linear(std::vector<GridCoord<T>> points) noexcept
-      -> bool {
+  [[nodiscard]] auto cut_piecewise_linear(std::vector<GridCoord<T>> points) noexcept -> bool {
     if (!m_cut_cell_idxs.empty()) {
       Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
       return false;
@@ -679,7 +677,7 @@ class UniformGrid {
             (std::ceil(p0.y) - p0.y) / s.y,
         };
 
-        auto r_entry = -std::numeric_limits<T>::max();
+        T r_entry = -std::numeric_limits<T>::max();
         for (auto r : rs) {
           if constexpr (extend_type == ExtendType::MAX) {
             if (r < EPS<T> && r > r_entry) { r_entry = r; }
@@ -709,7 +707,7 @@ class UniformGrid {
             (std::ceil(p1.y) - p1.y) / s.y,
         };
 
-        auto r_exit = std::numeric_limits<T>::max();
+        T r_exit = std::numeric_limits<T>::max();
         for (auto r : rs) {
           if constexpr (extend_type == ExtendType::MAX) {
             if (r > -EPS<T> && r < r_exit) { r_exit = r; }
@@ -747,8 +745,8 @@ class UniformGrid {
       // Intersections where x in N
       if (search_whole_x) {
         for (int x = get_whole_min(p0.x, p1.x); x <= get_whole_max(p0.x, p1.x); ++x) {
-          const auto r = (static_cast<T>(x) - p0.x) / slope.x;
-          const auto y = p0.y + r * slope.y;
+          const T r = (static_cast<T>(x) - p0.x) / slope.x;
+          const T y = p0.y + r * slope.y;
           intersect_points.emplace_back(static_cast<T>(x), y);
         }
       }
@@ -756,11 +754,11 @@ class UniformGrid {
       // Intersections where y in N
       if (search_whole_y) {
         for (int y = get_whole_min(p0.y, p1.y); y <= get_whole_max(p0.y, p1.y); ++y) {
-          const auto r = (static_cast<T>(y) - p0.y) / slope.y;
-          const auto x = p0.x + r * slope.x;
+          const T r = (static_cast<T>(y) - p0.y) / slope.y;
+          const T x = p0.x + r * slope.x;
 
           // If x is a whole number, the point was already added in the previous loop, can ignore it
-          if (search_whole_x && approx_eq(x, std::round(x))) { continue; }
+          if (search_whole_x && approx_eq(ad::value(x), std::round(ad::value(x)))) { continue; }
 
           intersect_points.emplace_back(x, static_cast<T>(y));
         }
@@ -898,7 +896,7 @@ class UniformGrid {
     }
 
     const size_t xi = [this, &gpos] {
-      if (approx_eq(gpos.x, static_cast<PassiveFloat>(m_nx))) {
+      if (approx_eq(ad::value(gpos.x), static_cast<PassiveFloat>(m_nx))) {
         return m_nx - 1;
       } else {
         return static_cast<size_t>(std::floor(gpos.x));
@@ -906,7 +904,7 @@ class UniformGrid {
     }();
 
     const size_t yi = [this, &gpos] {
-      if (approx_eq(gpos.y, static_cast<PassiveFloat>(m_ny))) {
+      if (approx_eq(ad::value(gpos.y), static_cast<PassiveFloat>(m_ny))) {
         return m_ny - 1;
       } else {
         return static_cast<size_t>(std::floor(gpos.y));

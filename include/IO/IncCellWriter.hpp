@@ -153,13 +153,22 @@ class IncCellWriter {
         m_out.write(reinterpret_cast<const char*>(&y_min), sizeof(y_min));
         m_out.write(reinterpret_cast<const char*>(&dy), sizeof(dy));
 
-        static_assert(std::is_floating_point_v<ActiveFloat>,
-                      "For the moment, ActiveFloat must be a floating point type. Need to handle "
-                      "AD types differently.");
-        const auto value = cell.get_cartesian().value;
-        static_assert(std::is_same_v<typename decltype(value)::Scalar, ActiveFloat>,
-                      "Value must be ActiveFloat.");
-        m_out.write(reinterpret_cast<const char*>(value.data()), DIM * sizeof(ActiveFloat));
+        if constexpr (ad::mode<ActiveFloat>::is_ad_type) {
+          // TODO: Should we save the derivative values as well?
+          Eigen::Vector<PassiveFloat, DIM> passive_value;
+          std::transform(std::cbegin(cell.get_cartesian().value),
+                         std::cend(cell.get_cartesian().value),
+                         std::begin(passive_value),
+                         [](const ActiveFloat& v) { return ad::value(v); });
+
+          m_out.write(reinterpret_cast<const char*>(passive_value.data()),
+                      DIM * sizeof(PassiveFloat));
+        } else {
+          static_assert(std::is_floating_point_v<ActiveFloat>,
+                        "We assume ActiveFloat is a floating point type.");
+          m_out.write(reinterpret_cast<const char*>(cell.get_cartesian().value.data()),
+                      DIM * sizeof(ActiveFloat));
+        }
         // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
       } else if (cell.is_cut()) {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -181,19 +190,32 @@ class IncCellWriter {
         m_out.write(reinterpret_cast<const char*>(&cut2.x), sizeof(cut2.x));
         m_out.write(reinterpret_cast<const char*>(&cut2.y), sizeof(cut2.y));
 
-        static_assert(std::is_floating_point_v<ActiveFloat>,
-                      "For the moment, ActiveFloat must be a floating point type. Need to handle "
-                      "AD types differently.");
-        static_assert(std::is_same_v<typename decltype(cell_value.left_value)::Scalar, ActiveFloat>,
-                      "Value must be ActiveFloat.");
-        static_assert(
-            std::is_same_v<typename decltype(cell_value.right_value)::Scalar, ActiveFloat>,
-            "Value must be ActiveFloat.");
         // Value
-        m_out.write(reinterpret_cast<const char*>(cell_value.left_value.data()),
-                    DIM * sizeof(ActiveFloat));
-        m_out.write(reinterpret_cast<const char*>(cell_value.right_value.data()),
-                    DIM * sizeof(ActiveFloat));
+        if constexpr (ad::mode<ActiveFloat>::is_ad_type) {
+          // TODO: Should we save the derivative values as well?
+          Eigen::Vector<PassiveFloat, DIM> passive_value;
+
+          std::transform(std::cbegin(cell_value.left_value),
+                         std::cend(cell_value.left_value),
+                         std::begin(passive_value),
+                         [](const ActiveFloat& v) { return ad::value(v); });
+          m_out.write(reinterpret_cast<const char*>(passive_value.data()),
+                      DIM * sizeof(PassiveFloat));
+
+          std::transform(std::cbegin(cell_value.right_value),
+                         std::cend(cell_value.right_value),
+                         std::begin(passive_value),
+                         [](const ActiveFloat& v) { return ad::value(v); });
+          m_out.write(reinterpret_cast<const char*>(passive_value.data()),
+                      DIM * sizeof(PassiveFloat));
+        } else {
+          static_assert(std::is_floating_point_v<ActiveFloat>,
+                        "We assume ActiveFloat is a floating point type.");
+          m_out.write(reinterpret_cast<const char*>(cell_value.left_value.data()),
+                      DIM * sizeof(ActiveFloat));
+          m_out.write(reinterpret_cast<const char*>(cell_value.right_value.data()),
+                      DIM * sizeof(ActiveFloat));
+        }
         // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
       } else {
         Igor::Panic("Unknown cell type with variant index {}", cell.value.index());

@@ -27,6 +27,7 @@ constexpr auto HEADER_SIZE =
 
 // -------------------------------------------------------------------------------------------------
 template <typename Scalar, int ROWS, int COLS, int OPTIONS>
+requires std::is_fundamental_v<Scalar>
 class IncMatrixWriter {
   std::string m_filename;
   std::ofstream m_out;
@@ -56,8 +57,8 @@ class IncMatrixWriter {
 
   // -----------------------------------------------------------------------------------------------
  private:
-  [[nodiscard]] auto
-  write_header(int64_t rows, int64_t cols, int8_t is_row_major) noexcept -> bool {
+  [[nodiscard]] auto write_header(int64_t rows, int64_t cols, int8_t is_row_major) noexcept
+      -> bool {
     using namespace std::string_view_literals;
 
     if (!m_out.write(IncMatrixHeaderLayout::MAGIC_STRING.data(),
@@ -98,8 +99,8 @@ class IncMatrixWriter {
 
   // -----------------------------------------------------------------------------------------------
  public:
-  [[nodiscard]] auto
-  write_data(const Eigen::Matrix<Scalar, ROWS, COLS, OPTIONS>& mat) noexcept -> bool {
+  [[nodiscard]] auto write_data(const Eigen::Matrix<Scalar, ROWS, COLS, OPTIONS>& mat) noexcept
+      -> bool {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     if (!m_out.write(reinterpret_cast<const char*>(mat.data()),
                      static_cast<std::streamsize>(sizeof(Scalar)) * mat.rows() * mat.cols())) {

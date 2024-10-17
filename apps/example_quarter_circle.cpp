@@ -156,8 +156,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 [[nodiscard]] auto init_shock(PassiveFloat t) noexcept -> Zap::CellBased::SimCoord<ActiveFloat> {
   const auto r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
   return {
-      .x = r * std::cos(std::numbers::pi_v<PassiveFloat> / 2 * t),
-      .y = r * std::sin(std::numbers::pi_v<PassiveFloat> / 2 * t),
+      r * std::cos(std::numbers::pi_v<PassiveFloat> / 2 * t),
+      r * std::sin(std::numbers::pi_v<PassiveFloat> / 2 * t),
   };
 };
 
@@ -414,7 +414,7 @@ auto compare(size_t nx,
   // - L1 of cell-based ----------------------------------------------------------------------------
   {
     auto f = [&](PassiveFloat x, PassiveFloat y) {
-      return std::abs(cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{.x = x, .y = y})(0));
+      return std::abs(cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y})(0));
     };
     const auto L1 = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
     out << "L1_cell = " << L1 << '\n';
@@ -427,7 +427,7 @@ auto compare(size_t nx,
   {
     auto f = [&](PassiveFloat x, PassiveFloat y) {
       return std::abs(
-          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{.x = x, .y = y})(0) -
+          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y})(0) -
           eval_mat_at(x, y, std::get<0>(*mat_res), std::get<1>(*mat_res), std::get<2>(*mat_res)));
     };
     const auto L1_error = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
@@ -438,7 +438,7 @@ auto compare(size_t nx,
   {
     auto f = [&](PassiveFloat x, PassiveFloat y) {
       return std::abs(
-          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{.x = x, .y = y})(0) -
+          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y})(0) -
           eval_mat_at(x, y, std::get<0>(hr_res), std::get<1>(hr_res), std::get<2>(hr_res)));
     };
     const auto L1_error = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);

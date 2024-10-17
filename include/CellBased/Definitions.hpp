@@ -9,15 +9,26 @@
 
 #include "Igor/Logging.hpp"
 
+#include <AD/ad.hpp>
+
 namespace Zap::CellBased {
 
 // - Tolerances for given floating point accuracy --------------------------------------------------
-template <std::floating_point Float>
+template <typename Float>
+requires(std::is_floating_point_v<Float> || ad::mode<Float>::is_ad_type)
 inline constexpr Float EPS;
 template <>
 inline constexpr float EPS<float> = 1e-6f;
 template <>
 inline constexpr double EPS<double> = 1e-8;
+
+// template <std::floating_point Float>
+// inline constexpr Float EPS<ad::internal::active_type<Float, ad::internal::ts_data<Float>>> =
+//     EPS<Float>;
+template <>
+inline constexpr float EPS<typename ad::gt1s<float>::type> = EPS<float>;
+template <>
+inline constexpr double EPS<typename ad::gt1s<double>::type> = EPS<double>;
 
 // - Points in grid and simulation coordinates -----------------------------------------------------
 template <typename PointType>
@@ -46,14 +57,30 @@ concept Point2D_c = requires(PointType t) {
 // NOTE: GridCoord and SimCoord are functionally the same type, but we want the C++ type checker to
 //       make sure that we never mix simulation- and grid-coordinates. Therefore they are defined to
 //       be two different types that both work exactly the same by using the Preprocessor.
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+// NOLINTBEGIN(cppcoreguidelines-macro-usage,bugprone-macro-parentheses)
 #define DEF_POINT2D_TYPE(name)                                                                     \
   template <typename Scalar>                                                                       \
   struct name {                                                                                    \
     Scalar x;                                                                                      \
     Scalar y;                                                                                      \
                                                                                                    \
-    [[nodiscard]] static constexpr auto Zero() noexcept -> name { return {.x = 0, .y = 0}; }       \
+    constexpr name() noexcept = default;                                                           \
+    constexpr name(Scalar x, Scalar y) noexcept                                                    \
+        : x(std::move(x)),                                                                         \
+          y(std::move(y)) {}                                                                       \
+    constexpr name(const name& other) noexcept                    = default;                       \
+    constexpr name(name&& other) noexcept                         = default;                       \
+    constexpr auto operator=(const name& other) noexcept -> name& = default;                       \
+    constexpr auto operator=(name&& other) noexcept -> name&      = default;                       \
+    constexpr ~name() noexcept                                    = default;                       \
+    template <typename PassiveScalar>                                                              \
+    requires(ad::mode<Scalar>::is_ad_type &&                                                       \
+             std::is_same_v<PassiveScalar, typename ad::mode<Scalar>::passive_t>)                  \
+    constexpr name(const name<PassiveScalar>& other) noexcept                                      \
+        : x(other.x),                                                                              \
+          y(other.y) {}                                                                            \
+                                                                                                   \
+    [[nodiscard]] static constexpr auto Zero() noexcept -> name { return {0, 0}; }                 \
                                                                                                    \
     [[nodiscard]] constexpr auto norm() const noexcept -> Scalar {                                 \
       return std::sqrt(x * x + y * y);                                                             \
@@ -71,27 +98,27 @@ concept Point2D_c = requires(PointType t) {
                                                                                                    \
     [[nodiscard]] friend constexpr auto operator+(const name& lhs, const name& rhs) noexcept       \
         -> name {                                                                                  \
-      return {.x = lhs.x + rhs.x, .y = lhs.y + rhs.y};                                             \
+      return {lhs.x + rhs.x, lhs.y + rhs.y};                                                       \
     }                                                                                              \
                                                                                                    \
     [[nodiscard]] friend constexpr auto operator-(const name& lhs, const name& rhs) noexcept       \
         -> name {                                                                                  \
-      return {.x = lhs.x - rhs.x, .y = lhs.y - rhs.y};                                             \
+      return {lhs.x - rhs.x, lhs.y - rhs.y};                                                       \
     }                                                                                              \
                                                                                                    \
     [[nodiscard]] friend constexpr auto operator*(const name& lhs, Scalar scalar) noexcept         \
         -> name {                                                                                  \
-      return {.x = lhs.x * scalar, .y = lhs.y * scalar};                                           \
+      return {lhs.x * scalar, lhs.y * scalar};                                                     \
     }                                                                                              \
                                                                                                    \
     [[nodiscard]] friend constexpr auto operator*(Scalar scalar, const name& rhs) noexcept         \
         -> name {                                                                                  \
-      return {.x = scalar * rhs.x, .y = scalar * rhs.y};                                           \
+      return {scalar * rhs.x, scalar * rhs.y};                                                     \
     }                                                                                              \
                                                                                                    \
     [[nodiscard]] friend constexpr auto operator/(const name& lhs, Scalar scalar) noexcept         \
         -> name {                                                                                  \
-      return {.x = lhs.x / scalar, .y = lhs.y / scalar};                                           \
+      return {lhs.x / scalar, lhs.y / scalar};                                                     \
     }                                                                                              \
                                                                                                    \
     constexpr auto operator+=(const name& other) noexcept -> name& {                               \
@@ -119,7 +146,6 @@ concept Point2D_c = requires(PointType t) {
     }                                                                                              \
   }
 
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define DEFINE_TEMPLATE_CHECK(name)                                                                \
   template <typename T>                                                                            \
   struct is_##name : std::false_type {};                                                           \
@@ -128,7 +154,6 @@ concept Point2D_c = requires(PointType t) {
   template <typename T>                                                                            \
   constexpr bool is_##name##_v = is_##name<T>::value
 
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define DEF_POINT2D_FORMATTER(name)                                                                \
   template <typename T, typename CharT>                                                            \
   struct formatter<name<T>, CharT> {                                                               \
@@ -141,6 +166,7 @@ concept Point2D_c = requires(PointType t) {
       return std::format_to(ctx.out(), "[{}, {}]", p.x, p.y);                                      \
     }                                                                                              \
   }
+// NOLINTEND(cppcoreguidelines-macro-usage,bugprone-macro-parentheses)
 
 DEF_POINT2D_TYPE(GenCoord);
 
@@ -149,6 +175,13 @@ DEFINE_TEMPLATE_CHECK(GridCoord);
 
 DEF_POINT2D_TYPE(SimCoord);
 DEFINE_TEMPLATE_CHECK(SimCoord);
+
+static_assert(std::is_trivial_v<GenCoord<double>>,
+              "GenCoord type should be trivial for trivial Scalar.");
+static_assert(std::is_trivial_v<GridCoord<double>>,
+              "GridCoord type should be trivial for trivial Scalar.");
+static_assert(std::is_trivial_v<SimCoord<double>>,
+              "SimCoord type should be trivial for trivial Scalar.");
 
 static_assert(is_GridCoord_v<GridCoord<double>>,
               "is_GridCoord_v must evaluate to true for GridCoord.");

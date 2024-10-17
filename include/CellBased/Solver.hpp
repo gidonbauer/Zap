@@ -87,7 +87,7 @@ class Solver {
     // Angle between cut_vector and y-axis (0, 1)
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
     // <=> cut_angle = arccos(cut_vector_1 / ||cut_vector||)
-    auto interface_angle = std::acos(tangent_vector.y);
+    ActiveFloat interface_angle = std::acos(tangent_vector.y);
     if (tangent_vector.x > 0) {
       interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
     }
@@ -161,7 +161,7 @@ class Solver {
                   "is {} larger than cell area",
                   intersect_area,
                   cell_area,
-                  intersect_area - cell_area);
+                  static_cast<ActiveFloat>(intersect_area - cell_area));
 
       value -= (intersect_area / cell_area) * wave.value;
     };
@@ -252,11 +252,11 @@ class Solver {
       const auto tangent_vector = (interface.end - interface.begin).normalized();
       assert(std::abs(tangent_vector.norm() - 1) <= 1e-8);
 
-      auto interface_angle = std::acos(tangent_vector.y);
+      ActiveFloat interface_angle = std::acos(tangent_vector.y);
       if (tangent_vector.x > 0) {
         interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
       }
-      PointType normal_vector{.x = std::cos(interface_angle), .y = std::sin(interface_angle)};
+      PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
       IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
                   "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
                   "normal_vector = {}",
@@ -344,8 +344,8 @@ class Solver {
       return std::nullopt;
     }
 
-    for (PassiveFloat t = 0.0; t < tend;) {
-      const PassiveFloat CFL_factor = cfl_factor(curr_grid);
+    for (ActiveFloat t = 0.0; t < tend;) {
+      const ActiveFloat CFL_factor = cfl_factor(curr_grid);
 
       if (std::isnan(CFL_factor) || std::isinf(CFL_factor)) {
         Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
@@ -557,7 +557,9 @@ class Solver {
 
       curr_grid = next_grid;
 
-      if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(t)) { return std::nullopt; }
+      if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
+        return std::nullopt;
+      }
       // break;
     }
 
