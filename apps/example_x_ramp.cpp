@@ -228,22 +228,17 @@ void print_solution_error(
   {
     const auto value = grid.eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
     Igor::Info("value = {}", value);
-    Igor::Info("type(value) = {}", Igor::type_name(value));
   }
   {
     const auto& cell       = grid[0];
     const auto& cell_value = cell.get_cartesian().value(0);
     Igor::Info("cell = {}", cell);
-    Igor::Info("type(cell) = {}", Igor::type_name(cell));
     Igor::Info("cell_value = {}", cell_value);
-    Igor::Info("type(cell_value) = {}", Igor::type_name(cell_value));
   }
   {
     const auto shock_points = grid.get_shock_curve();
     // Igor::Info("shock_points = {}", shock_points);
-    Igor::Info("type(shock_points) = {}", Igor::type_name(shock_points));
     Igor::Info("shock_points[0] = {}", shock_points[0]);
-    Igor::Info("type(shock_points[0]) = {}", Igor::type_name(shock_points[0]));
   }
   std::cout << "================================================================================\n";
   // ===============================================================================================
@@ -266,22 +261,17 @@ void print_solution_error(
   {
     const auto value = res->eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
     Igor::Info("value = {}", value);
-    Igor::Info("type(value) = {}", Igor::type_name(value));
   }
   {
     const auto& cell       = (*res)[0];
     const auto& cell_value = cell.get_cartesian().value(0);
     Igor::Info("cell = {}", cell);
-    Igor::Info("type(cell) = {}", Igor::type_name(cell));
     Igor::Info("cell_value = {}", cell_value);
-    Igor::Info("type(cell_value) = {}", Igor::type_name(cell_value));
   }
   {
     const auto shock_points = res->get_shock_curve();
     // Igor::Info("shock_points = {}", shock_points);
-    Igor::Info("type(shock_points) = {}", Igor::type_name(shock_points));
     Igor::Info("shock_points[0] = {}", shock_points[0]);
-    Igor::Info("type(shock_points[0]) = {}", Igor::type_name(shock_points[0]));
   }
   std::cout << "================================================================================\n";
   // ===============================================================================================

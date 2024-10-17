@@ -54,10 +54,10 @@ class Solver {
             return std::max(m_A.max_abs_eig_val(cell.get_cartesian().value),
                             m_B.max_abs_eig_val(cell.get_cartesian().value));
           } else {
-            return std::max(std::max(m_A.max_abs_eig_val(cell.get_cut().left_value),
-                                     m_A.max_abs_eig_val(cell.get_cut().right_value)),
-                            std::max(m_B.max_abs_eig_val(cell.get_cut().left_value),
-                                     m_B.max_abs_eig_val(cell.get_cut().right_value)));
+            return std::max({m_A.max_abs_eig_val(cell.get_cut().left_value),
+                             m_A.max_abs_eig_val(cell.get_cut().right_value),
+                             m_B.max_abs_eig_val(cell.get_cut().left_value),
+                             m_B.max_abs_eig_val(cell.get_cut().right_value)});
           }
         });
   }
@@ -106,21 +106,22 @@ class Solver {
       normal_vector.y *= scale_y;
     }
 
-    const auto u_mid = ((interface.left_value + interface.right_value) / 2).eval();
+    const Eigen::Vector<ActiveFloat, DIM> u_mid =
+        (interface.left_value + interface.right_value) / 2;
 
     // Matrix for rotated PDE in normal direction to cut
     // TODO: Why cos(interface_angle) * A + sin(interface_angle) * B and not -?
-    const auto eta_mat =
-        (std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid))
-            .eval();
+    const Eigen::Matrix<ActiveFloat, DIM, DIM> eta_mat =
+        std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
 
     Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals;
     Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs;
     get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
-    const auto wave_lengths = (eig_vals * dt).eval();
+    const Eigen::Matrix<ActiveFloat, DIM, DIM> wave_lengths = eig_vals * dt;
 
     // Eigen expansion of jump; wave strength
-    const auto alpha = (eig_vecs.inverse() * (interface.right_value - interface.left_value)).eval();
+    const Eigen::Vector<ActiveFloat, DIM> alpha =
+        eig_vecs.inverse() * (interface.right_value - interface.left_value);
 
     SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> waves(DIM);
 
@@ -269,19 +270,18 @@ class Solver {
         normal_vector.y *= curr_grid.scale_y();
       }
 
-      const auto u_mid = ((interface.left_value + interface.right_value) / 2).eval();
+      const Eigen::Vector<ActiveFloat, DIM> u_mid =
+          (interface.left_value + interface.right_value) / 2;
 
-      const auto eta_mat =
-          (std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid))
-              .eval();
+      const Eigen::Matrix<ActiveFloat, DIM, DIM> eta_mat =
+          std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
 
       Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals;
       Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs;
       get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
-
       // Wave strength
-      const auto alpha =
-          (eig_vecs.inverse() * (interface.right_value - interface.left_value)).eval();
+      const Eigen::Vector<ActiveFloat, DIM> alpha =
+          eig_vecs.inverse() * (interface.right_value - interface.left_value);
 
       Eigen::Index strong_wave_idx = 0;
       for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
@@ -289,7 +289,7 @@ class Solver {
         if (std::abs(alpha(i)) > std::abs(alpha(strong_wave_idx))) { strong_wave_idx = i; }
       }
 
-      const auto wave_length = eig_vals(strong_wave_idx) * dt;
+      const ActiveFloat wave_length = eig_vals(strong_wave_idx) * dt;
 
       new_shock_points.emplace_back(interface.begin + normal_vector * wave_length,
                                     interface.end + normal_vector * wave_length);
@@ -560,7 +560,7 @@ class Solver {
       if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
         return std::nullopt;
       }
-      // break;
+      break;
     }
 
     return curr_grid;
