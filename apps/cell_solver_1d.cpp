@@ -85,8 +85,8 @@ auto main(int argc, char** argv) -> int {
   // grid.same_value_boundary();
   grid.periodic_boundary();
 
-// #define RAMP_X
-#define QUARTER_CIRCLE
+#define RAMP_X
+// #define QUARTER_CIRCLE
 // #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
   auto u0 = [=](PassiveFloat x, PassiveFloat y) -> ActiveFloat {
@@ -123,12 +123,15 @@ auto main(int argc, char** argv) -> int {
     };
   };
 #elif defined(RAMP_X)
-  auto u0 = [=](Float x, Float /*y*/) -> Float {
+  auto u0 = [=](ActiveFloat x, ActiveFloat /*y*/) -> ActiveFloat {
     static_assert(DIM == 1);
-    return (x - x_min) * static_cast<Float>((x - x_min) < (x_max - x_min) / 2);
+    // return (x - x_min) * static_cast<ActiveFloat>((x - x_min) < (x_max - x_min) / 2);
+
+    // TODO: Inverse ramp is not solved correctly
+    return (x_max - x) * (1.0 - static_cast<ActiveFloat>((x - x_min) < (x_max - x_min) / 2));
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
+  [[maybe_unused]] auto init_shock = [=](PassiveFloat t) -> Zap::CellBased::SimCoord<PassiveFloat> {
     assert(t >= 0 && t <= 1);
     return {
         (x_max - x_min) / 2,

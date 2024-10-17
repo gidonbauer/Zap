@@ -511,8 +511,7 @@ get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& center_cell,
       }
       break;
     default:
-      Igor::Panic("side must be LEFT, RIGHT, BOTTOM, or TOP, but has value {}",
-                  std::to_underlying(side));
+      Igor::Panic("side must be LEFT, RIGHT, BOTTOM, or TOP, but has value {}", side);
       std::unreachable();
   }
 

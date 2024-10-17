@@ -1038,6 +1038,22 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto mass() const noexcept -> Eigen::Vector<ActiveFloat, DIM> {
+    Eigen::Vector<ActiveFloat, DIM> mass = Eigen::Vector<ActiveFloat, DIM>::Zero();
+    for (const auto& cell : m_cells) {
+      assert(cell.is_cartesian() || cell.is_cut());
+      if (cell.is_cartesian()) {
+        mass += cell.get_cartesian().value * cell.template dx<SIM_C>() * cell.template dy<SIM_C>();
+      } else {
+        const auto left_area  = cell.template get_cut_left_polygon<SIM_C>().area();
+        const auto right_area = cell.template get_cut_right_polygon<SIM_C>().area();
+        mass += cell.get_cut().left_value * left_area + cell.get_cut().right_value * right_area;
+      }
+    }
+    return mass;
+  }
+
+  // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto nx() const noexcept -> size_t { return m_nx; }
   [[nodiscard]] constexpr auto ny() const noexcept -> size_t { return m_ny; }
   [[nodiscard]] constexpr auto min_delta() const noexcept -> PassiveFloat {

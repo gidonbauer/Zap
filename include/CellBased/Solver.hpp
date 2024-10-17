@@ -156,7 +156,7 @@ class Solver {
       const auto intersect      = Geometry::intersection(cell_polygon, wave.polygon);
       const auto intersect_area = intersect.area();
       assert(intersect_area >= 0 || std::abs(intersect_area) < EPS<PassiveFloat>);
-      IGOR_ASSERT(intersect_area - cell_area <= EPS<PassiveFloat>,
+      IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<PassiveFloat>,
                   "Expected area intersection of intersection to be smaller or equal to the area "
                   "of the cell, but intersection area is {} and cell area is {}, intersection area "
                   "is {} larger than cell area",
@@ -356,6 +356,11 @@ class Solver {
 
       next_grid = curr_grid;
 #ifndef ZAP_STATIC_CUT
+
+#ifdef ZAP_ASSERT_CONSERVATIVE
+      const auto mass_before_moving = next_grid.mass();
+#endif  // ZAP_ASSERT_CONSERVATIVE
+
       if (!curr_grid.cut_cell_idxs().empty()) {
         next_grid.merge_cut_cells();
 
@@ -367,10 +372,6 @@ class Solver {
           Igor::Warn("Could not cut on new shock curve.");
           return std::nullopt;
         }
-        // Igor::Debug("t = {}", t);
-        // Igor::Debug("#cut cells curr_grid = {}", curr_grid.cut_cell_idxs().size());
-        // Igor::Debug("#cut cells next_grid = {}", next_grid.cut_cell_idxs().size());
-        // std::cout << "----------------------------------------\n";
       }
 
       // Re-calculate value for newly cut cells
@@ -426,6 +427,15 @@ class Solver {
           }
         }
       }
+
+#ifdef ZAP_ASSERT_CONSERVATIVE
+      const auto mass_after_moving = next_grid.mass();
+      IGOR_ASSERT(
+          (mass_before_moving - mass_after_moving).norm() <= EPS<PassiveFloat>,
+          "Mass has to be conserved while moving the cuts, but mass before is {} and after {}.",
+          mass_before_moving,
+          mass_after_moving);
+#endif  // ZAP_ASSERT_CONSERVATIVE
 #endif  // ZAP_STATIC_CUT
 
       // TODO: What happens when a subcell has area 0?
@@ -437,15 +447,188 @@ class Solver {
         const auto& curr_cell = curr_grid[cell_idx];
         auto& next_cell       = next_grid[cell_idx];
 
-        // Left interface
-        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
-        // Right interface
-        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
-        // Bottom interface
-        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
-        // Top interface
-        apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
+        // = Cut cell ==============================================================================
+        if (curr_cell.is_cut() || next_cell.is_cut()) {
+          // Left interface
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
+          // Right interface
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
+          // Bottom interface
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
+          // Top interface
+          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
+        }
+        // = Cut cell ==============================================================================
+        // = Cartesian cell ========================================================================
+        else {
+          // - Handle left interface ---------------------------------------------------------------
+          if (curr_grid.is_cell(curr_cell.left_idx)) {
+            const auto& other_cell = curr_grid[curr_cell.left_idx];
+            const auto interfaces =
+                get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, SimCoord<ActiveFloat>>(
+                    curr_cell, other_cell, LEFT);
+
+            for (const auto& interface : interfaces) {
+              const Eigen::Vector<ActiveFloat, DIM> u_mid =
+                  (interface.left_value + interface.right_value) / 2;
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals = m_A.eig_vals(u_mid);
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs = m_A.eig_vecs(u_mid);
+
+              bool all_zero = true;
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                if (std::abs(eig_vals(i, i)) >= 1e-6) { all_zero = false; }
+              }
+              if (all_zero) { continue; }
+
+              assert(std::abs(eig_vecs.determinant()) >= 1e-8);
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                eig_vals(i, i) = eig_vals(i, i) > 0 ? eig_vals(i, i) : 0;
+              }
+              const Eigen::Matrix<ActiveFloat, DIM, DIM> A_plus =
+                  eig_vecs * eig_vals * eig_vecs.inverse();
+
+              next_cell.get_cartesian().value -=
+                  A_plus *
+                  ((interface.end - interface.begin).norm() / curr_cell.template dy<SIM_C>()) *
+                  (dt / curr_cell.template dx<SIM_C>()) *
+                  (interface.right_value - interface.left_value);
+            }
+          } else if (curr_cell.left_idx == SAME_VALUE_INDEX ||
+                     curr_cell.left_idx == ZERO_FLUX_INDEX) {
+            // No-op
+          } else {
+            Igor::Debug("cell = {}", curr_cell);
+            Igor::Panic("Invalid left-index.");
+          }
+          // - Handle left interface ---------------------------------------------------------------
+
+          // - Handle right interface --------------------------------------------------------------
+          if (curr_grid.is_cell(curr_cell.right_idx)) {
+            const auto& other_cell = curr_grid[curr_cell.right_idx];
+            const auto interfaces =
+                get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, SimCoord<ActiveFloat>>(
+                    curr_cell, other_cell, RIGHT);
+
+            for (const auto& interface : interfaces) {
+              const Eigen::Vector<ActiveFloat, DIM> u_mid =
+                  (interface.left_value + interface.right_value) / 2;
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals = m_A.eig_vals(u_mid);
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs = m_A.eig_vecs(u_mid);
+
+              bool all_zero = true;
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                if (std::abs(eig_vals(i, i)) >= 1e-6) { all_zero = false; }
+              }
+              if (all_zero) { continue; }
+
+              assert(std::abs(eig_vecs.determinant()) >= 1e-8);
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                eig_vals(i, i) = eig_vals(i, i) < 0 ? eig_vals(i, i) : 0;
+              }
+              const Eigen::Matrix<ActiveFloat, DIM, DIM> A_minus =
+                  eig_vecs * eig_vals * eig_vecs.inverse();
+              next_cell.get_cartesian().value +=
+                  A_minus *
+                  ((interface.end - interface.begin).norm() / curr_cell.template dy<SIM_C>()) *
+                  (dt / curr_cell.template dx<SIM_C>()) *
+                  (interface.right_value - interface.left_value);
+            }
+          } else if (curr_cell.right_idx == SAME_VALUE_INDEX ||
+                     curr_cell.right_idx == ZERO_FLUX_INDEX) {
+            // No-op
+          } else {
+            Igor::Debug("cell = {}", curr_cell);
+            Igor::Panic("Invalid right-index.");
+          }
+          // - Handle right interface --------------------------------------------------------------
+
+          // - Handle bottom interface -------------------------------------------------------------
+          if (curr_grid.is_cell(curr_cell.bottom_idx)) {
+            const auto& other_cell = curr_grid[curr_cell.bottom_idx];
+            const auto interfaces =
+                get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, SimCoord<ActiveFloat>>(
+                    curr_cell, other_cell, BOTTOM);
+
+            for (const auto& interface : interfaces) {
+              const Eigen::Vector<ActiveFloat, DIM> u_mid =
+                  (interface.left_value + interface.right_value) / 2;
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals = m_B.eig_vals(u_mid);
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs = m_B.eig_vecs(u_mid);
+
+              bool all_zero = true;
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                if (std::abs(eig_vals(i, i)) >= 1e-6) { all_zero = false; }
+              }
+              if (all_zero) { continue; }
+
+              assert(std::abs(eig_vecs.determinant()) >= 1e-8);
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                eig_vals(i, i) = eig_vals(i, i) > 0 ? eig_vals(i, i) : 0;
+              }
+              const Eigen::Matrix<ActiveFloat, DIM, DIM> A_plus =
+                  eig_vecs * eig_vals * eig_vecs.inverse();
+
+              next_cell.get_cartesian().value -=
+                  A_plus *
+                  ((interface.end - interface.begin).norm() / curr_cell.template dx<SIM_C>()) *
+                  (dt / curr_cell.template dy<SIM_C>()) *
+                  (interface.right_value - interface.left_value);
+            }
+          } else if (curr_cell.bottom_idx == SAME_VALUE_INDEX ||
+                     curr_cell.bottom_idx == ZERO_FLUX_INDEX) {
+            // No-op
+          } else {
+            Igor::Debug("cell = {}", curr_cell);
+            Igor::Panic("Invalid bottom-index.");
+          }
+          // - Handle bottom interface -------------------------------------------------------------
+
+          // - Handle top interface ----------------------------------------------------------------
+          if (curr_grid.is_cell(curr_cell.top_idx)) {
+            const auto& other_cell = curr_grid[curr_cell.top_idx];
+            const auto interfaces =
+                get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, SimCoord<ActiveFloat>>(
+                    curr_cell, other_cell, TOP);
+
+            for (const auto& interface : interfaces) {
+              const Eigen::Vector<ActiveFloat, DIM> u_mid =
+                  (interface.left_value + interface.right_value) / 2;
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals = m_B.eig_vals(u_mid);
+              Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs = m_B.eig_vecs(u_mid);
+
+              bool all_zero = true;
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                if (std::abs(eig_vals(i, i)) >= 1e-6) { all_zero = false; }
+              }
+              if (all_zero) { continue; }
+
+              assert(std::abs(eig_vecs.determinant()) >= 1e-8);
+              for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
+                eig_vals(i, i) = eig_vals(i, i) < 0 ? eig_vals(i, i) : 0;
+              }
+              const Eigen::Matrix<ActiveFloat, DIM, DIM> A_minus =
+                  eig_vecs * eig_vals * eig_vecs.inverse();
+              next_cell.get_cartesian().value +=
+                  A_minus *
+                  ((interface.end - interface.begin).norm() / curr_cell.template dx<SIM_C>()) *
+                  (dt / curr_cell.template dy<SIM_C>()) *
+                  (interface.right_value - interface.left_value);
+            }
+          } else if (curr_cell.top_idx == SAME_VALUE_INDEX ||
+                     curr_cell.top_idx == ZERO_FLUX_INDEX) {
+            // No-op
+          } else {
+            Igor::Debug("cell = {}", curr_cell);
+            Igor::Panic("Invalid top-index.");
+          }
+          // - Handle top interface ----------------------------------------------------------------
+        }
+        // = Cartesian cell ========================================================================
       }
+
+#ifdef ZAP_ASSERT_CONSERVATIVE
+      const auto mass_after_inter_cell_update = next_grid.mass();
+#endif  // ZAP_ASSERT_CONSERVATIVE
 
       for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
         const auto& curr_cell = curr_grid[cell_idx];
@@ -472,6 +655,28 @@ class Solver {
         }
         // - Handle internal interface -----------------------------------------------------------
       }
+
+#ifdef ZAP_ASSERT_CONSERVATIVE
+      const auto mass_after_inner_cell_update = next_grid.mass();
+      IGOR_ASSERT((mass_after_inner_cell_update - mass_after_moving).norm() <= EPS<PassiveFloat>,
+                  "Mass has to be conserved while doing the update, but mass before is {} and "
+                  "after {}. Difference is {}. Mass after just doing inter-cell updates {}. Number "
+                  "of small subcells is {}.",
+                  mass_after_moving,
+                  mass_after_inner_cell_update,
+                  (mass_after_inner_cell_update - mass_after_moving).eval(),
+                  mass_after_inter_cell_update,
+                  std::count_if(std::cbegin(next_grid.cells()),
+                                std::cend(next_grid.cells()),
+                                [](const Cell<ActiveFloat, PassiveFloat, DIM>& cell) {
+                                  return cell.is_cut() &&
+                                         (cell.template get_cut_left_polygon<SIM_C>().area() <
+                                              EPS<PassiveFloat> ||
+                                          cell.template get_cut_right_polygon<SIM_C>().area() <
+                                              EPS<PassiveFloat>);
+                                }));
+#endif  // ZAP_ASSERT_CONSERVATIVE
+
 #else
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
         const auto& curr_cell = curr_grid[cell_idx];

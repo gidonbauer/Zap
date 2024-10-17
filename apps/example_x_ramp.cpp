@@ -20,7 +20,7 @@
 
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
-using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
+using ActiveFloat            = double;  // ad::gt1s<PassiveFloat>::type;
 constexpr size_t DIM         = 1;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 2.0;
@@ -215,9 +215,9 @@ void print_solution_error(
     if (!grid.cut_piecewise_linear(points)) { return false; }
   }
 
-  ActiveFloat eps     = 0.0;
-  ad::derivative(eps) = 1.0;
-  Igor::Info("eps = {}", eps);
+  ActiveFloat eps = 0.0;
+  // ad::derivative(eps) = 1.0;
+  // Igor::Info("eps = {}", eps);
 
   auto u0 = [&eps](ActiveFloat x, ActiveFloat /*y*/) {
     return analytical_quasi_1d(x, PassiveFloat{0}, eps);
@@ -225,22 +225,23 @@ void print_solution_error(
   grid.fill_four_point(u0);
 
   // ===============================================================================================
-  {
-    const auto value = grid.eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
-    Igor::Info("value = {}", value);
-  }
-  {
-    const auto& cell       = grid[0];
-    const auto& cell_value = cell.get_cartesian().value(0);
-    Igor::Info("cell = {}", cell);
-    Igor::Info("cell_value = {}", cell_value);
-  }
-  {
-    const auto shock_points = grid.get_shock_curve();
-    // Igor::Info("shock_points = {}", shock_points);
-    Igor::Info("shock_points[0] = {}", shock_points[0]);
-  }
-  std::cout << "================================================================================\n";
+  // {
+  //   const auto value = grid.eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
+  //   Igor::Info("value = {}", value);
+  // }
+  // {
+  //   const auto& cell       = grid[0];
+  //   const auto& cell_value = cell.get_cartesian().value(0);
+  //   Igor::Info("cell = {}", cell);
+  //   Igor::Info("cell_value = {}", cell_value);
+  // }
+  // {
+  //   const auto shock_points = grid.get_shock_curve();
+  //   // Igor::Info("shock_points = {}", shock_points);
+  //   Igor::Info("shock_points[0] = {}", shock_points[0]);
+  // }
+  // std::cout <<
+  // "================================================================================\n";
   // ===============================================================================================
 
   const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
@@ -258,22 +259,23 @@ void print_solution_error(
   }
 
   // ===============================================================================================
-  {
-    const auto value = res->eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
-    Igor::Info("value = {}", value);
-  }
-  {
-    const auto& cell       = (*res)[0];
-    const auto& cell_value = cell.get_cartesian().value(0);
-    Igor::Info("cell = {}", cell);
-    Igor::Info("cell_value = {}", cell_value);
-  }
-  {
-    const auto shock_points = res->get_shock_curve();
-    // Igor::Info("shock_points = {}", shock_points);
-    Igor::Info("shock_points[0] = {}", shock_points[0]);
-  }
-  std::cout << "================================================================================\n";
+  // {
+  //   const auto value = res->eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
+  //   Igor::Info("value = {}", value);
+  // }
+  // {
+  //   const auto& cell       = (*res)[0];
+  //   const auto& cell_value = cell.get_cartesian().value(0);
+  //   Igor::Info("cell = {}", cell);
+  //   Igor::Info("cell_value = {}", cell_value);
+  // }
+  // {
+  //   const auto shock_points = res->get_shock_curve();
+  //   // Igor::Info("shock_points = {}", shock_points);
+  //   Igor::Info("shock_points[0] = {}", shock_points[0]);
+  // }
+  // std::cout <<
+  // "================================================================================\n";
   // ===============================================================================================
 
   out << nx << 'x' << ny << ":\n";
