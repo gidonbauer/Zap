@@ -16,7 +16,7 @@ add_compile_definitions(ZAP_OUTPUT_DIR=${ZAP_OUTPUT_DIR})
 add_compile_options(-Wall -Wextra -pedantic -Wconversion -Wshadow)
 
 # - AD compile definitions ------------------------------------------------------------------------- 
-add_compile_definitions(AD_STD_COMPATIBILITY AD_INTEROP_EIGEN AD_AUTO_SUPPORT)
+add_compile_definitions(AD_STD_COMPATIBILITY AD_INTEROP_EIGEN AD_AUTO_SUPPORT AD_FORMATTING)
 
 # - Build type options -----------------------------------------------------------------------------
 if (NOT CMAKE_BUILD_TYPE)
