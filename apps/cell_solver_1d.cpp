@@ -166,33 +166,8 @@ auto main(int argc, char** argv) -> int {
 
   // grid.dump_cells(std::cout);
 
-#ifdef OLD_SOLVER
-  constexpr auto flux = [](const auto& u) constexpr noexcept {
-    return static_cast<Float>(0.5) * u * u;
-  };
-
-  // From LeVeque: Numerical Methods for Conservation Laws 2nd edition (13.24)
-  constexpr auto godunov_flux = [flux]<typename T>(const T& u_left,
-                                                   const T& u_right) constexpr noexcept -> T {
-    constexpr auto zero = static_cast<T>(0);
-    if (u_left <= u_right) {
-      // min u in [u_left, u_right] f(u) = 0.5 * u^2
-      if (u_left <= zero && u_right >= zero) { return flux(zero); }
-      return flux(std::min(std::abs(u_left), std::abs(u_right)));
-    }
-    // max u in [u_right, u_left] f(u) = 0.5 * u^2
-    return flux(std::max(std::abs(u_left), std::abs(u_right)));
-  };
-
-#endif  // OLD_SOLVER
-
-  // Zap::IO::NoopWriter grid_writer{};
-  // Zap::IO::VTKWriter<Zap::IO::VTKFormat::UNSTRUCTURED_GRID> grid_writer{OUTPUT_DIR "u_grid"};
-
   constexpr auto u_file = OUTPUT_DIR "u_1d.grid";
   Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
-
-  // Zap::IO::NoopWriter t_writer{};
 
   constexpr auto t_file = OUTPUT_DIR "t_1d.mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
@@ -201,16 +176,6 @@ auto main(int argc, char** argv) -> int {
 #ifdef SAVE_ONLY_INITIAL_STATE
   if (!grid_writer.write_data(grid)) { return 1; }
   if (!t_writer.write_data(Float{0})) { return 1; }
-#else
-#ifdef OLD_SOLVER
-  IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver solver(godunov_flux, godunov_flux);
-    if (!solver.solve(grid, static_cast<Float>(tend), grid_writer, t_writer).has_value()) {
-      Igor::Warn("Solver failed.");
-      return 1;
-    }
-  }
-  Igor::Info("Solver finished successfully.");
 #else
   IGOR_TIME_SCOPE("Solver") {
     auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
@@ -243,7 +208,6 @@ auto main(int argc, char** argv) -> int {
     Igor::Info("std_dev_shock_x = {}", std_dev_shock_x);
   }
   Igor::Info("Solver finished successfully.");
-#endif  // OLD_SOLVER
 #endif
   Igor::Info("Saved grid to {}.", u_file);
   Igor::Info("Saved time steps to {}.", t_file);
