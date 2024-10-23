@@ -64,8 +64,9 @@ class Solver {
   template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
   requires(DIM > 0)
   struct WaveProperties {
-    Eigen::Vector<ActiveFloat, DIM> value;
+    Eigen::Vector<ActiveFloat, DIM> mass;
     Geometry::Polygon<PointType> polygon;
+    ActiveFloat sign;
   };
 
   // -----------------------------------------------------------------------------------------------
@@ -77,6 +78,8 @@ class Solver {
                       PassiveFloat scale_x,
                       PassiveFloat scale_y) const noexcept
       -> SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> {
+    // TODO: Do tangential splitting correction.
+
     if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return {}; }
 
     // Vector tangential to interface
@@ -86,7 +89,7 @@ class Solver {
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
     // <=> cut_angle = arccos(cut_vector_1 / ||cut_vector||)
     ActiveFloat interface_angle = std::acos(tangent_vector.y);
-    if (tangent_vector.x > 0) {
+    if (tangent_vector.x > EPS<PassiveFloat>) {
       interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
     }
 
@@ -122,11 +125,10 @@ class Solver {
         eig_vecs.inverse() * (interface.right_value - interface.left_value);
 
     SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> waves(DIM);
-
     for (Eigen::Index p = 0; p < static_cast<Eigen::Index>(DIM); ++p) {
       auto& wave = waves[static_cast<size_t>(p)];
 
-      wave.value = alpha(p, p) * eig_vecs.col(p);
+      wave.mass = alpha(p, p) * eig_vecs.col(p);
 
       wave.polygon = Geometry::Polygon<PointType>{{
           interface.begin,
@@ -134,6 +136,11 @@ class Solver {
           interface.end,
           interface.end + normal_vector * wave_lengths(p, p),
       }};
+
+      // wave.sign = static_cast<PassiveFloat>(eig_vals(p, p) > 0) -
+      //             static_cast<PassiveFloat>(eig_vals(p, p) < 0);
+      wave.sign = static_cast<PassiveFloat>(eig_vals(p, p) > EPS<PassiveFloat>) -
+                  static_cast<PassiveFloat>(eig_vals(p, p) < -EPS<PassiveFloat>);
     }
 
     return waves;
@@ -162,7 +169,7 @@ class Solver {
                   cell_area,
                   static_cast<ActiveFloat>(intersect_area - cell_area));
 
-      value -= (intersect_area / cell_area) * wave.value;
+      value += -wave.sign * (intersect_area / cell_area) * wave.mass;
     };
 
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
@@ -294,7 +301,9 @@ class Solver {
     }
 
     std::vector<PointType> avg_new_shock_points(new_shock_points.size() + 1);
-    assert(avg_new_shock_points.size() > 2);
+    // IGOR_ASSERT(avg_new_shock_points.size() > 2,
+    //             "Require more than two averaged points for the new shock front, but only got {}.
+    //             " "new_shock_points = {}", avg_new_shock_points.size(), new_shock_points);
     avg_new_shock_points[0] = new_shock_points[0].first;
     for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
       avg_new_shock_points[i] = (new_shock_points[i - 1].second + new_shock_points[i].first) / 2;
@@ -380,7 +389,6 @@ class Solver {
         assert(curr_cell.is_cartesian() || curr_cell.is_cut());
 
         if (curr_cell.is_cut()) {
-          // TODO: Change the type for one to SIM to see compilation error
           const auto curr_cell_left_polygon  = curr_cell.template get_cut_left_polygon<GRID_C>();
           const auto curr_cell_right_polygon = curr_cell.template get_cut_right_polygon<GRID_C>();
 
@@ -524,6 +532,9 @@ class Solver {
               }
               const Eigen::Matrix<ActiveFloat, DIM, DIM> A_minus =
                   eig_vecs * eig_vals * eig_vecs.inverse();
+
+              // TODO: This might need to be `-=`, but the flux is always zero so it does not show
+              // up
               next_cell.get_cartesian().value +=
                   A_minus *
                   ((interface.end - interface.begin).norm() / curr_cell.template dy<SIM_C>()) *
@@ -605,6 +616,8 @@ class Solver {
               }
               const Eigen::Matrix<ActiveFloat, DIM, DIM> A_minus =
                   eig_vecs * eig_vals * eig_vecs.inverse();
+
+              // TODO: This might need to be `-=`, but the flux is always zero so it does not show
               next_cell.get_cartesian().value +=
                   A_minus *
                   ((interface.end - interface.begin).norm() / curr_cell.template dx<SIM_C>()) *
@@ -627,13 +640,14 @@ class Solver {
       const auto mass_after_inter_cell_update = next_grid.mass();
 #endif  // ZAP_ASSERT_CONSERVATIVE
 
+      // - Handle internal interface ---------------------------------------------------------------
       for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
         const auto& curr_cell = curr_grid[cell_idx];
         assert(curr_cell.is_cut());
         auto& next_cell = next_grid[cell_idx];
         assert(next_cell.is_cartesian() || next_cell.is_cut());
 
-        // - Handle internal interface -----------------------------------------------------------
+        // TODO: Do we need a "negative wave", side interfaces are applied on every cell?
         const auto internal_interface =
             get_internal_interface<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
                 curr_cell);
@@ -650,8 +664,8 @@ class Solver {
           // This cell
           update_cell(next_cell, wave);
         }
-        // - Handle internal interface -----------------------------------------------------------
       }
+      // - Handle internal interface ---------------------------------------------------------------
 
 #ifdef ZAP_ASSERT_CONSERVATIVE
       const auto mass_after_inner_cell_update = next_grid.mass();

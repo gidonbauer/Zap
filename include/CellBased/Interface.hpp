@@ -71,18 +71,18 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
             {
                 {
                     .value = cell.get_cartesian().value,
-                    .begin = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
-                    .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                    .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
                               cell.template y_min<coord_type>()},
+                    .end   = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
                 },
             },
         .top =
             {
                 {
                     .value = cell.get_cartesian().value,
-                    .begin = {cell.template x_min<coord_type>(),
+                    .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
                               cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                    .end   = {cell.template x_min<coord_type>(),
                               cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                 },
             },
@@ -123,27 +123,28 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template cut1<coord_type>().x,
                                   cell.template y_min<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
+                        .end   = {cell.template x_min<coord_type>(),
                                   cell.template y_min<coord_type>()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template cut1<coord_type>().x,
+                        .begin = {cell.template x_min<coord_type>() +
+                                      cell.template dx<coord_type>(),
                                   cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>()},
+                        .end   = {cell.template cut1<coord_type>().x,
+                                  cell.template y_min<coord_type>()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        .begin =
+                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+                        .end = {cell.template x_min<coord_type>(),
                                 cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                 },
@@ -184,27 +185,28 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template cut1<coord_type>().x,
                                   cell.template y_min<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
+                        .end   = {cell.template x_min<coord_type>(),
                                   cell.template y_min<coord_type>()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template cut1<coord_type>().x,
+                        .begin = {cell.template x_min<coord_type>() +
+                                      cell.template dx<coord_type>(),
                                   cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>()},
+                        .end   = {cell.template cut1<coord_type>().x,
+                                  cell.template y_min<coord_type>()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        .begin =
+                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+                        .end = {cell.template x_min<coord_type>(),
                                 cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                 },
@@ -245,28 +247,29 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template x_min<coord_type>() +
+                                      cell.template dx<coord_type>(),
                                   cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>()},
+                        .end   = {cell.template x_min<coord_type>(),
+                                  cell.template y_min<coord_type>()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template cut2<coord_type>().x,
                                   cell.template y_min<coord_type>() +
                                       cell.template dy<coord_type>()},
-                        .end   = {cell.template cut2<coord_type>().x,
+                        .end   = {cell.template x_min<coord_type>(),
                                   cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template cut2<coord_type>().x,
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        .begin =
+                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+                        .end = {cell.template cut2<coord_type>().x,
                                 cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                 },
@@ -306,28 +309,29 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template x_min<coord_type>() +
+                                      cell.template dx<coord_type>(),
                                   cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>()},
+                        .end   = {cell.template x_min<coord_type>(),
+                                  cell.template y_min<coord_type>()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template cut1<coord_type>().x,
                                   cell.template y_min<coord_type>() +
                                       cell.template dy<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
+                        .end   = {cell.template x_min<coord_type>(),
                                   cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        .begin =
+                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+                        .end = {cell.template cut1<coord_type>().x,
                                 cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                 },
@@ -375,20 +379,21 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template x_min<coord_type>() +
+                                      cell.template dx<coord_type>(),
                                   cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>()},
+                        .end   = {cell.template x_min<coord_type>(),
+                                  cell.template y_min<coord_type>()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        .begin =
+                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+                        .end = {cell.template x_min<coord_type>(),
                                 cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                 },
@@ -421,35 +426,36 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template cut1<coord_type>().x,
                                   cell.template y_min<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
+                        .end   = {cell.template x_min<coord_type>(),
                                   cell.template y_min<coord_type>()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template cut1<coord_type>().x,
+                        .begin = {cell.template x_min<coord_type>() +
+                                      cell.template dx<coord_type>(),
                                   cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>()},
+                        .end   = {cell.template cut1<coord_type>().x,
+                                  cell.template y_min<coord_type>()},
                     },
                 },
             .top =
                 {
                     {
                         .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
+                        .begin = {cell.template cut2<coord_type>().x,
                                   cell.template y_min<coord_type>() +
                                       cell.template dy<coord_type>()},
-                        .end   = {cell.template cut2<coord_type>().x,
+                        .end   = {cell.template x_min<coord_type>(),
                                   cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                     {
                         .value = cell.get_cut().right_value,
-                        .begin = {cell.template cut2<coord_type>().x,
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        .begin =
+                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+                        .end = {cell.template cut2<coord_type>().x,
                                 cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
                     },
                 },

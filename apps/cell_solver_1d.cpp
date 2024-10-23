@@ -85,8 +85,8 @@ auto main(int argc, char** argv) -> int {
   // grid.same_value_boundary();
   grid.periodic_boundary();
 
-#define RAMP_X
-// #define QUARTER_CIRCLE
+// #define RAMP_X
+#define QUARTER_CIRCLE
 // #define FULL_CIRCLE
 #ifdef QUARTER_CIRCLE
   auto u0 = [=](PassiveFloat x, PassiveFloat y) -> ActiveFloat {
@@ -181,7 +181,7 @@ auto main(int argc, char** argv) -> int {
     auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
         Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
     const auto res =
-        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.1);
+        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
