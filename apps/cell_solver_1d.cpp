@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <numbers>
 
-// #define USE_FLUX_FOR_CARTESIAN
+// #define ZAP_TANGENTIAL_CORRECTION
 
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"

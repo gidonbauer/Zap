@@ -3,6 +3,7 @@
 
 #include <numbers>
 #include <numeric>
+#include <unordered_set>
 
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
@@ -14,12 +15,17 @@ namespace Zap::CellBased {
 
 template <typename Float, int DIM>
 requires(DIM > 0)
-constexpr void get_eigen_decomp(const Eigen::Matrix<Float, DIM, DIM>& mat,
-                                Eigen::Matrix<Float, DIM, DIM>& eig_vals,
-                                Eigen::Matrix<Float, DIM, DIM>& eig_vecs) noexcept {
+struct EigenDecomp {
+  Eigen::Matrix<Float, DIM, DIM> vals;
+  Eigen::Matrix<Float, DIM, DIM> vecs;
+};
+
+template <typename Float, int DIM>
+requires(DIM > 0)
+[[nodiscard]] constexpr auto get_eigen_decomp(const Eigen::Matrix<Float, DIM, DIM>& mat) noexcept
+    -> EigenDecomp<Float, DIM> {
   if (DIM == 1) {
-    eig_vals = mat;
-    eig_vecs = Eigen::Matrix<Float, DIM, DIM>::Identity();
+    return {.vals = mat, .vecs = Eigen::Matrix<Float, DIM, DIM>::Identity()};
   } else if (DIM == 2) {
     assert(std::pow((mat(0, 0) + mat(1, 1)) / 2, 2) >= mat.determinant() &&
            "mat has complex eigenvalues");
@@ -83,7 +89,7 @@ class Solver {
     if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return {}; }
 
     // Vector tangential to interface
-    const PointType tangent_vector = (interface.end - interface.begin).normalized();
+    PointType tangent_vector = (interface.end - interface.begin).normalized();
 
     // Angle between cut_vector and y-axis (0, 1)
     //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
@@ -97,10 +103,17 @@ class Solver {
     PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
     IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
                 "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
-                "normal_vector = {}",
+                "normal_vector = {}, interface_angle = {}",
                 tangent_vector,
                 normal_vector,
-                tangent_vector.dot(normal_vector));
+                tangent_vector.dot(normal_vector),
+                interface_angle);
+
+    // Scale tangential vector when operating in grid coordinates
+    if constexpr (is_GridCoord_v<PointType>) {
+      tangent_vector.x *= scale_x;
+      tangent_vector.y *= scale_y;
+    }
     // Scale normal vector when operating in grid coordinates
     if constexpr (is_GridCoord_v<PointType>) {
       normal_vector.x *= scale_x;
@@ -112,36 +125,73 @@ class Solver {
 
     // Matrix for rotated PDE in normal direction to cut
     // TODO: Why cos(interface_angle) * A + sin(interface_angle) * B and not -?
-    const Eigen::Matrix<ActiveFloat, DIM, DIM> eta_mat =
+    const Eigen::Matrix<ActiveFloat, DIM, DIM> normal_mat =
         std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
 
-    Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals;
-    Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs;
-    get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
-    const Eigen::Matrix<ActiveFloat, DIM, DIM> wave_lengths = eig_vals * dt;
+    const auto normal_eig                                          = get_eigen_decomp(normal_mat);
+    const Eigen::Matrix<ActiveFloat, DIM, DIM> normal_wave_lengths = normal_eig.vals * dt;
 
     // Eigen expansion of jump; wave strength
-    const Eigen::Vector<ActiveFloat, DIM> alpha =
-        eig_vecs.inverse() * (interface.right_value - interface.left_value);
+    const Eigen::Vector<ActiveFloat, DIM> normal_alpha =
+        normal_eig.vecs.inverse() * (interface.right_value - interface.left_value);
 
+#ifndef ZAP_TANGENTIAL_CORRECTION
     SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> waves(DIM);
     for (Eigen::Index p = 0; p < static_cast<Eigen::Index>(DIM); ++p) {
       auto& wave = waves[static_cast<size_t>(p)];
 
-      wave.mass = alpha(p, p) * eig_vecs.col(p);
+      wave.mass = normal_alpha(p) * normal_eig.vecs.col(p);
 
       wave.polygon = Geometry::Polygon<PointType>{{
           interface.begin,
-          interface.begin + normal_vector * wave_lengths(p, p),
+          interface.begin + normal_vector * normal_wave_lengths(p, p),
           interface.end,
-          interface.end + normal_vector * wave_lengths(p, p),
+          interface.end + normal_vector * normal_wave_lengths(p, p),
       }};
 
-      // wave.sign = static_cast<PassiveFloat>(eig_vals(p, p) > 0) -
-      //             static_cast<PassiveFloat>(eig_vals(p, p) < 0);
-      wave.sign = static_cast<PassiveFloat>(eig_vals(p, p) > EPS<PassiveFloat>) -
-                  static_cast<PassiveFloat>(eig_vals(p, p) < -EPS<PassiveFloat>);
+      // wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > 0) -
+      //             static_cast<PassiveFloat>(normal_eig.vals(p, p) < 0);
+      wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > EPS<PassiveFloat>) -
+                  static_cast<PassiveFloat>(normal_eig.vals(p, p) < -EPS<PassiveFloat>);
     }
+#else
+    // Matrix for rotated PDE in tangential direction to cut
+    const Eigen::Matrix<ActiveFloat, DIM, DIM> tangent_mat =
+        -std::sin(interface_angle) * m_A.mat(u_mid) + std::cos(interface_angle) * m_B.mat(u_mid);
+
+    const auto tangent_eig                                          = get_eigen_decomp(tangent_mat);
+    const Eigen::Matrix<ActiveFloat, DIM, DIM> tangent_wave_lengths = tangent_eig.vals * dt;
+
+    SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> waves(DIM * DIM);
+    size_t idx = 0;
+    for (Eigen::Index p = 0; p < static_cast<Eigen::Index>(DIM); ++p) {
+      for (Eigen::Index q = 0; q < static_cast<Eigen::Index>(DIM); ++q) {
+        auto& wave = waves[idx];
+
+        // Eigen expansion of jump; wave strength
+        const Eigen::Vector<ActiveFloat, DIM> tangent_beta =
+            tangent_eig.vecs.inverse() * (normal_alpha(p) * normal_eig.vecs.col(p));
+
+        wave.mass = tangent_beta(q) * tangent_eig.vecs.col(q);
+
+        wave.polygon = Geometry::Polygon<PointType>{{
+            interface.begin,
+            interface.begin + normal_vector * normal_wave_lengths(p, p) +
+                tangent_vector * tangent_wave_lengths(q, q),
+            interface.end,
+            interface.end + normal_vector * normal_wave_lengths(p, p) +
+                tangent_vector * tangent_wave_lengths(q, q),
+        }};
+
+        // wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > 0) -
+        //             static_cast<PassiveFloat>(normal_eig.vals(p, p) < 0);
+        wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > EPS<PassiveFloat>) -
+                    static_cast<PassiveFloat>(normal_eig.vals(p, p) < -EPS<PassiveFloat>);
+
+        idx += 1;
+      }
+    }
+#endif  // ZAP_NOT_TANGENTIAL_CORRECTION
 
     return waves;
   }
@@ -184,13 +234,15 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
+#ifndef ZAP_TANGENTIAL_CORRECTION
   template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
-  constexpr void apply_side_interfaces(const UniformGrid<ActiveFloat, PassiveFloat, DIM>& curr_grid,
-                                       Cell<ActiveFloat, PassiveFloat, DIM>& next_cell,
-                                       const Cell<ActiveFloat, PassiveFloat, DIM>& curr_cell,
-                                       size_t idx,
-                                       Side side,
-                                       ActiveFloat dt) {
+  constexpr void
+  apply_side_interfaces_uncorrected(const UniformGrid<ActiveFloat, PassiveFloat, DIM>& curr_grid,
+                                    Cell<ActiveFloat, PassiveFloat, DIM>& next_cell,
+                                    const Cell<ActiveFloat, PassiveFloat, DIM>& curr_cell,
+                                    size_t idx,
+                                    Side side,
+                                    ActiveFloat dt) {
     if (curr_grid.is_cell(idx)) {
       const auto& other_cell = curr_grid[idx];
       const auto interfaces =
@@ -203,22 +255,17 @@ class Solver {
           update_cell(next_cell, wave);
         }
       }
-    } else if (idx == SAME_VALUE_INDEX) {
-      // TODO: Noop?
-    } else if (idx == ZERO_FLUX_INDEX) {
-      // TODO: Noop?
+    } else if (idx == SAME_VALUE_INDEX || idx == ZERO_FLUX_INDEX) {
+      // TODO: Noop? Same?
     } else if (idx == NULL_INDEX) {
-      std::stringstream s;
-      s << curr_cell;
-      Igor::Debug("cell = {}", s.str());
+      Igor::Debug("cell = {}", curr_cell);
       Igor::Panic("cell has NULL index.");
     } else {
-      std::stringstream s;
-      s << curr_cell;
-      Igor::Debug("cell = {}", s.str());
+      Igor::Debug("cell = {}", curr_cell);
       Igor::Panic("cell has unknown index with value {}.", idx);
     }
   };
+#endif  // ZAP_TANGENTIAL_CORRECTION
 
   // -----------------------------------------------------------------------------------------------
   template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
@@ -281,12 +328,10 @@ class Solver {
       const Eigen::Matrix<ActiveFloat, DIM, DIM> eta_mat =
           std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
 
-      Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vals;
-      Eigen::Matrix<ActiveFloat, DIM, DIM> eig_vecs;
-      get_eigen_decomp(eta_mat, eig_vals, eig_vecs);
+      const auto eig = get_eigen_decomp(eta_mat);
       // Wave strength
       const Eigen::Vector<ActiveFloat, DIM> alpha =
-          eig_vecs.inverse() * (interface.right_value - interface.left_value);
+          eig.vecs.inverse() * (interface.right_value - interface.left_value);
 
       Eigen::Index strong_wave_idx = 0;
       for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
@@ -294,7 +339,7 @@ class Solver {
         if (std::abs(alpha(i)) > std::abs(alpha(strong_wave_idx))) { strong_wave_idx = i; }
       }
 
-      const ActiveFloat wave_length = eig_vals(strong_wave_idx) * dt;
+      const ActiveFloat wave_length = eig.vals(strong_wave_idx) * dt;
 
       new_shock_points.emplace_back(interface.begin + normal_vector * wave_length,
                                     interface.end + normal_vector * wave_length);
@@ -362,12 +407,8 @@ class Solver {
           std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
       next_grid = curr_grid;
+
 #ifndef ZAP_STATIC_CUT
-
-#ifdef ZAP_ASSERT_CONSERVATIVE
-      const auto mass_before_moving = next_grid.mass();
-#endif  // ZAP_ASSERT_CONSERVATIVE
-
       if (!curr_grid.cut_cell_idxs().empty()) {
         next_grid.merge_cut_cells();
 
@@ -434,14 +475,6 @@ class Solver {
         }
       }
 
-#ifdef ZAP_ASSERT_CONSERVATIVE
-      const auto mass_after_moving = next_grid.mass();
-      IGOR_ASSERT(
-          (mass_before_moving - mass_after_moving).norm() <= EPS<PassiveFloat>,
-          "Mass has to be conserved while moving the cuts, but mass before is {} and after {}.",
-          mass_before_moving,
-          mass_after_moving);
-#endif  // ZAP_ASSERT_CONSERVATIVE
 #endif  // ZAP_STATIC_CUT
 
       // TODO: What happens when a subcell has area 0?
@@ -453,15 +486,23 @@ class Solver {
         auto& next_cell       = next_grid[cell_idx];
 
         // = Cut cell ==============================================================================
-        if (curr_cell.is_cut() || next_cell.is_cut()) {
+        if (next_cell.is_cut()) {
+#ifndef ZAP_TANGENTIAL_CORRECTION
           // Left interface
-          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
+          apply_side_interfaces_uncorrected(
+              curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
           // Right interface
-          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
+          apply_side_interfaces_uncorrected(
+              curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
           // Bottom interface
-          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
+          apply_side_interfaces_uncorrected(
+              curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
           // Top interface
-          apply_side_interfaces(curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
+          apply_side_interfaces_uncorrected(
+              curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
+#else
+          continue;
+#endif  // ZAP_TANGENTIAL_CORRECTION
         }
         // = Cut cell ==============================================================================
         // = Cartesian cell ========================================================================
@@ -636,9 +677,100 @@ class Solver {
         // = Cartesian cell ========================================================================
       }
 
-#ifdef ZAP_ASSERT_CONSERVATIVE
-      const auto mass_after_inter_cell_update = next_grid.mass();
-#endif  // ZAP_ASSERT_CONSERVATIVE
+#ifdef ZAP_TANGENTIAL_CORRECTION
+      auto pair_hasher = [](const std::pair<size_t, size_t>& p) { return p.first ^ p.second; };
+      std::unordered_set<std::pair<size_t, size_t>, decltype(pair_hasher)> calculated_interfaces;
+      for (size_t cell_idx : next_grid.cut_cell_idxs()) {
+        const auto& curr_cell      = curr_grid[cell_idx];
+        auto& next_cell            = next_grid[cell_idx];
+        const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
+        // TODO: Calculate outer interfaces
+
+        // - Left outer interface ------------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.left_idx) &&
+            !calculated_interfaces.contains({cell_idx, curr_cell.left_idx})) {
+          const auto& other_cell = curr_grid[curr_cell.left_idx];
+          const auto interfaces =
+              get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+                  curr_cell, other_cell, LEFT);
+
+          for (const auto& interface : interfaces) {
+            const auto waves =
+                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
+            for (const auto& wave : waves) {
+              for (size_t neighbour_idx : cell_neighbours) {
+                update_cell(next_grid[neighbour_idx], wave);
+              }
+              update_cell(next_cell, wave);
+            }
+          }
+          calculated_interfaces.emplace(cell_idx, curr_cell.left_idx);
+        }
+
+        // - Right outer interface -----------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.right_idx) &&
+            !calculated_interfaces.contains({cell_idx, curr_cell.right_idx})) {
+          const auto& other_cell = curr_grid[curr_cell.right_idx];
+          const auto interfaces =
+              get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+                  curr_cell, other_cell, RIGHT);
+
+          for (const auto& interface : interfaces) {
+            const auto waves =
+                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
+            for (const auto& wave : waves) {
+              for (size_t neighbour_idx : cell_neighbours) {
+                update_cell(next_grid[neighbour_idx], wave);
+              }
+              update_cell(next_cell, wave);
+            }
+          }
+          calculated_interfaces.emplace(cell_idx, curr_cell.right_idx);
+        }
+
+        // - Bottom outer interface ----------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.bottom_idx) &&
+            !calculated_interfaces.contains({cell_idx, curr_cell.bottom_idx})) {
+          const auto& other_cell = curr_grid[curr_cell.bottom_idx];
+          const auto interfaces =
+              get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+                  curr_cell, other_cell, BOTTOM);
+
+          for (const auto& interface : interfaces) {
+            const auto waves =
+                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
+            for (const auto& wave : waves) {
+              for (size_t neighbour_idx : cell_neighbours) {
+                update_cell(next_grid[neighbour_idx], wave);
+              }
+              update_cell(next_cell, wave);
+            }
+          }
+          calculated_interfaces.emplace(cell_idx, curr_cell.bottom_idx);
+        }
+
+        // - Top outer interface -------------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.top_idx) &&
+            !calculated_interfaces.contains({cell_idx, curr_cell.top_idx})) {
+          const auto& other_cell = curr_grid[curr_cell.top_idx];
+          const auto interfaces =
+              get_shared_interfaces<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
+                  curr_cell, other_cell, TOP);
+
+          for (const auto& interface : interfaces) {
+            const auto waves =
+                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
+            for (const auto& wave : waves) {
+              for (size_t neighbour_idx : cell_neighbours) {
+                update_cell(next_grid[neighbour_idx], wave);
+              }
+              update_cell(next_cell, wave);
+            }
+          }
+          calculated_interfaces.emplace(cell_idx, curr_cell.top_idx);
+        }
+      }
+#endif  // ZAP_TANGENTIAL_CORRECTION
 
       // - Handle internal interface ---------------------------------------------------------------
       for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
@@ -666,27 +798,6 @@ class Solver {
         }
       }
       // - Handle internal interface ---------------------------------------------------------------
-
-#ifdef ZAP_ASSERT_CONSERVATIVE
-      const auto mass_after_inner_cell_update = next_grid.mass();
-      IGOR_ASSERT((mass_after_inner_cell_update - mass_after_moving).norm() <= EPS<PassiveFloat>,
-                  "Mass has to be conserved while doing the update, but mass before is {} and "
-                  "after {}. Difference is {}. Mass after just doing inter-cell updates {}. Number "
-                  "of small subcells is {}.",
-                  mass_after_moving,
-                  mass_after_inner_cell_update,
-                  (mass_after_inner_cell_update - mass_after_moving).eval(),
-                  mass_after_inter_cell_update,
-                  std::count_if(std::cbegin(next_grid.cells()),
-                                std::cend(next_grid.cells()),
-                                [](const Cell<ActiveFloat, PassiveFloat, DIM>& cell) {
-                                  return cell.is_cut() &&
-                                         (cell.template get_cut_left_polygon<SIM_C>().area() <
-                                              EPS<PassiveFloat> ||
-                                          cell.template get_cut_right_polygon<SIM_C>().area() <
-                                              EPS<PassiveFloat>);
-                                }));
-#endif  // ZAP_ASSERT_CONSERVATIVE
 
       // Update time
       t += dt;

@@ -2,6 +2,8 @@
 #include <filesystem>
 
 // #define ZAP_STATIC_CUT
+// #define ZAP_TANGENTIAL_CORRECTION
+
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Solver.hpp"
@@ -14,6 +16,7 @@
 
 #include "Igor/Logging.hpp"
 #include "Igor/Macros.hpp"
+#include "Igor/Timer.hpp"
 
 #include "Common.hpp"
 
@@ -488,8 +491,8 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("High-res-ny       = {}", args->ref_ny);
 
   // - Run high-resolution Godunov solver ----------------------------------------------------------
-  const auto hr_res =
-      run_mat_based(args->ref_nx, args->ref_ny, args->tend, args->CFL_safety_factor);
+  const auto hr_res = run_mat_based(
+      args->ref_nx, args->ref_ny, args->tend, std::max(args->CFL_safety_factor, 0.25));
   if (!hr_res.has_value()) {
     Igor::Warn("High-resultion ({}x{}) solver failed.", args->ref_nx, args->ref_ny);
     return 1;
@@ -503,15 +506,25 @@ auto main(int argc, char** argv) -> int {
   // - Run high-resolution Godunov solver ----------------------------------------------------------
 
   if (args->run_benchmark) {
+    constexpr auto output_file = "./"
 #ifdef ZAP_STATIC_CUT
-    constexpr auto output_file = "./static_cut_results.txt";
+                                 "static_"
 #else
-    constexpr auto output_file = "./moving_cut_results.txt";
+                                 "moving_"
 #endif  // ZAP_STATIC_CUT
+#ifndef ZAP_TANGENTIAL_CORRECTION
+                                 "no_correction"
+#else
+                                 "correction"
+#endif  // ZAP_TANGENTIAL_CORRECTION
+                                 "_results.txt";
+
     std::ofstream out(output_file);
     if (!out) {
       Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
     }
+
+    Igor::Info("Saveing results to `{}`.", output_file);
 
     bool all_success = true;
     // TODO: Find out why 71 does not work
@@ -543,8 +556,6 @@ auto main(int argc, char** argv) -> int {
       }
       all_success = all_success && success;
     }
-
-    Igor::Info("Saved errors to `{}`.", output_file);
 
     return all_success ? 0 : 1;
   } else {
