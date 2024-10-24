@@ -206,7 +206,7 @@ class Solver {
       assert(cell_area > 0 || std::abs(cell_area) <= EPS<PassiveFloat>);
       if (std::abs(cell_area) <= EPS<PassiveFloat>) { return; }
 
-      const auto intersect      = Geometry::intersection(cell_polygon, wave.polygon);
+      const auto intersect      = cell_polygon & wave.polygon;
       const auto intersect_area = intersect.area();
       assert(intersect_area >= 0 || std::abs(intersect_area) < EPS<PassiveFloat>);
       IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<PassiveFloat>,
@@ -438,9 +438,9 @@ class Solver {
                    std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>);
             if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>) {
               const auto left_intersect_area =
-                  Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
+                  (next_subcell_polygon & curr_cell_left_polygon).area();
               const auto right_intersect_area =
-                  Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
+                  (next_subcell_polygon & curr_cell_right_polygon).area();
 
               IGOR_ASSERT(std::abs(left_intersect_area + right_intersect_area -
                                    next_subcell_polygon.area()) < 1e-6,
@@ -465,9 +465,9 @@ class Solver {
                    std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>);
             if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>) {
               const auto left_intersect_area =
-                  Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
+                  (next_subcell_polygon & curr_cell_left_polygon).area();
               const auto right_intersect_area =
-                  Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
+                  (next_subcell_polygon & curr_cell_right_polygon).area();
               assert(std::abs(left_intersect_area + right_intersect_area -
                               next_subcell_polygon.area()) < 1e-6);
 

@@ -2,7 +2,7 @@
 #include <filesystem>
 
 // #define ZAP_STATIC_CUT
-#define ZAP_TANGENTIAL_CORRECTION
+// #define ZAP_TANGENTIAL_CORRECTION
 
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Grid.hpp"

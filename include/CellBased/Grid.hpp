@@ -1148,10 +1148,8 @@ class UniformGrid {
     } else if (cell.is_cut()) {
       constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
-      const auto point_in_left =
-          cell.template get_cut_left_polygon<coord_type>().point_in_polygon(point);
-      const auto point_in_right =
-          cell.template get_cut_right_polygon<coord_type>().point_in_polygon(point);
+      const auto point_in_left  = cell.template get_cut_left_polygon<coord_type>().contains(point);
+      const auto point_in_right = cell.template get_cut_right_polygon<coord_type>().contains(point);
 
       if (point_in_left) {
         return cell.get_cut().left_value;

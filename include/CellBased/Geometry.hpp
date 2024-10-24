@@ -76,7 +76,7 @@ class Polygon {
   // -----------------------------------------------------------------------------------------------
   constexpr void add_point(PointType p) noexcept {
     if (std::find_if(std::cbegin(m_points), std::cend(m_points), [&p](const PointType& e) {
-          return (p - e).norm() <= 1e-8;
+          return (p - e).norm() <= EPS<PassiveFloat>;
         }) == std::cend(m_points)) {
       m_points.push_back(std::move(p));
       sort_points_counter_clockwise();
@@ -101,7 +101,7 @@ class Polygon {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto point_in_polygon(const PointType& p) const noexcept -> bool {
+  [[nodiscard]] constexpr auto contains(const PointType& p) const noexcept -> bool {
     if (size() < 2) { return false; }
 
     for (size_t i = 0; i < size(); ++i) {
@@ -115,73 +115,60 @@ class Polygon {
   }
 };
 
-// - Calculate intersection polygon using Sutherland-Hodgman algorithm -----------------------------
+// - Utility function to compute intersection point of line segment ab with cd ---------------------
 template <Point2D_c PointType>
-[[nodiscard]] constexpr auto intersection(const Polygon<PointType>& polygon1,
-                                          const Polygon<PointType>& polygon2) noexcept
-    -> Polygon<PointType> {
+[[nodiscard]] constexpr auto
+line_intersect(const PointType& A, const PointType& B, const PointType& C, const PointType& D)
+    -> std::optional<PointType> {
   static_assert(
       std::is_same_v<decltype(std::declval<PointType>().x), decltype(std::declval<PointType>().y)>,
       "Expect x- and y-component of PointType to have the same type.");
   using Float = decltype(std::declval<PointType>().x);
 
-  // Utility function to check if point is inside a polygon edge
-  const auto point_on_line =
-      [](const PointType& p, const PointType& a, const PointType& b) -> bool {
-    // Check if point p is to the left of line segment ab
-    return (b.x - a.x) * (p.y - a.y) >= (b.y - a.y) * (p.x - a.x) - EPS<Float>;
-  };
+  const Float det = (B.x - A.x) * (C.y - D.y) - (B.y - A.y) * (C.x - D.x);
+  if (std::abs(det) < EPS<Float>) { return std::nullopt; }
 
-  // Utility function to compute intersection point of line segment ab with cd
-  const auto line_intersect = [](const PointType& a,
-                                 const PointType& b,
-                                 const PointType& c,
-                                 const PointType& d) -> PointType {
-    Float a1 = b.y - a.y;
-    Float b1 = a.x - b.x;
-    Float c1 = a1 * a.x + b1 * a.y;
+  const Float r = ((C.y - D.y) * (C.x - A.x) + (D.x - C.x) * (C.y - A.y)) / det;
+  const Float s = ((A.y - B.y) * (C.x - A.x) + (B.x - A.x) * (C.y - A.y)) / det;
 
-    Float a2 = d.y - c.y;
-    Float b2 = c.x - d.x;
-    Float c2 = a2 * c.x + b2 * c.y;
+  if (!(0 - EPS<Float> <= r && r <= 1 + EPS<Float>) ||
+      !(0 - EPS<Float> <= s && s <= 1 + EPS<Float>)) {
+    return std::nullopt;
+  }
 
-    Float determinant = a1 * b2 - a2 * b1;
-    IGOR_ASSERT(std::abs(determinant) >= EPS<Float>,
-                "Cannot find intersection of lines {}->{} and {}->{}: determinant is {}.",
-                a,
-                b,
-                c,
-                d,
-                determinant);
+  return std::optional<PointType>({A.x + r * (B.x - A.x), A.y + r * (B.y - A.y)});
+}
 
-    return {(b2 * c1 - b1 * c2) / determinant, (a1 * c2 - a2 * c1) / determinant};
-  };
-
+// - Calculate intersection of two convex polygons -------------------------------------------------
+// Taken from
+// https://codereview.stackexchange.com/questions/243743/the-intersection-of-two-polygons-in-c
+template <Point2D_c PointType>
+[[nodiscard]] constexpr auto operator&(const Polygon<PointType>& polygon1,
+                                       const Polygon<PointType>& polygon2) noexcept
+    -> Polygon<PointType> {
+  // TODO: Consider looking into the Sutherland-Hodgman algorithm
   if (polygon1.empty() || polygon2.empty()) { return Polygon<PointType>{}; }
 
-  Polygon output_list = polygon1;
-
-  for (size_t i = 0; i < polygon2.size(); i++) {
-    Polygon input_list = output_list;
-    output_list.clear();
-
-    const auto A = polygon2[i];
-    const auto B = polygon2[(i + 1) % polygon2.size()];
-
-    for (size_t j = 0; j < input_list.size(); j++) {
-      const auto P = input_list[j];
-      const auto Q = input_list[(j + 1) % input_list.size()];
-
-      if (point_on_line(Q, A, B)) {
-        if (!point_on_line(P, A, B)) { output_list.add_point(line_intersect(A, B, P, Q)); }
-        output_list.add_point(Q);
-      } else if (point_on_line(P, A, B)) {
-        output_list.add_point(line_intersect(A, B, P, Q));
-      }
+  Polygon<PointType> intersect;
+  for (size_t i = 0; i < polygon1.size(); ++i) {
+    // Add points of p1 contained in p2.
+    if (polygon2.contains(polygon1[i])) { intersect.add_point(polygon1[i]); }
+    for (size_t j = 0; j < polygon2.size(); ++j) {
+      // Add points of intersection.
+      auto cross = line_intersect(polygon1[i],
+                                  polygon1[(i + 1) % polygon1.size()],
+                                  polygon2[j],
+                                  polygon2[(j + 1) % polygon2.size()]);
+      if (cross.has_value()) { intersect.add_point(std::move(*cross)); }
     }
   }
 
-  return output_list;
+  // Add points of p2 contained in p1.
+  for (size_t i = 0; i < polygon2.size(); ++i) {
+    if (polygon1.contains(polygon2[i])) { intersect.add_point(polygon2[i]); }
+  }
+
+  return intersect;
 }
 
 }  // namespace Zap::CellBased::Geometry

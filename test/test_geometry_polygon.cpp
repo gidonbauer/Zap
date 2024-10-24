@@ -106,8 +106,8 @@ TEST(GeometryPolygon, Intersect) {
 
     const Geo::Polygon<GenCoord<double>> poly2{{}};
 
-    const auto intersect1 = Geo::intersection(poly1, poly2);
-    const auto intersect2 = Geo::intersection(poly2, poly1);
+    const auto intersect1 = poly1 & poly2;
+    const auto intersect2 = poly2 & poly1;
 
     EXPECT_EQ(intersect1.size(), intersect2.size());
     EXPECT_DOUBLE_EQ(intersect1.area(), intersect2.area());
@@ -130,8 +130,8 @@ TEST(GeometryPolygon, Intersect) {
         {3.0, 0.0},
     }};
 
-    const auto intersect1 = Geo::intersection(poly1, poly2);
-    const auto intersect2 = Geo::intersection(poly2, poly1);
+    const auto intersect1 = poly1 & poly2;
+    const auto intersect2 = poly2 & poly1;
 
     EXPECT_EQ(intersect1.size(), intersect2.size());
     EXPECT_DOUBLE_EQ(intersect1.area(), intersect2.area());
@@ -154,8 +154,8 @@ TEST(GeometryPolygon, Intersect) {
         {3.0, 0.0},
     }};
 
-    const auto intersect1 = Geo::intersection(poly1, poly2);
-    const auto intersect2 = Geo::intersection(poly2, poly1);
+    const auto intersect1 = poly1 & poly2;
+    const auto intersect2 = poly2 & poly1;
 
     EXPECT_EQ(intersect1.size(), intersect2.size());
     EXPECT_DOUBLE_EQ(intersect1.area(), intersect2.area());
@@ -178,8 +178,8 @@ TEST(GeometryPolygon, Intersect) {
         {1.0, 0.0},
     }};
 
-    const auto intersect1 = Geo::intersection(poly1, poly2);
-    const auto intersect2 = Geo::intersection(poly2, poly1);
+    const auto intersect1 = poly1 & poly2;
+    const auto intersect2 = poly2 & poly1;
 
     EXPECT_EQ(intersect1.size(), intersect2.size());
     EXPECT_DOUBLE_EQ(intersect1.area(), intersect2.area());
@@ -209,8 +209,8 @@ TEST(GeometryPolygon, Intersect) {
         {1.0, 1.0},
     }};
 
-    const auto intersect1 = Geo::intersection(poly1, poly2);
-    const auto intersect2 = Geo::intersection(poly2, poly1);
+    const auto intersect1 = poly1 & poly2;
+    const auto intersect2 = poly2 & poly1;
 
     EXPECT_EQ(intersect1.size(), intersect2.size());
     EXPECT_DOUBLE_EQ(intersect1.area(), intersect2.area());
@@ -240,8 +240,8 @@ TEST(GeometryPolygon, Intersect) {
 //       {1.6666666666666665f, 1.6666666666666665f},
 //   }};
 //
-//   const auto intersect_12 = Geo::intersection(p1, p2);
-//   const auto intersect_21 = Geo::intersection(p2, p1);
+//   const auto intersect_12 = p1 & p2;
+//   const auto intersect_21 = p2 & p1;
 //
 // #define EXPECT_EPS_EQ(a, b) EXPECT_NEAR(a, b, 1e-6f)  // NOLINT
 //
@@ -270,8 +270,8 @@ TEST(GeometryPolygon, IntersectRoundingBugDouble) {
       {1.6666666666666665, 1.6666666666666665},
   }};
 
-  const auto intersect_12 = Geo::intersection(p1, p2);
-  const auto intersect_21 = Geo::intersection(p2, p1);
+  const auto intersect_12 = p1 & p2;
+  const auto intersect_21 = p2 & p1;
 
 #define EXPECT_EPS_EQ(a, b) EXPECT_NEAR(a, b, 1e-8)  // NOLINT
 
@@ -294,15 +294,15 @@ TEST(GeometryPolygon, PointInPolygon) {
       {1.0, 1.0},
   });
 
-  EXPECT_TRUE(polygon.point_in_polygon(GenCoord<double>{0.5, 0.5}));
-  EXPECT_FALSE(polygon.point_in_polygon(GenCoord<double>{1.5, 0.5}));
-  EXPECT_FALSE(polygon.point_in_polygon(GenCoord<double>{0.5, 1.5}));
-  EXPECT_FALSE(polygon.point_in_polygon(GenCoord<double>{1.5, 1.5}));
+  EXPECT_TRUE(polygon.contains(GenCoord<double>{0.5, 0.5}));
+  EXPECT_FALSE(polygon.contains(GenCoord<double>{1.5, 0.5}));
+  EXPECT_FALSE(polygon.contains(GenCoord<double>{0.5, 1.5}));
+  EXPECT_FALSE(polygon.contains(GenCoord<double>{1.5, 1.5}));
 
-  EXPECT_TRUE(polygon.point_in_polygon(GenCoord<double>{0.0, 0.0}));
-  EXPECT_TRUE(polygon.point_in_polygon(GenCoord<double>{0.1, 0.0}));
-  EXPECT_TRUE(polygon.point_in_polygon(GenCoord<double>{0.0, 0.1}));
-  EXPECT_TRUE(polygon.point_in_polygon(GenCoord<double>{0.1, 0.1}));
+  EXPECT_TRUE(polygon.contains(GenCoord<double>{0.0, 0.0}));
+  EXPECT_TRUE(polygon.contains(GenCoord<double>{0.1, 0.0}));
+  EXPECT_TRUE(polygon.contains(GenCoord<double>{0.0, 0.1}));
+  EXPECT_TRUE(polygon.contains(GenCoord<double>{0.1, 0.1}));
 }
 
 TEST(GeometryPolygon, ScalingAndRelativeSizes) {
@@ -319,7 +319,7 @@ TEST(GeometryPolygon, ScalingAndRelativeSizes) {
       {0.4, 0.45},
   });
 
-  const auto intersect_AB = Geo::intersection(polygon_A, polygon_B);
+  const auto intersect_AB = polygon_A & polygon_B;
 
   const double scale_x = 1.75;
   const double scale_y = 0.55;
@@ -334,7 +334,7 @@ TEST(GeometryPolygon, ScalingAndRelativeSizes) {
     scaled_polygon_B.add_point({scale_x * p.x, scale_y * p.y});
   }
 
-  const auto scaled_intersect_AB = Geo::intersection(scaled_polygon_A, scaled_polygon_B);
+  const auto scaled_intersect_AB = scaled_polygon_A & scaled_polygon_B;
 
   EXPECT_DOUBLE_EQ(scaled_polygon_A.area(), scale_x * scale_y * polygon_A.area());
 
@@ -366,7 +366,7 @@ TEST(GeometryPolygon, NonIntersectingParallel) {
     Geo::Polygon<PointType> A({{0, 0}, {0, 1}, {1, 1}, {1, 0}});
     Geo::Polygon<PointType> B({{2, 0}, {2, 1}, {3, 1}, {3, 0}});
 
-    const auto intersect_AB = Geo::intersection(A, B);
+    const auto intersect_AB = A & B;
 
     EXPECT_TRUE(intersect_AB.empty());
     EXPECT_DOUBLE_EQ(intersect_AB.area(), 0.0);
@@ -376,7 +376,7 @@ TEST(GeometryPolygon, NonIntersectingParallel) {
     Geo::Polygon<PointType> A({{0, 0}, {0, 1}, {1, 1}, {1, 0}});
     Geo::Polygon<PointType> B({{1, 0}, {1, 1}, {3, 1}, {3, 0}});
 
-    const auto intersect_AB = Geo::intersection(A, B);
+    const auto intersect_AB = A & B;
 
     // EXPECT_TRUE(intersect_AB.empty());
     EXPECT_EQ(intersect_AB.size(), 2UZ);
