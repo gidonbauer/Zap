@@ -183,8 +183,6 @@ class Solver {
                 tangent_vector * tangent_wave_lengths(q, q),
         }};
 
-        // wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > 0) -
-        //             static_cast<PassiveFloat>(normal_eig.vals(p, p) < 0);
         wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > EPS<PassiveFloat>) -
                     static_cast<PassiveFloat>(normal_eig.vals(p, p) < -EPS<PassiveFloat>);
 
@@ -443,8 +441,15 @@ class Solver {
                   Geometry::intersection(next_subcell_polygon, curr_cell_left_polygon).area();
               const auto right_intersect_area =
                   Geometry::intersection(next_subcell_polygon, curr_cell_right_polygon).area();
-              assert(std::abs(left_intersect_area + right_intersect_area -
-                              next_subcell_polygon.area()) < 1e-6);
+
+              IGOR_ASSERT(std::abs(left_intersect_area + right_intersect_area -
+                                   next_subcell_polygon.area()) < 1e-6,
+                          "Expect the sum of the intersected areas of the subcells to be equal to "
+                          "the area of the entire subcell, but {} + {} = {} != {}",
+                          left_intersect_area,
+                          right_intersect_area,
+                          left_intersect_area + right_intersect_area,
+                          next_subcell_polygon.area());
 
               next_cell.get_cut().left_value =
                   (curr_cell.get_cut().left_value * left_intersect_area +
@@ -679,7 +684,13 @@ class Solver {
 
 #ifdef ZAP_TANGENTIAL_CORRECTION
       auto pair_hasher = [](const std::pair<size_t, size_t>& p) { return p.first ^ p.second; };
-      std::unordered_set<std::pair<size_t, size_t>, decltype(pair_hasher)> calculated_interfaces;
+      auto pair_equal  = [](const std::pair<size_t, size_t>& p1,
+                           const std::pair<size_t, size_t>& p2) {
+        return (p1.first == p2.first && p1.second == p2.second) ||
+               (p1.first == p2.second && p1.second == p2.first);
+      };
+      std::unordered_set<std::pair<size_t, size_t>, decltype(pair_hasher), decltype(pair_equal)>
+          calculated_interfaces;
       for (size_t cell_idx : next_grid.cut_cell_idxs()) {
         const auto& curr_cell      = curr_grid[cell_idx];
         auto& next_cell            = next_grid[cell_idx];
@@ -779,7 +790,6 @@ class Solver {
         auto& next_cell = next_grid[cell_idx];
         assert(next_cell.is_cartesian() || next_cell.is_cut());
 
-        // TODO: Do we need a "negative wave", side interfaces are applied on every cell?
         const auto internal_interface =
             get_internal_interface<ActiveFloat, PassiveFloat, DIM, GridCoord<ActiveFloat>>(
                 curr_cell);

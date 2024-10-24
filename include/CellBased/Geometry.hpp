@@ -54,11 +54,12 @@ class Polygon {
 
   // -----------------------------------------------------------------------------------------------
   constexpr void remove_duplicate_points() noexcept {
-    const auto first_duplicate = std::unique(
-        std::begin(m_points), std::end(m_points), [](const PointType& p1, const PointType& p2) {
-          return (p1 - p2).norm() < EPS<PassiveFloat>;
-        });
-    m_points.erase(first_duplicate, std::end(m_points));
+    m_points.erase(std::unique(std::begin(m_points),
+                               std::end(m_points),
+                               [](const PointType& p1, const PointType& p2) {
+                                 return (p1 - p2).norm() < 50 * EPS<PassiveFloat>;
+                               }),
+                   std::end(m_points));
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -172,9 +173,7 @@ template <Point2D_c PointType>
       const auto Q = input_list[(j + 1) % input_list.size()];
 
       if (point_on_line(Q, A, B)) {
-        if (!point_on_line(P, A, B)) {
-          output_list.add_point(line_intersect(A, B, P, Q));  //
-        }
+        if (!point_on_line(P, A, B)) { output_list.add_point(line_intersect(A, B, P, Q)); }
         output_list.add_point(Q);
       } else if (point_on_line(P, A, B)) {
         output_list.add_point(line_intersect(A, B, P, Q));

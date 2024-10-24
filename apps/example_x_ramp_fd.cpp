@@ -54,7 +54,7 @@ constexpr Float Y_MAX = 2.0;
         {x_shock(0, eps), 0.0},
         {x_shock(0, eps), (Y_MAX - Y_MIN) + Y_MIN},
     };
-    if (!grid.cut_piecewise_linear(points)) {
+    if (!grid.cut_piecewise_linear<ExtendType::MAX>(points)) {
       Igor::Panic("Could not cut the grid along the initial shock.");
     }
   }

@@ -358,3 +358,28 @@ TEST(GeometryPolygon, ScalingAndRelativeSizes) {
               scaled_intersect_AB.area() / scaled_polygon_B.area(),
               Zap::CellBased::EPS<double>);
 }
+
+TEST(GeometryPolygon, NonIntersectingParallel) {
+  using PointType = GenCoord<double>;
+
+  {
+    Geo::Polygon<PointType> A({{0, 0}, {0, 1}, {1, 1}, {1, 0}});
+    Geo::Polygon<PointType> B({{2, 0}, {2, 1}, {3, 1}, {3, 0}});
+
+    const auto intersect_AB = Geo::intersection(A, B);
+
+    EXPECT_TRUE(intersect_AB.empty());
+    EXPECT_DOUBLE_EQ(intersect_AB.area(), 0.0);
+  }
+
+  {
+    Geo::Polygon<PointType> A({{0, 0}, {0, 1}, {1, 1}, {1, 0}});
+    Geo::Polygon<PointType> B({{1, 0}, {1, 1}, {3, 1}, {3, 0}});
+
+    const auto intersect_AB = Geo::intersection(A, B);
+
+    // EXPECT_TRUE(intersect_AB.empty());
+    EXPECT_EQ(intersect_AB.size(), 2UZ);
+    EXPECT_DOUBLE_EQ(intersect_AB.area(), 0.0);
+  }
+}

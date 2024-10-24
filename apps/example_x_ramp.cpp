@@ -212,7 +212,7 @@ void print_solution_error(
         {(X_MAX - X_MIN) / 2, 0.0},
         {(X_MAX - X_MIN) / 2, (Y_MAX - Y_MIN) + Y_MIN},
     };
-    if (!grid.cut_piecewise_linear(points)) { return false; }
+    if (!grid.cut_piecewise_linear<Zap::CellBased::ExtendType::MAX>(points)) { return false; }
   }
 
   ActiveFloat eps = 0.0;

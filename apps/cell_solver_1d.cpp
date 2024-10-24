@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <numbers>
 
-// #define ZAP_TANGENTIAL_CORRECTION
+#define ZAP_TANGENTIAL_CORRECTION
 
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
@@ -181,7 +181,7 @@ auto main(int argc, char** argv) -> int {
     auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
         Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
     const auto res =
-        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
+        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.35);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;

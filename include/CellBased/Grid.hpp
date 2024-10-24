@@ -308,43 +308,58 @@ class UniformGrid {
     }
   }
 
+  // -------------------------------------------------------------------------------------------------
+  template <typename PointType>
+  [[nodiscard]] constexpr auto
+  find_sides(const PointType& p, const Cell<ActiveFloat, PassiveFloat, DIM>& cell) const noexcept
+      -> Side {
+    constexpr CoordType coord_type = PointType2CoordType<PointType>;
+
+    const int on_x = approx_eq(cell.template x_min<coord_type>(), ad::value(p.x)) * ON_MIN +
+                     approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                               ad::value(p.x)) *
+                         ON_MAX;
+    const int on_y = approx_eq(cell.template y_min<coord_type>(), ad::value(p.y)) * ON_MIN +
+                     approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
+                               ad::value(p.y)) *
+                         ON_MAX;
+    IGOR_ASSERT(on_x != NOT_ON || on_y != NOT_ON,
+                "Point {} is not on a edge in x-direction or in y-direction of cell {}.",
+                p,
+                cell);
+    Side loc = static_cast<Side>((on_x == ON_MIN) * LEFT | (on_x == ON_MAX) * RIGHT |
+                                 (on_y == ON_MIN) * BOTTOM | (on_y == ON_MAX) * TOP);
+    IGOR_ASSERT(count_sides(loc) <= 2,
+                "The cut can be on a maximum of two sides, but is on {}.",
+                count_sides(loc));
+    return loc;
+  };
+
+  // -------------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto count_sides(Side side) const noexcept {
+    return std::popcount(std::to_underlying(side));
+  }
+
   // -----------------------------------------------------------------------------------------------
+  enum class ClassifyError : uint8_t { OK, BOTH_CUTS_ON_SAME_SIDE, CUT_ON_MULTIPLE_SIDES };
+
   template <Point2D_c PointType>
   [[nodiscard]] constexpr auto classify_cut(const Cell<ActiveFloat, PassiveFloat, DIM>& cell,
                                             PointType& cut1_point,
-                                            PointType& cut2_point) const noexcept -> CutType {
+                                            PointType& cut2_point,
+                                            CutType& type) const noexcept -> ClassifyError {
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
-    IGOR_ASSERT(
-        point_in_cell(cut1_point, cell), "Cut1-point {} is not in cell {}.", cut1_point, cell);
-    IGOR_ASSERT(
-        point_in_cell(cut2_point, cell), "Cut2-point {} is not in cell {}.", cut2_point, cell);
-
-    auto find_sides = [&cell](const PointType& p) -> Side {
-      const int on_x = approx_eq(cell.template x_min<coord_type>(), ad::value(p.x)) * ON_MIN +
-                       approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                 ad::value(p.x)) *
-                           ON_MAX;
-      const int on_y = approx_eq(cell.template y_min<coord_type>(), ad::value(p.y)) * ON_MIN +
-                       approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
-                                 ad::value(p.y)) *
-                           ON_MAX;
-      IGOR_ASSERT(on_x != NOT_ON || on_y != NOT_ON,
-                  "Point {} is not on a edge in x-direction or in y-direction of cell {}.",
-                  p,
-                  cell);
-      Side loc = static_cast<Side>((on_x == ON_MIN) * LEFT | (on_x == ON_MAX) * RIGHT |
-                                   (on_y == ON_MIN) * BOTTOM | (on_y == ON_MAX) * TOP);
-      IGOR_ASSERT(std::popcount(std::to_underlying(loc)) <= 2,
-                  "The cut can be on a maximum of two sides, but is on {}.",
-                  std::popcount(std::to_underlying(loc)));
-      return loc;
-    };
-
-    auto on_single_side = [](Side side) -> bool {
-      // Only a single bit is set to 1
-      return std::popcount(std::to_underlying(side)) == 1;
-    };
+    IGOR_ASSERT(point_in_cell(cut1_point, cell),
+                "Cut1-point ({}) {} is not in cell {}.",
+                Igor::type_name(cut1_point),
+                cut1_point,
+                cell);
+    IGOR_ASSERT(point_in_cell(cut2_point, cell),
+                "Cut2-point ({}) {} is not in cell {}.",
+                Igor::type_name(cut2_point),
+                cut2_point,
+                cell);
 
     auto remove_common = [](Side& side1, Side& side2) {
       const Side common = static_cast<Side>(side1 & side2);
@@ -361,38 +376,42 @@ class UniformGrid {
       }
     };
 
-    Side cut1_loc = find_sides(cut1_point);
-    Side cut2_loc = find_sides(cut2_point);
+    Side cut1_loc = find_sides(cut1_point, cell);
+    Side cut2_loc = find_sides(cut2_point, cell);
 
-    IGOR_ASSERT(cut1_loc != cut2_loc,
-                "Expected the cuts to be at different sides of the cell, but both cuts are on "
-                "side {}. cut1_point = {}, cut2_point = {}. PointType = {}.",
-                cut1_loc,
-                cut1_point,
-                cut2_point,
-                Igor::type_name<PointType>());
+    if (cut1_loc == cut2_loc) {
+      // Igor::Warn("Expected the cuts to be at different sides of the cell, but both cuts are on "
+      //            "side {}. cut1_point = {}, cut2_point = {}. ||cut1_point - cut2_point|| = {}. "
+      //            "PointType = {}.",
+      //            cut1_loc,
+      //            cut1_point,
+      //            cut2_point,
+      //            (cut1_point - cut2_point).norm(),
+      //            Igor::type_name<PointType>());
+      return ClassifyError::BOTH_CUTS_ON_SAME_SIDE;
+    }
 
     remove_common(cut1_loc, cut2_loc);
     decide_on_corner(cut1_loc);
     decide_on_corner(cut2_loc);
 
-    IGOR_ASSERT(on_single_side(cut1_loc) && on_single_side(cut2_loc),
-                "Expected cut1 on cut2 to be on only one side after removing common sides, but "
-                "cut1_loc = {} and cut2_loc = {}.",
-                cut1_loc,
-                cut2_loc);
+    if (count_sides(cut1_loc) == 0 || count_sides(cut2_loc) == 0) {
+      return ClassifyError::BOTH_CUTS_ON_SAME_SIDE;
+    }
 
-    IGOR_ASSERT(cut1_loc != cut2_loc,
-                "Expected the cuts to be at different sides of the cell, but both cuts are on "
-                "side {}.",
-                cut1_loc);
+    if (!(count_sides(cut1_loc) == 1 && count_sides(cut2_loc) == 1)) {
+      Igor::Warn("Expected cut1 on cut2 to be on only one side after removing common sides, but "
+                 "cut1_loc = {} and cut2_loc = {}.",
+                 cut1_loc,
+                 cut2_loc);
+      return ClassifyError::CUT_ON_MULTIPLE_SIDES;
+    }
 
     if (cut1_loc > cut2_loc) {
       std::swap(cut1_loc, cut2_loc);
       std::swap(cut1_point, cut2_point);
     }
 
-    CutType type;
     switch (cut1_loc | cut2_loc) {
       case LEFT | BOTTOM:  type = CutType::BOTTOM_LEFT; break;
       case BOTTOM | RIGHT: type = CutType::BOTTOM_RIGHT; break;
@@ -428,7 +447,7 @@ class UniformGrid {
                 "Cut2-y {} is not in [0, 1].",
                 cut2_point.y);
 
-    return type;
+    return ClassifyError::OK;
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -612,7 +631,11 @@ class UniformGrid {
       auto cut1_point   = entry_points[i];
       auto cut2_point   = entry_points[i + 1];
 
-      const auto type = classify_cut(cell_to_cut, cut1_point, cut2_point);
+      CutType type;
+      if (classify_cut(cell_to_cut, cut1_point, cut2_point, type) != ClassifyError::OK) {
+        Igor::Warn("Could not classify cut, cut is invalid.");
+        return false;
+      }
 
       Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
       if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
@@ -630,7 +653,7 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <ExtendType extend_type = ExtendType::MAX, typename T>
+  template <ExtendType extend_type, typename T>
   [[nodiscard]] auto cut_piecewise_linear(const std::vector<SimCoord<T>>& points) noexcept -> bool {
     std::vector<GridCoord<T>> points_grid_coord(points.size());
     std::transform(std::cbegin(points),
@@ -641,7 +664,7 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <ExtendType extend_type = ExtendType::MAX, typename T>
+  template <ExtendType extend_type, typename T>
   [[nodiscard]] auto cut_piecewise_linear(std::vector<GridCoord<T>> points) noexcept -> bool {
     if (!m_cut_cell_idxs.empty()) {
       Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
@@ -783,6 +806,7 @@ class UniformGrid {
                                        }),
                            intersect_points.end());
 
+#if 0
     m_cut_cell_idxs.resize(intersect_points.size() - 1);
     for (size_t i = 0; i < intersect_points.size() - 1; ++i) {
       const auto entry_point = intersect_points[i];
@@ -816,7 +840,12 @@ class UniformGrid {
       auto cut1_point   = intersect_points[i];
       auto cut2_point   = intersect_points[i + 1];
 
-      const auto type = classify_cut(cell_to_cut, cut1_point, cut2_point);
+      CutType type;
+      if (!classify_cut(cell_to_cut, cut1_point, cut2_point, type)) {
+        Igor::Warn("Could not classify the cut, cut is invalid.");
+        Igor::Debug("Points used to cut the grid piecewise linear:\n{}", points);
+        return false;
+      }
 
       Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
       if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
@@ -829,6 +858,114 @@ class UniformGrid {
           .rel_cut2    = {cut2_point.x, cut2_point.y},
       };
     }
+#else
+    m_cut_cell_idxs.reserve(intersect_points.size() - 1);
+    for (size_t i = 0; i < intersect_points.size() - 1;) {
+      auto entry_point = intersect_points[i];
+      auto exit_point  = intersect_points[i + 1];
+      if (approx_eq((entry_point - exit_point).norm(), static_cast<T>(0))) {
+        Igor::Warn("entry_point {} and exit_point {} are the same point, ignore.",
+                   entry_point,
+                   exit_point);
+        continue;
+      }
+
+      const auto mid_point = (entry_point + exit_point) / 2;
+      const auto cell_idx  = find_cell(mid_point);
+      IGOR_ASSERT(cell_idx != NULL_INDEX,
+                  "Expected mid_point {} to be in grid [{}, {}]x[{}, {}], but is not.",
+                  mid_point,
+                  0,
+                  m_nx,
+                  0,
+                  m_ny);
+
+      auto& cell_to_cut = m_cells[cell_idx];
+      CutType type;
+      switch (classify_cut(cell_to_cut, entry_point, exit_point, type)) {
+        case ClassifyError::BOTH_CUTS_ON_SAME_SIDE:
+          {
+            const auto num_sides_entry = count_sides(find_sides(entry_point, cell_to_cut));
+            const auto num_sides_exit  = count_sides(find_sides(exit_point, cell_to_cut));
+            IGOR_ASSERT(!(num_sides_entry == 2 && num_sides_exit == 2),
+                        "The case where both intersection points lay on a corner should be handled "
+                        "correctly.");
+
+            // Entry point lays on single side => remove entry and exit point and clean up last
+            // cut-cell
+            if (num_sides_entry == 1 && num_sides_exit == 1) {
+              // Remove intersection points that are on the same side of the cell
+              intersect_points.erase(
+                  std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i)),
+                  std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i + 2)));
+
+              // Reset i to continue at the correct index
+              IGOR_ASSERT(i >= 1,
+                          "Index must be greater or equal to 1, but is {}. I don't think we can do "
+                          "anything in this case.",
+                          i);
+              i -= 1;
+
+              // Repair cut cells by removing last cut as it was incorrect
+              const auto last_cut_idx = m_cut_cell_idxs.back();
+              m_cut_cell_idxs.pop_back();
+              const auto old_value = m_cells[last_cut_idx].get_cut().left_value;  // == right_value
+              m_cells[last_cut_idx].value = CartesianValue<ActiveFloat, DIM>{.value = old_value};
+            }
+            // Entry point lays on corner => remove only exit point and leave last cut-cell
+            else if (num_sides_entry == 2) {
+              // Remove exit point
+              intersect_points.erase(
+                  std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i + 1)),
+                  std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i + 2)));
+            } else if (num_sides_exit == 2) {
+              // Remove entry point
+              intersect_points.erase(
+                  std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i)),
+                  std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i + 1)));
+
+              // Reset i to continue at the correct index
+              IGOR_ASSERT(i >= 1,
+                          "Index must be greater or equal to 1, but is {}. I don't think we can do "
+                          "anything in this case.",
+                          i);
+              i -= 1;
+
+              // Repair cut cells by removing last cut as it was incorrect
+              const auto last_cut_idx = m_cut_cell_idxs.back();
+              m_cut_cell_idxs.pop_back();
+              const auto old_value = m_cells[last_cut_idx].get_cut().left_value;  // == right_value
+              m_cells[last_cut_idx].value = CartesianValue<ActiveFloat, DIM>{.value = old_value};
+            }
+
+            continue;
+          }
+        case ClassifyError::CUT_ON_MULTIPLE_SIDES:
+          {
+            Igor::Warn("Could not classify the cut, cut is invalid.");
+            Igor::Debug("Points used to cut the grid piecewise linear: {}", points);
+            Igor::Debug("entry_point = {}", entry_point);
+            Igor::Debug("exit_point = {}", exit_point);
+            return false;
+          }
+        case ClassifyError::OK:
+      }
+
+      Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
+      if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
+
+      cell_to_cut.value = CutValue<ActiveFloat, DIM>{
+          .left_value  = old_value,
+          .right_value = old_value,
+          .type        = type,
+          .rel_cut1    = {entry_point.x, entry_point.y},
+          .rel_cut2    = {exit_point.x, exit_point.y},
+      };
+
+      m_cut_cell_idxs.push_back(cell_idx);
+      ++i;
+    }
+#endif
 
     return true;
   }
