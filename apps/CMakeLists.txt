@@ -9,8 +9,10 @@ set(executables
   mat_solver
   
   example_quarter_circle
+  example_full_circle
   example_x_ramp
   example_x_ramp_fd
+  example_inverse_ramp
 )
 
 foreach(exec ${executables})

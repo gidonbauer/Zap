@@ -13,6 +13,7 @@
 
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
+#include "IO/NoopWriter.hpp"
 
 #include "Igor/Logging.hpp"
 #include "Igor/Macros.hpp"
@@ -233,19 +234,41 @@ auto run_mat_based(size_t nx, size_t ny, PassiveFloat tend, PassiveFloat CFL_saf
     //     u_next, u_curr, dt, local_dx, local_dy, numerical_flux_x, numerical_flux_y);
   };
 
-  const std::string u_filename =
-      OUTPUT_DIR "u_mat_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
-  Zap::IO::IncMatrixWriter u_writer(u_filename, u0_grid);
+  if (nx > 800 || ny > 800) {
+    Igor::Warn("Do not save intermediate solution for grid with size {}x{}", nx, ny);
 
-  const std::string t_filename =
-      OUTPUT_DIR "t_mat_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
-  Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
+    if (CFL_safety_factor < 0.5) {
+      Igor::Warn("Change CFL-safety-factor from {} to 0.5 for grid with size {}x{}",
+                 CFL_safety_factor,
+                 nx,
+                 ny);
+      CFL_safety_factor = 0.5;
+    }
 
-  const auto res = Zap::MatBased::solve_2d_burgers(
-      x, y, u0_grid, tend, boundary, u_writer, t_writer, CFL_safety_factor);
+    Igor::ScopeTimer timer{std::format("Godunov solver for grid with size {}x{}", nx, ny)};
 
-  if (!res.has_value()) { return std::nullopt; }
-  return std::make_tuple(x, y, *res);
+    Zap::IO::NoopWriter u_writer;
+    Zap::IO::NoopWriter t_writer;
+    const auto res = Zap::MatBased::solve_2d_burgers(
+        x, y, u0_grid, tend, boundary, u_writer, t_writer, CFL_safety_factor);
+
+    if (!res.has_value()) { return std::nullopt; }
+    return std::make_tuple(x, y, *res);
+  } else {
+    const std::string u_filename =
+        OUTPUT_DIR "u_mat_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
+    Zap::IO::IncMatrixWriter u_writer(u_filename, u0_grid);
+
+    const std::string t_filename =
+        OUTPUT_DIR "t_mat_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
+    Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
+
+    const auto res = Zap::MatBased::solve_2d_burgers(
+        x, y, u0_grid, tend, boundary, u_writer, t_writer, CFL_safety_factor);
+
+    if (!res.has_value()) { return std::nullopt; }
+    return std::make_tuple(x, y, *res);
+  }
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -506,6 +529,9 @@ auto main(int argc, char** argv) -> int {
   // - Run high-resolution Godunov solver ----------------------------------------------------------
 
   if (args->run_benchmark) {
+    // TODO: Consider comparing convergence via Richardson extrapolation
+    // (https://en.wikipedia.org/wiki/Richardson_extrapolation)
+
     constexpr auto output_file = "./"
 #ifdef ZAP_STATIC_CUT
                                  "static_"
@@ -524,7 +550,7 @@ auto main(int argc, char** argv) -> int {
       Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
     }
 
-    Igor::Info("Saveing results to `{}`.", output_file);
+    Igor::Info("Saving results to `{}`.", output_file);
 
     bool all_success = true;
     // TODO: Find out why 71 does not work
@@ -537,12 +563,14 @@ auto main(int argc, char** argv) -> int {
     };
 #else
     constexpr std::array ns = {
-        3UZ,  5UZ,  7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,
-        81UZ, 91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ,
+        3UZ,  5UZ,   7UZ,   9UZ,   11UZ,  15UZ,  21UZ,  31UZ,  41UZ,  51UZ,  61UZ,  71UZ,  81UZ,
+        91UZ, 101UZ, 111UZ, 121UZ, 131UZ, 141UZ, 151UZ, 161UZ, 171UZ, 181UZ, 191UZ, 201UZ,
     };
 #endif  // ZAP_STATIC_CUT
 
+    Igor::ScopeTimer timer{"Benchmark"};
     for (size_t n : ns) {
+
       bool success;
       if (n < 10) {
         success = compare(n, n, args->tend, *hr_res, L1_hr, 0.5, out);

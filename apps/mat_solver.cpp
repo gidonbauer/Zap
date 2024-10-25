@@ -4,6 +4,7 @@
 
 #include "Igor/Logging.hpp"
 #include "Igor/Macros.hpp"
+#include "Igor/Timer.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "mat_based/"
 
@@ -95,16 +96,15 @@ auto main(int argc, char** argv) -> int {
       //                                          std::pow((x_min + x_max + y_min + y_max) / 4, 2));
 
       // = Quater circle - Version 2 ===============================================================
-      // u0(yi, xi) = (std::pow(x(xi) - x_min, 2) + std::pow(y(yi) - y_min, 2)) *
-      //              static_cast<Float>((std::pow(x(xi) - x_min, 2) + std::pow(y(yi) - y_min, 2))
-      //              <=
-      //                                 std::pow((x_min + x_max + y_min + y_max) / 4, 2));
+      u0(yi, xi) = (std::pow(x(xi) - x_min, 2) + std::pow(y(yi) - y_min, 2)) *
+                   static_cast<Float>((std::pow(x(xi) - x_min, 2) + std::pow(y(yi) - y_min, 2)) <=
+                                      std::pow((x_min + x_max + y_min + y_max) / 4, 2));
 
       // = X-ramp ==================================================================================
       // u0(yi, xi) = x(xi) * static_cast<Float>(x(xi) <= (x_min + x_max) / 2);
 
       // = Inverse X-ramp ==========================================================================
-      u0(yi, xi) = (x_max - x(xi)) * (1.0 - static_cast<Float>(x(xi) <= (x_min + x_max) / 2));
+      // u0(yi, xi) = (x_max - x(xi)) * (1.0 - static_cast<Float>(x(xi) <= (x_min + x_max) / 2));
 
       // = Y-ramp ==================================================================================
       // u0(yi, xi) = y(yi) * static_cast<Float>(y(yi) <= (y_min + y_max) / 2);
@@ -138,7 +138,9 @@ auto main(int argc, char** argv) -> int {
   constexpr auto t_filename = OUTPUT_DIR "t.mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
 
-  const auto u_res = Zap::MatBased::solve_2d_burgers(x, y, u0, tend, boundary, u_writer, t_writer);
+  Igor::ScopeTimer timer{"Solver"};
+  const auto u_res =
+      Zap::MatBased::solve_2d_burgers(x, y, u0, tend, boundary, u_writer, t_writer, 0.5);
 
   Igor::Info("Wrote solution to `{}`", u_filename);
   Igor::Info("Wrote time steps to `{}`", t_filename);
