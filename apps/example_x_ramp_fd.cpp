@@ -96,7 +96,7 @@ template <typename FUNC>
 
 // -------------------------------------------------------------------------------------------------
 auto main() -> int {
-  const size_t nx   = 5000;
+  const size_t nx   = 1000;
   const size_t ny   = 5;
   const Float tend  = 1.0;
   const size_t n_L1 = 100'000;

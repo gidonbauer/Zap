@@ -89,44 +89,44 @@ class Solver {
     if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return {}; }
 
     // Vector tangential to interface
-    PointType tangent_vector = (interface.end - interface.begin).normalized();
-
-    // Angle between cut_vector and y-axis (0, 1)
-    //     cut_angle = arccos(cut_vector^T * (0, 1) / ||cut_vector|| * ||(0, 1)||)
-    // <=> cut_angle = arccos(cut_vector_1 / ||cut_vector||)
-    ActiveFloat interface_angle = std::acos(tangent_vector.y);
-    if (tangent_vector.x > EPS<PassiveFloat>) {
-      interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
-    }
+    const PointType tangent_vector = (interface.end - interface.begin).normalized();
 
     // Vector normal to cut
-    PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
+    const PointType normal_vector{tangent_vector.y, -tangent_vector.x};
     IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
                 "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
-                "normal_vector = {}, interface_angle = {}",
+                "normal_vector = {}.",
                 tangent_vector,
                 normal_vector,
-                tangent_vector.dot(normal_vector),
-                interface_angle);
+                tangent_vector.dot(normal_vector));
 
     // Scale tangential vector when operating in grid coordinates
-    if constexpr (is_GridCoord_v<PointType>) {
-      tangent_vector.x *= scale_x;
-      tangent_vector.y *= scale_y;
-    }
-    // Scale normal vector when operating in grid coordinates
-    if constexpr (is_GridCoord_v<PointType>) {
-      normal_vector.x *= scale_x;
-      normal_vector.y *= scale_y;
-    }
+    auto scale_if_grid_c = [=](const PointType& p) {
+      if constexpr (is_GridCoord_v<PointType>) {
+        return PointType{
+            p.x * scale_x,
+            p.y * scale_y,
+        };
+      } else {
+        return p;
+      }
+    };
+#ifdef ZAP_TANGENTIAL_CORRECTION
+    const PointType scaled_tangent_vector = scale_if_grid_c(tangent_vector);
+#endif  // ZAP_TANGENTIAL_CORRECTION
+    const PointType scaled_normal_vector = scale_if_grid_c(normal_vector);
 
     const Eigen::Vector<ActiveFloat, DIM> u_mid =
         (interface.left_value + interface.right_value) / 2;
 
     // Matrix for rotated PDE in normal direction to cut
     // TODO: Why cos(interface_angle) * A + sin(interface_angle) * B and not -?
+    // Equivalent to `cos(interface_angle) * A + sin(interface_angle) * B`, but do not actually
+    // calculate the interface angle
     const Eigen::Matrix<ActiveFloat, DIM, DIM> normal_mat =
-        std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+        tangent_vector.y * m_A.mat(u_mid) +  //
+        -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y) *
+            m_B.mat(u_mid);
 
     const auto normal_eig                                          = get_eigen_decomp(normal_mat);
     const Eigen::Matrix<ActiveFloat, DIM, DIM> normal_wave_lengths = normal_eig.vals * dt;
@@ -144,20 +144,20 @@ class Solver {
 
       wave.polygon = Geometry::Polygon<PointType>{{
           interface.begin,
-          interface.begin + normal_vector * normal_wave_lengths(p, p),
+          interface.begin + scaled_normal_vector * normal_wave_lengths(p, p),
           interface.end,
-          interface.end + normal_vector * normal_wave_lengths(p, p),
+          interface.end + scaled_normal_vector * normal_wave_lengths(p, p),
       }};
 
-      // wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > 0) -
-      //             static_cast<PassiveFloat>(normal_eig.vals(p, p) < 0);
-      wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > EPS<PassiveFloat>) -
-                  static_cast<PassiveFloat>(normal_eig.vals(p, p) < -EPS<PassiveFloat>);
+      wave.sign = sign(normal_eig.vals(p, p));
     }
 #else
     // Matrix for rotated PDE in tangential direction to cut
+    // Equivalent to `-std::sin(interface_angle) * A + std::cos(interface_angle) * B`
     const Eigen::Matrix<ActiveFloat, DIM, DIM> tangent_mat =
-        -std::sin(interface_angle) * m_A.mat(u_mid) + std::cos(interface_angle) * m_B.mat(u_mid);
+        sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y) *
+            m_A.mat(u_mid) +
+        tangent_vector.y * m_B.mat(u_mid);
 
     const auto tangent_eig                                          = get_eigen_decomp(tangent_mat);
     const Eigen::Matrix<ActiveFloat, DIM, DIM> tangent_wave_lengths = tangent_eig.vals * dt;
@@ -176,11 +176,11 @@ class Solver {
 
         wave.polygon = Geometry::Polygon<PointType>{{
             interface.begin,
-            interface.begin + normal_vector * normal_wave_lengths(p, p) +
-                tangent_vector * tangent_wave_lengths(q, q),
+            interface.begin + scaled_normal_vector * normal_wave_lengths(p, p) +
+                scaled_tangent_vector * tangent_wave_lengths(q, q),
             interface.end,
-            interface.end + normal_vector * normal_wave_lengths(p, p) +
-                tangent_vector * tangent_wave_lengths(q, q),
+            interface.end + scaled_normal_vector * normal_wave_lengths(p, p) +
+                scaled_tangent_vector * tangent_wave_lengths(q, q),
         }};
 
         wave.sign = static_cast<PassiveFloat>(normal_eig.vals(p, p) > EPS<PassiveFloat>) -
@@ -208,7 +208,9 @@ class Solver {
 
       const auto intersect      = cell_polygon & wave.polygon;
       const auto intersect_area = intersect.area();
-      assert(intersect_area >= 0 || std::abs(intersect_area) < EPS<PassiveFloat>);
+      IGOR_ASSERT(intersect_area >= 0 || std::abs(intersect_area) < EPS<PassiveFloat>,
+                  "Expect the intersection area to be greater or equal to zero but is {}",
+                  intersect_area);
       IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<PassiveFloat>,
                   "Expected area intersection of intersection to be smaller or equal to the area "
                   "of the cell, but intersection area is {} and cell area is {}, intersection area "
@@ -303,11 +305,7 @@ class Solver {
       const auto tangent_vector = (interface.end - interface.begin).normalized();
       assert(std::abs(tangent_vector.norm() - 1) <= 1e-8);
 
-      ActiveFloat interface_angle = std::acos(tangent_vector.y);
-      if (tangent_vector.x > 0) {
-        interface_angle = 2 * std::numbers::pi_v<PassiveFloat> - interface_angle;
-      }
-      PointType normal_vector{std::cos(interface_angle), std::sin(interface_angle)};
+      PointType normal_vector{tangent_vector.y, -tangent_vector.x};
       IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
                   "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
                   "normal_vector = {}",
@@ -323,8 +321,12 @@ class Solver {
       const Eigen::Vector<ActiveFloat, DIM> u_mid =
           (interface.left_value + interface.right_value) / 2;
 
+      // Equivalent to `cos(interface_angle) * A + sin(interface_angle) * B`, but do not actually
+      // calculate the interface angle
       const Eigen::Matrix<ActiveFloat, DIM, DIM> eta_mat =
-          std::cos(interface_angle) * m_A.mat(u_mid) + std::sin(interface_angle) * m_B.mat(u_mid);
+          tangent_vector.y * m_A.mat(u_mid) +
+          -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y) *
+              m_B.mat(u_mid);
 
       const auto eig = get_eigen_decomp(eta_mat);
       // Wave strength
@@ -344,9 +346,6 @@ class Solver {
     }
 
     std::vector<PointType> avg_new_shock_points(new_shock_points.size() + 1);
-    // IGOR_ASSERT(avg_new_shock_points.size() > 2,
-    //             "Require more than two averaged points for the new shock front, but only got {}.
-    //             " "new_shock_points = {}", avg_new_shock_points.size(), new_shock_points);
     avg_new_shock_points[0] = new_shock_points[0].first;
     for (size_t i = 1; i < avg_new_shock_points.size() - 1; ++i) {
       avg_new_shock_points[i] = (new_shock_points[i - 1].second + new_shock_points[i].first) / 2;
@@ -412,7 +411,6 @@ class Solver {
 
         auto avg_new_shock_points = move_wave_front(curr_grid, next_grid, dt);
         if (!avg_new_shock_points.has_value()) { return std::nullopt; }
-
         if (!next_grid.template cut_piecewise_linear<extend_type>(
                 std::move(*avg_new_shock_points))) {
           Igor::Warn("Could not cut on new shock curve.");
@@ -448,7 +446,7 @@ class Solver {
                           "the area of the entire subcell, but {} + {} = {} != {}",
                           left_intersect_area,
                           right_intersect_area,
-                          left_intersect_area + right_intersect_area,
+                          static_cast<ActiveFloat>(left_intersect_area + right_intersect_area),
                           next_subcell_polygon.area());
 
               next_cell.get_cut().left_value =
@@ -479,7 +477,6 @@ class Solver {
           }
         }
       }
-
 #endif  // ZAP_STATIC_CUT
 
       // TODO: What happens when a subcell has area 0?

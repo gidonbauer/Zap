@@ -159,10 +159,10 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(Float{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::MAX>(
+    auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
         Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
     const auto res =
-        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.5);
+        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;

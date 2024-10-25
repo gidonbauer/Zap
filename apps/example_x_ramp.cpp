@@ -3,7 +3,7 @@
 
 // #define USE_FLUX_FOR_CARTESIAN
 
-#include "AD/ad.hpp"
+#include <AD/ad.hpp>
 
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
@@ -20,7 +20,7 @@
 
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
-using ActiveFloat            = double;  // ad::gt1s<PassiveFloat>::type;
+using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
 constexpr size_t DIM         = 1;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 2.0;
@@ -102,31 +102,32 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto init_shock(PassiveFloat t) -> Zap::CellBased::SimCoord<ActiveFloat> {
-  assert(t >= 0 && t <= 1);
-  return {
-      (X_MAX - X_MIN) / 2,
-      t * (Y_MAX - Y_MIN) + Y_MIN,
-  };
-};
-
-// -------------------------------------------------------------------------------------------------
 [[nodiscard]] constexpr auto chi(PassiveFloat x, PassiveFloat x_min, PassiveFloat x_max) noexcept
     -> PassiveFloat {
   return static_cast<PassiveFloat>(x >= x_min && x <= x_max);
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] constexpr auto expected_shock_location(PassiveFloat t, ActiveFloat eps) noexcept
-    -> ActiveFloat {
+template <typename AT>
+[[nodiscard]] constexpr auto x_shock(PassiveFloat t, AT eps) noexcept -> AT {
   return std::sqrt(1 + (1 + eps) * t);
 }
 
 // -------------------------------------------------------------------------------------------------
+[[nodiscard]] constexpr auto xi_shock(PassiveFloat t) noexcept -> PassiveFloat {
+  return t / (2 * std::sqrt(1 + t));
+}
+
+// -------------------------------------------------------------------------------------------------
 template <typename AT>
-[[nodiscard]] constexpr auto analytical_quasi_1d(AT x, PassiveFloat t, AT eps) noexcept -> AT {
+[[nodiscard]] constexpr auto u_eps(AT x, PassiveFloat t, AT eps) noexcept -> AT {
   return (1 + eps) * x / (1 + (1 + eps) * t) *
-         chi(ad::value(x), PassiveFloat{0}, ad::value(expected_shock_location(t, eps)));
+         chi(ad::value(x), PassiveFloat{0}, ad::value(x_shock(t, eps)));
+}
+
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] constexpr auto v(PassiveFloat x, PassiveFloat t) noexcept -> PassiveFloat {
+  return x / ((1 + t) * (1 + t)) * chi(x, 0, x_shock(t, PassiveFloat{0}));
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -136,31 +137,57 @@ void print_shock_error(
     std::ostream& out) noexcept {
   const auto final_shock = numerical_solution.get_shock_curve();
 
-  const auto mean_shock_x = std::transform_reduce(std::cbegin(final_shock),
-                                                  std::cend(final_shock),
-                                                  ActiveFloat{0},
-                                                  std::plus<>{},
-                                                  [](const auto& p) { return p.x; }) /
-                            static_cast<PassiveFloat>(final_shock.size());
+  const auto avg_x_shock = std::transform_reduce(std::cbegin(final_shock),
+                                                 std::cend(final_shock),
+                                                 ActiveFloat{0},
+                                                 std::plus<>{},
+                                                 [](const auto& p) { return p.x; }) /
+                           static_cast<PassiveFloat>(final_shock.size());
 
-  const auto std_dev_shock_x = std::sqrt(
+  const auto std_dev_x_shock = std::sqrt(
       std::transform_reduce(std::cbegin(final_shock),
                             std::cend(final_shock),
                             ActiveFloat{0},
                             std::plus<>{},
-                            [=](const auto& p) { return std::pow(p.x - mean_shock_x, 2); }) /
+                            [=](const auto& p) { return std::pow(p.x - avg_x_shock, 2); }) /
       static_cast<PassiveFloat>(final_shock.size()));
 
-  out << "mean_shock_x     = " << std::setprecision(8) << mean_shock_x << '\n';
-  out << "std_dev_shock_x  = " << std::setprecision(8) << std_dev_shock_x << '\n';
+  const auto avg_xi_shock =
+      std::transform_reduce(std::cbegin(final_shock),
+                            std::cend(final_shock),
+                            ActiveFloat{0},
+                            std::plus<>{},
+                            [](const auto& p) { return ad::derivative(p.x); }) /
+      static_cast<PassiveFloat>(final_shock.size());
 
-  const auto expected_shock_x = expected_shock_location(tend, ActiveFloat{0});
-  const auto abs_err          = std::abs(mean_shock_x - expected_shock_x);
-  const auto rel_err          = abs_err / expected_shock_x;
+  const auto std_dev_xi_shock =
+      std::sqrt(std::transform_reduce(std::cbegin(final_shock),
+                                      std::cend(final_shock),
+                                      ActiveFloat{0},
+                                      std::plus<>{},
+                                      [=](const auto& p) {
+                                        return std::pow(ad::derivative(p.x) - avg_xi_shock, 2);
+                                      }) /
+                static_cast<PassiveFloat>(final_shock.size()));
 
-  out << "expected_shock_x = " << std::setprecision(8) << expected_shock_x << '\n';
-  out << "abs_error_pos    = " << std::setprecision(8) << abs_err << '\n';
-  out << "rel_error_pos    = " << std::setprecision(8) << rel_err << '\n';
+  const auto expected_x_shock = x_shock(tend, PassiveFloat{0});
+  const auto abs_err_x_shock  = std::abs(avg_x_shock - expected_x_shock);
+  const auto rel_err_x_shock  = abs_err_x_shock / expected_x_shock;
+
+  const auto expected_xi_shock = xi_shock(tend);
+  const auto abs_err_xi_shock  = std::abs(avg_xi_shock - expected_xi_shock);
+  const auto rel_err_xi_shock  = abs_err_xi_shock / expected_xi_shock;
+
+  out << "avg_x_shock       = " << std::setprecision(8) << avg_x_shock << '\n';
+  out << "std_dev_x_shock   = " << std::setprecision(8) << std_dev_x_shock << '\n';
+  out << "expected_x_shock  = " << std::setprecision(8) << expected_x_shock << '\n';
+  out << "abs_err_x_shock   = " << std::setprecision(8) << abs_err_x_shock << '\n';
+  out << "rel_err_x_shock   = " << std::setprecision(8) << rel_err_x_shock << '\n';
+  out << "avg_xi_shock      = " << std::setprecision(8) << avg_xi_shock << '\n';
+  out << "std_dev_xi_shock  = " << std::setprecision(8) << std_dev_xi_shock << '\n';
+  out << "expected_xi_shock = " << std::setprecision(8) << expected_xi_shock << '\n';
+  out << "abs_err_xi_shock  = " << std::setprecision(8) << abs_err_xi_shock << '\n';
+  out << "rel_err_xi_shock  = " << std::setprecision(8) << rel_err_xi_shock << '\n';
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -169,34 +196,23 @@ void print_solution_error(
     PassiveFloat tend,
     size_t n,
     std::ostream& out) noexcept {
-  assert(n > 0);
-  if (n % 2 == 1) { n += 1; }
 
-  // Use simpsons rule
-  ActiveFloat L1_error  = 0;
-  const PassiveFloat dx = (X_MAX - X_MIN) / static_cast<PassiveFloat>(n);
-  for (size_t i = 1; i <= n / 2; ++i) {
-    {
-      const PassiveFloat x = static_cast<PassiveFloat>(2 * i - 2) * dx + X_MIN;
-      L1_error +=
-          std::abs(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0) -
-                   analytical_quasi_1d(x, tend, PassiveFloat{0}));
-    }
-    {
-      const PassiveFloat x = static_cast<PassiveFloat>(2 * i - 1) * dx + X_MIN;
-      L1_error +=
-          4 * std::abs(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0) -
-                       analytical_quasi_1d(x, tend, PassiveFloat{0}));
-    }
-    {
-      const PassiveFloat x = static_cast<PassiveFloat>(2 * i) * dx + X_MIN;
-      L1_error +=
-          std::abs(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0) -
-                   analytical_quasi_1d(x, tend, PassiveFloat{0}));
-    }
-  }
-  L1_error *= dx / 3;
-  out << "L1_error         = " << std::setprecision(8) << L1_error << '\n';
+  auto L1_func_u = [&](PassiveFloat x) -> PassiveFloat {
+    return std::abs(
+        ad::value(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0)) -
+        u_eps(x, tend, PassiveFloat{0}));
+  };
+  const auto L1_err_u = simpsons_rule_1d(L1_func_u, X_MIN, X_MAX, n);
+
+  auto L1_func_v = [&](PassiveFloat x) -> PassiveFloat {
+    return std::abs(
+        ad::derivative(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0)) -
+        v(x, tend));
+  };
+  const auto L1_err_v = simpsons_rule_1d(L1_func_v, X_MIN, X_MAX, n);
+
+  out << "L1_err_u          = " << std::setprecision(8) << L1_err_u << '\n';
+  out << "L1_err_v          = " << std::setprecision(8) << L1_err_v << '\n';
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -215,34 +231,11 @@ void print_solution_error(
     if (!grid.cut_piecewise_linear<Zap::CellBased::ExtendType::MAX>(points)) { return false; }
   }
 
-  ActiveFloat eps = 0.0;
-  // ad::derivative(eps) = 1.0;
-  // Igor::Info("eps = {}", eps);
+  ActiveFloat eps     = 0.0;
+  ad::derivative(eps) = 1.0;
 
-  auto u0 = [&eps](ActiveFloat x, ActiveFloat /*y*/) {
-    return analytical_quasi_1d(x, PassiveFloat{0}, eps);
-  };
+  auto u0 = [&eps](ActiveFloat x, ActiveFloat /*y*/) { return u_eps(x, PassiveFloat{0}, eps); };
   grid.fill_four_point(u0);
-
-  // ===============================================================================================
-  // {
-  //   const auto value = grid.eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
-  //   Igor::Info("value = {}", value);
-  // }
-  // {
-  //   const auto& cell       = grid[0];
-  //   const auto& cell_value = cell.get_cartesian().value(0);
-  //   Igor::Info("cell = {}", cell);
-  //   Igor::Info("cell_value = {}", cell_value);
-  // }
-  // {
-  //   const auto shock_points = grid.get_shock_curve();
-  //   // Igor::Info("shock_points = {}", shock_points);
-  //   Igor::Info("shock_points[0] = {}", shock_points[0]);
-  // }
-  // std::cout <<
-  // "================================================================================\n";
-  // ===============================================================================================
 
   const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
   Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
@@ -257,26 +250,6 @@ void print_solution_error(
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);
     return false;
   }
-
-  // ===============================================================================================
-  // {
-  //   const auto value = res->eval(Zap::CellBased::SimCoord<PassiveFloat>{1.0, 1.0})(0);
-  //   Igor::Info("value = {}", value);
-  // }
-  // {
-  //   const auto& cell       = (*res)[0];
-  //   const auto& cell_value = cell.get_cartesian().value(0);
-  //   Igor::Info("cell = {}", cell);
-  //   Igor::Info("cell_value = {}", cell_value);
-  // }
-  // {
-  //   const auto shock_points = res->get_shock_curve();
-  //   // Igor::Info("shock_points = {}", shock_points);
-  //   Igor::Info("shock_points[0] = {}", shock_points[0]);
-  // }
-  // std::cout <<
-  // "================================================================================\n";
-  // ===============================================================================================
 
   out << nx << 'x' << ny << ":\n";
   print_shock_error(*res, tend, out);

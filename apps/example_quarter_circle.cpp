@@ -347,47 +347,6 @@ constexpr auto eval_mat_at(PassiveFloat x,
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename FUNC>
-[[nodiscard]] auto simpsons_rule_2d(FUNC f,
-                                    PassiveFloat x_min,
-                                    PassiveFloat x_max,
-                                    PassiveFloat y_min,
-                                    PassiveFloat y_max,
-                                    size_t nx,
-                                    size_t ny) noexcept -> PassiveFloat {
-  auto get_w = [](size_t idx, size_t end_idx) -> PassiveFloat {
-    if (idx == 0 || idx == end_idx) {
-      return 1;
-    } else {
-      if (idx % 2 == 1) {
-        return 4;
-      } else {
-        return 2;
-      }
-    }
-  };
-
-  if (nx % 2 == 1) { nx += 1; }
-  if (ny % 2 == 1) { ny += 1; }
-
-  const PassiveFloat dx = (x_max - x_min) / static_cast<PassiveFloat>(nx);
-  const PassiveFloat dy = (y_max - y_min) / static_cast<PassiveFloat>(ny);
-
-  PassiveFloat res = 0;
-#pragma omp parallel for reduction(+ : res)
-  for (size_t i = 0; i < (nx + 1) * (ny + 1); ++i) {
-    const size_t ix       = i / (nx + 1);
-    const size_t iy       = i % (nx + 1);
-    const PassiveFloat x  = x_min + static_cast<PassiveFloat>(ix) * dx;
-    const PassiveFloat y  = y_min + static_cast<PassiveFloat>(iy) * dy;
-    const PassiveFloat wx = get_w(ix, nx);
-    const PassiveFloat wy = get_w(iy, ny);
-    res += wx * wy * f(x, y);
-  }
-  return res * dx * dy / 9;
-}
-
-// -------------------------------------------------------------------------------------------------
 auto compare(size_t nx,
              size_t ny,
              PassiveFloat tend,

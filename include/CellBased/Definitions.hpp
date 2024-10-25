@@ -30,6 +30,12 @@ inline constexpr float EPS<typename ad::gt1s<float>::type> = EPS<float>;
 template <>
 inline constexpr double EPS<typename ad::gt1s<double>::type> = EPS<double>;
 
+// - Sign function ---------------------------------------------------------------------------------
+template <typename T>
+[[nodiscard]] constexpr auto sign(const T& x) noexcept -> T {
+  return static_cast<T>(x > EPS<T>) - static_cast<T>(x < -EPS<T>);
+}
+
 // - Points in grid and simulation coordinates -----------------------------------------------------
 template <typename PointType>
 concept Point2D_c = requires(PointType t) {
