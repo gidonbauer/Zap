@@ -11,8 +11,6 @@
 
 namespace Zap::CellBased {
 
-// TODO: Use grid coordinates for all geometry operations
-
 template <typename Float, int DIM>
 requires(DIM > 0)
 struct EigenDecomp {
@@ -84,8 +82,6 @@ class Solver {
                       PassiveFloat scale_x,
                       PassiveFloat scale_y) const noexcept
       -> SmallVector<WaveProperties<ActiveFloat, DIM, PointType>> {
-    // TODO: Do tangential splitting correction.
-
     if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return {}; }
 
     // Vector tangential to interface
@@ -692,7 +688,6 @@ class Solver {
         const auto& curr_cell      = curr_grid[cell_idx];
         auto& next_cell            = next_grid[cell_idx];
         const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
-        // TODO: Calculate outer interfaces
 
         // - Left outer interface ------------------------------------------------------------------
         if (curr_grid.is_cell(curr_cell.left_idx) &&

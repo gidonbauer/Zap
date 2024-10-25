@@ -135,8 +135,6 @@ class IncCellWriter {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto
   write_data(const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid) noexcept -> bool {
-    // TODO: Make sure that cuts are not relative to the cell
-
     for (const auto& cell : grid) {
       // Extend of cell
       const PassiveFloat x_min = cell.template x_min<CellBased::SIM_C>();

@@ -503,10 +503,10 @@ class UniformGrid {
         assert(is_cell(m_cells[cell.top_idx].right_idx));
 
         // TODO: Add check that this is actually the correct next cell
-        // Igor::Todo("Exit on top right corner.");
-        // return m_cells[cell.top_idx].right_idx;
+        Igor::Todo("Exit on top right corner.");
+        return m_cells[cell.top_idx].right_idx;
 
-        return cell.top_idx;
+        // return cell.top_idx;
       }
     } else {
       // Left side
@@ -684,7 +684,6 @@ class UniformGrid {
                 "Only {} points inside of the grid, require at least 2.",
                 points.size());
 
-    // TODO: Add option to extend to nearest intersection point
     // - Extend end points -------------------------------------------------------------------------
     if constexpr (extend_type != ExtendType::NONE) {
       // - Handle first point; extend curve backwards to cut cell containing the first point -------
@@ -806,59 +805,6 @@ class UniformGrid {
                                        }),
                            intersect_points.end());
 
-#if 0
-    m_cut_cell_idxs.resize(intersect_points.size() - 1);
-    for (size_t i = 0; i < intersect_points.size() - 1; ++i) {
-      const auto entry_point = intersect_points[i];
-      const auto exit_point  = intersect_points[i + 1];
-      if (approx_eq((entry_point - exit_point).norm(), static_cast<T>(0))) {
-        Igor::Warn("entry_point {} and exit_point {} are the same point, ignore.",
-                   entry_point,
-                   exit_point);
-        continue;
-      }
-
-      const auto mid_point = (entry_point + exit_point) / 2;
-      const auto cell_idx  = find_cell(mid_point);
-      IGOR_ASSERT(cell_idx != NULL_INDEX,
-                  "Expected mid_point {} to be in grid [{}, {}]x[{}, {}], but is not.",
-                  mid_point,
-                  0,
-                  m_nx,
-                  0,
-                  m_ny);
-      m_cut_cell_idxs[i] = cell_idx;
-    }
-
-    IGOR_ASSERT(
-        m_cut_cell_idxs.size() + 1 == intersect_points.size(),
-        "Expected to find exactly one point more than cells, but found {} points and {} cells",
-        intersect_points.size(),
-        m_cut_cell_idxs.size());
-    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
-      auto& cell_to_cut = m_cells[m_cut_cell_idxs[i]];
-      auto cut1_point   = intersect_points[i];
-      auto cut2_point   = intersect_points[i + 1];
-
-      CutType type;
-      if (!classify_cut(cell_to_cut, cut1_point, cut2_point, type)) {
-        Igor::Warn("Could not classify the cut, cut is invalid.");
-        Igor::Debug("Points used to cut the grid piecewise linear:\n{}", points);
-        return false;
-      }
-
-      Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
-      if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
-
-      cell_to_cut.value = CutValue<ActiveFloat, DIM>{
-          .left_value  = old_value,
-          .right_value = old_value,
-          .type        = type,
-          .rel_cut1    = {cut1_point.x, cut1_point.y},
-          .rel_cut2    = {cut2_point.x, cut2_point.y},
-      };
-    }
-#else
     m_cut_cell_idxs.reserve(intersect_points.size() - 1);
     for (size_t i = 0; i < intersect_points.size() - 1;) {
       auto entry_point = intersect_points[i];
@@ -965,7 +911,6 @@ class UniformGrid {
       m_cut_cell_idxs.push_back(cell_idx);
       ++i;
     }
-#endif
 
     return true;
   }
