@@ -190,51 +190,45 @@ class UniformGrid {
   // -----------------------------------------------------------------------------------------------
   template <typename FUNC>
   constexpr void fill_center(FUNC f) noexcept {
-    Igor::Todo();
-    (void)f;
-    std::unreachable();
-    // const auto get_centroid = [](const auto& points) -> Eigen::Vector<Float, 2> {
-    //   Eigen::Vector<Float, 2> centroid = Eigen::Vector<Float, 2>::Zero();
-    //   for (const auto& p : points) {
-    //     centroid += p;
-    //   }
-    //   return centroid / points.size();
-    // };
+    const auto get_centroid =
+        []<typename PointType>(const SmallVector<PointType>& points) -> PointType {
+      auto centroid = PointType::Zero();
+      for (const auto& p : points) {
+        centroid += p;
+      }
+      return centroid / static_cast<PassiveFloat>(points.size());
+    };
 
-    // for (auto& cell : m_cells) {
-    //   if (cell.is_cartesian()) {
-    //     auto& value = cell.get_cartesian().value;
-    //     if constexpr (DIM == 1) {
-    //       value(0) =
-    //           f(cell.template x_min<SIM_C>() + static_cast<Float>(0.5) * cell.template
-    //           dx<SIM_C>(),
-    //             cell.template y_min<SIM_C>() + static_cast<Float>(0.5) * cell.template
-    //             dy<SIM_C>());
-    //     } else {
-    //       value =
-    //           f(cell.template x_min<SIM_C>() + static_cast<Float>(0.5) * cell.template
-    //           dx<SIM_C>(),
-    //             cell.template y_min<SIM_C>() + static_cast<Float>(0.5) * cell.template
-    //             dy<SIM_C>());
-    //     }
-    //   } else if (cell.is_cut()) {
-    //     Eigen::Vector<Float, 2> left_centroid =
-    //         get_centroid(get_left_points<Cell<Float, DIM>, Float>(cell));
-    //     Eigen::Vector<Float, 2> right_centroid =
-    //         get_centroid(get_right_points<Cell<Float, DIM>, Float>(cell));
+    for (auto& cell : m_cells) {
+      if (cell.is_cartesian()) {
+        auto& value = cell.get_cartesian().value;
+        if constexpr (DIM == 1) {
+          value(0) = f(cell.template x_min<SIM_C>() +
+                           static_cast<PassiveFloat>(0.5) * cell.template dx<SIM_C>(),
+                       cell.template y_min<SIM_C>() +
+                           static_cast<PassiveFloat>(0.5) * cell.template dy<SIM_C>());
+        } else {
+          value = f(cell.template x_min<SIM_C>() +
+                        static_cast<PassiveFloat>(0.5) * cell.template dx<SIM_C>(),
+                    cell.template y_min<SIM_C>() +
+                        static_cast<PassiveFloat>(0.5) * cell.template dy<SIM_C>());
+        }
+      } else if (cell.is_cut()) {
+        const auto left_centroid  = get_centroid(cell.template get_left_points<SIM_C>());
+        const auto right_centroid = get_centroid(cell.template get_right_points<SIM_C>());
 
-    //     auto& cell_value = cell.get_cut();
-    //     if constexpr (DIM == 1) {
-    //       cell_value.left_value(0)  = f(left_centroid(X), left_centroid(Y));
-    //       cell_value.right_value(0) = f(right_centroid(X), right_centroid(Y));
-    //     } else {
-    //       cell_value.left_value  = f(left_centroid(X), left_centroid(Y));
-    //       cell_value.right_value = f(right_centroid(X), right_centroid(Y));
-    //     }
-    //   } else {
-    //     Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
-    //   }
-    // }
+        auto& cell_value = cell.get_cut();
+        if constexpr (DIM == 1) {
+          cell_value.left_value(0)  = f(left_centroid.x, left_centroid.y);
+          cell_value.right_value(0) = f(right_centroid.x, right_centroid.y);
+        } else {
+          cell_value.left_value  = f(left_centroid.x, left_centroid.y);
+          cell_value.right_value = f(right_centroid.x, right_centroid.y);
+        }
+      } else {
+        Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
+      }
+    }
   }
 
   // -----------------------------------------------------------------------------------------------
