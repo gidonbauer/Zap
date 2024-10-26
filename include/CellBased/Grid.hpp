@@ -1019,12 +1019,33 @@ class UniformGrid {
       curve_points[0]  = cell.template cut1<SIM_C>();
     }
 
-    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
-      const auto& cell    = m_cells[m_cut_cell_idxs[i]];
-      curve_points[i + 1] = cell.template cut2<SIM_C>();
+    for (size_t i = 0; i < m_cut_cell_idxs.size() - 1; ++i) {
+      const auto& cell1   = m_cells[m_cut_cell_idxs[i]];
+      const auto& cell2   = m_cells[m_cut_cell_idxs[i + 1]];
+      curve_points[i + 1] = (cell1.template cut2<SIM_C>() + cell2.template cut1<SIM_C>()) / 2;
+    }
+
+    {
+      const auto& cell    = m_cells[m_cut_cell_idxs.back()];
+      curve_points.back() = cell.template cut2<SIM_C>();
     }
 
     return curve_points;
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto get_cuts() const noexcept -> std::vector<SimCoord<ActiveFloat>> {
+    if (m_cut_cell_idxs.empty()) { return {}; }
+
+    std::vector<SimCoord<ActiveFloat>> cut_points(2 * m_cut_cell_idxs.size());
+
+    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
+      const auto& cell      = m_cells[m_cut_cell_idxs[i]];
+      cut_points[2 * i + 0] = cell.template cut1<SIM_C>();
+      cut_points[2 * i + 1] = cell.template cut2<SIM_C>();
+    }
+
+    return cut_points;
   }
 
   // -----------------------------------------------------------------------------------------------

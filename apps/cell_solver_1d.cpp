@@ -1,6 +1,8 @@
 #include <filesystem>
 #include <numbers>
 
+#include <AD/ad.hpp>
+
 // #define ZAP_TANGENTIAL_CORRECTION
 
 #include "CellBased/EigenDecomp.hpp"
@@ -13,43 +15,127 @@
 #include "Igor/Macros.hpp"
 #include "Igor/Timer.hpp"
 
+#include "Common.hpp"
+
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 
-// -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto parse_size_t(const char* cstr) -> size_t {
-  char* end        = nullptr;
-  const size_t val = std::strtoul(cstr, &end, 10);
-  if (end != cstr + std::strlen(cstr)) {  // NOLINT
-    Igor::Panic("String `{}` contains non-digits.", cstr);
-  }
-  if (val == 0UL) { Igor::Panic("Could not parse string `{}` to size_t.", cstr); }
-  if (val == std::numeric_limits<unsigned long>::max()) {
-    Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
-  }
-  return val;
+// - Setup -----------------------------------------------------------------------------------------
+using PassiveFloat           = double;
+using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
+constexpr size_t DIM         = 1;
+constexpr PassiveFloat X_MIN = 0.0;
+constexpr PassiveFloat X_MAX = 5.0;
+constexpr PassiveFloat Y_MIN = 0.0;
+constexpr PassiveFloat Y_MAX = 5.0;
+
+// - Available command line options ----------------------------------------------------------------
+struct Args {
+  size_t nx                      = 25;
+  size_t ny                      = 25;
+  PassiveFloat tend              = 1.0;
+  PassiveFloat eps               = 0.0;
+  PassiveFloat CFL_safety_factor = 0.25;
+  bool print_shock_curve         = false;
+  bool print_cuts                = false;
+};
+
+// - Print usage -----------------------------------------------------------------------------------
+template <Igor::detail::Level level>
+void usage(std::string_view prog, std::ostream& out) noexcept {
+  Args args{};
+
+  out << Igor::detail::level_repr(level) << "Usage: " << prog
+      << " [--nx nx] [--ny ny] [--tend tend] [--eps eps] [--CFL CFL-safety-factor] [--print-shock] "
+         "[--print-cuts]\n";
+  out << "\t--nx              Number of cells in x-direction, default is " << args.nx << '\n';
+  out << "\t--ny              Number of cells in y-direction, default is " << args.ny << '\n';
+  out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
+  out << "\t--eps             Perturbation of initial condition, default is " << args.eps << '\n';
+  out << "\t--CFL             Safety factor for CFL condition, must be in (0, 1), default is "
+      << args.CFL_safety_factor << '\n';
+  out << "\t--print-shock     Print the final shock curve and its derivative, default is "
+      << std::boolalpha << args.print_shock_curve << '\n';
+  out << "\t--print-cuts      Print the final cut values and their derivative, default is "
+      << std::boolalpha << args.print_cuts << '\n';
 }
 
-// -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto parse_double(const char* cstr) -> double {
-  char* end        = nullptr;
-  const double val = std::strtod(cstr, &end);
-  if (val == HUGE_VAL) {
-    Igor::Panic("Could not parse string `{}` to double: Out of range.", cstr);
+// - Parse command line arguments ------------------------------------------------------------------
+[[nodiscard]] auto parse_args(int argc, char** argv) noexcept -> std::optional<Args> {
+  Args args{};
+
+  const auto prog = next_arg(argc, argv);
+  IGOR_ASSERT(prog.has_value(), "Could not get program name from command line arguments.");
+
+  for (auto arg = next_arg(argc, argv); arg.has_value(); arg = next_arg(argc, argv)) {
+    using namespace std::string_view_literals;
+    if (arg == "--nx"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --nx.\n";
+        return std::nullopt;
+      }
+      args.nx = parse_size_t(*arg);
+    } else if (arg == "--ny"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --ny.\n";
+        return std::nullopt;
+      }
+      args.ny = parse_size_t(*arg);
+    } else if (arg == "--tend"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --tend.\n";
+        return std::nullopt;
+      }
+      args.tend = parse_double(*arg);
+    } else if (arg == "--eps"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --eps.\n";
+        return std::nullopt;
+      }
+      args.eps = parse_double(*arg);
+    } else if (arg == "--CFL"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --CFL.\n";
+        return std::nullopt;
+      }
+      args.CFL_safety_factor = parse_double(*arg);
+    } else if (arg == "--print-shock"sv) {
+      args.print_shock_curve = true;
+    } else if (arg == "--print-cuts"sv) {
+      args.print_cuts = true;
+    } else if (arg == "-h"sv || arg == "--help"sv) {
+      usage<Igor::detail::Level::INFO>(*prog, std::cout);
+      return std::nullopt;
+    } else {
+      usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+      std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC) << "Unknown argument `"
+                << *arg << "`.\n";
+      return std::nullopt;
+    }
   }
-  if (cstr == end) { Igor::Panic("Could not parse string `{}` to double.", cstr); }
-  return val;
+  return args;
 }
 
 // -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  using ActiveFloat    = double;
-  using PassiveFloat   = double;
-  constexpr size_t DIM = 1;
-
-  if (argc < 4) {
-    Igor::Warn("Usage: {} <nx> <ny> <tend>", *argv);
-    return 1;
-  }
+  const auto args = parse_args(argc, argv);
+  if (!args.has_value()) { return 1; }
+  assert(args->nx < std::numeric_limits<int>::max());
+  assert(args->ny < std::numeric_limits<int>::max());
 
   {
     std::error_code ec;
@@ -60,44 +146,39 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  const auto nx   = parse_size_t(argv[1]);  // NOLINT
-  const auto ny   = parse_size_t(argv[2]);  // NOLINT
-  const auto tend = parse_double(argv[3]);  // NOLINT
-  assert(nx < std::numeric_limits<int>::max());
-  assert(ny < std::numeric_limits<int>::max());
-
-  if (tend <= 0.0) {
-    Igor::Warn("tend must be larger than 0, but is {}.", tend);
+  if (args->tend <= 0.0) {
+    Igor::Warn("tend must be larger than 0, but is {}.", args->tend);
     return 1;
   }
 
-  Igor::Info("nx = {}", nx);
-  Igor::Info("ny = {}", ny);
-  Igor::Info("tend = {}", tend);
-
-  const PassiveFloat x_min = 0.0;
-  const PassiveFloat x_max = 5.0;
-  const PassiveFloat y_min = 0.0;
-  const PassiveFloat y_max = 5.0;
+  Igor::Info("nx   = {}", args->nx);
+  Igor::Info("ny   = {}", args->ny);
+  Igor::Info("tend = {}", args->tend);
+  Igor::Info("eps  = {}", args->eps);
+  Igor::Info("CFL  = {}", args->CFL_safety_factor);
 
   Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(
-      x_min, x_max, nx, y_min, y_max, ny);
+      X_MIN, X_MAX, args->nx, Y_MIN, Y_MAX, args->ny);
   // grid.same_value_boundary();
   grid.periodic_boundary();
+
+  ActiveFloat eps     = args->eps;
+  ad::derivative(eps) = 1;
 
   // #define RAMP_X
 #define QUARTER_CIRCLE
 #ifdef QUARTER_CIRCLE
-  auto u0 = [=](PassiveFloat x, PassiveFloat y) -> ActiveFloat {
+  const PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
+
+  auto u0 = [=](ActiveFloat x, ActiveFloat y) -> ActiveFloat {
     static_assert(DIM == 1);
-    return (std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) *
-           static_cast<ActiveFloat>((std::pow(x - x_min, 2) + std::pow(y - y_min, 2)) <=
-                                    std::pow((x_min + x_max + y_min + y_max) / 4, 2));
+    return (1 + eps) * (std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) *
+           static_cast<ActiveFloat>((std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) <=
+                                    std::pow(r, 2));
   };
 
   [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
     // assert(t >= 0 && t <= 1);
-    const auto r = (x_min + x_max + y_min + y_max) / 4;
     return {
         r * std::cos(std::numbers::pi_v<PassiveFloat> / 2 * t),
         r * std::sin(std::numbers::pi_v<PassiveFloat> / 2 * t),
@@ -106,25 +187,25 @@ auto main(int argc, char** argv) -> int {
 #elif defined(RAMP_X)
   auto u0 = [=](ActiveFloat x, ActiveFloat /*y*/) -> ActiveFloat {
     static_assert(DIM == 1);
-    // return (x - x_min) * static_cast<ActiveFloat>((x - x_min) < (x_max - x_min) / 2);
+    // return (1+eps) * (x - x_min) * static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2);
 
     // TODO: Inverse ramp is not solved correctly
-    return (x_max - x) * (1.0 - static_cast<ActiveFloat>((x - x_min) < (x_max - x_min) / 2));
+    return (X_MAX - x) * (1.0 - static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2));
   };
 
   [[maybe_unused]] auto init_shock = [=](PassiveFloat t) -> Zap::CellBased::SimCoord<PassiveFloat> {
     assert(t >= 0 && t <= 1);
     return {
-        (x_max - x_min) / 2,
-        t * (y_max - y_min) + y_min,
+        (X_MAX - X_MIN) / 2,
+        t * (Y_MAX - Y_MIN) + Y_MIN,
     };
   };
 #elif defined(HAT_X)
   auto u0 = [=](Float x, Float /*y*/) -> Float {
-    if ((x - x_min) < 0.25 * (x_max - x_min)) {
+    if ((x - X_MIN) < 0.25 * (X_MAX - X_MIN)) {
       return x;
-    } else if ((x - x_min) < 0.5 * (x_max - x_min)) {
-      return 0.25 * (x_max - x_min) - (x - 0.25 * (x_max - x_min));
+    } else if ((x - X_MIN) < 0.5 * (X_MAX - X_MIN)) {
+      return 0.25 * (X_MAX - X_MIN) - (x - 0.25 * (X_MAX - X_MIN));
     } else {
       return 0;
     }
@@ -145,8 +226,6 @@ auto main(int argc, char** argv) -> int {
   // grid.fill_center(u0);
   grid.fill_four_point(u0);
 
-  // grid.dump_cells(std::cout);
-
   constexpr auto u_file = OUTPUT_DIR "u_1d.grid";
   Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
 
@@ -161,32 +240,73 @@ auto main(int argc, char** argv) -> int {
   IGOR_TIME_SCOPE("Solver") {
     auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
         Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
-    const auto res =
-        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
+    const auto res = solver.solve(grid, args->tend, grid_writer, t_writer, args->CFL_safety_factor);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
     }
 
-    const auto final_shock = res->get_shock_curve();
-    // Igor::Info("Final shock curve: {}", final_shock);
-    const auto mean_shock_x = std::transform_reduce(std::cbegin(final_shock),
-                                                    std::cend(final_shock),
-                                                    ActiveFloat{0},
-                                                    std::plus<>{},
-                                                    [](const auto& p) { return p.x; }) /
-                              static_cast<PassiveFloat>(final_shock.size());
+    if (args->print_shock_curve) {
+      const auto final_shock = res->get_shock_curve();
 
-    const auto std_dev_shock_x = std::sqrt(
-        std::transform_reduce(std::cbegin(final_shock),
-                              std::cend(final_shock),
-                              ActiveFloat{0},
-                              std::plus<>{},
-                              [=](const auto& p) { return std::pow(p.x - mean_shock_x, 2); }) /
-        static_cast<PassiveFloat>(final_shock.size()));
+      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> x_shock(final_shock.size());
+      std::transform(std::cbegin(final_shock),
+                     std::cend(final_shock),
+                     std::begin(x_shock),
+                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
+                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::value(p.x),
+                                                                     ad::value(p.y)};
+                     });
 
-    Igor::Info("mean_shock_x = {}", mean_shock_x);
-    Igor::Info("std_dev_shock_x = {}", std_dev_shock_x);
+      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> xi_shock(final_shock.size());
+      std::transform(std::cbegin(final_shock),
+                     std::cend(final_shock),
+                     std::begin(xi_shock),
+                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
+                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::derivative(p.x),
+                                                                     ad::derivative(p.y)};
+                     });
+
+      std::cout << "==============================================================================="
+                   "==========\n";
+      Igor::Info("x_shock = {}", x_shock);
+      std::cout << "==============================================================================="
+                   "==========\n";
+      Igor::Info("xi_shock = {}", xi_shock);
+      std::cout << "==============================================================================="
+                   "==========\n";
+    }
+
+    if (args->print_cuts) {
+      const auto final_cuts = res->get_cuts();
+
+      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> cuts(final_cuts.size());
+      std::transform(std::cbegin(final_cuts),
+                     std::cend(final_cuts),
+                     std::begin(cuts),
+                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
+                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::value(p.x),
+                                                                     ad::value(p.y)};
+                     });
+
+      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> dcuts(final_cuts.size());
+      std::transform(std::cbegin(final_cuts),
+                     std::cend(final_cuts),
+                     std::begin(dcuts),
+                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
+                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::derivative(p.x),
+                                                                     ad::derivative(p.y)};
+                     });
+
+      std::cout << "==============================================================================="
+                   "==========\n";
+      Igor::Info("cuts = {}", cuts);
+      std::cout << "==============================================================================="
+                   "==========\n";
+      Igor::Info("dcuts = {}", dcuts);
+      std::cout << "==============================================================================="
+                   "==========\n";
+    }
   }
   Igor::Info("Solver finished successfully.");
 #endif
