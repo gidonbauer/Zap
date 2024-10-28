@@ -462,13 +462,13 @@ template <typename Float, size_t DIM>
 
       switch (args.save_frame_images) {
         case Args::PPM:
-          if (std::string filename = std::format("tmp_{:0>4}.ppm", iter);
+          if (std::string filename = std::format("frame_{:0>4}.ppm", iter);
               !canvas.to_ppm(filename)) {
             Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
           }
           break;
         case Args::JPEG:
-          if (std::string filename = std::format("tmp_{:0>4}.jpeg", iter);
+          if (std::string filename = std::format("frame_{:0>4}.jpeg", iter);
               !canvas.to_jpeg(filename)) {
             Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
           }
@@ -602,13 +602,13 @@ template <typename Float, size_t DIM>
 
       switch (args.save_frame_images) {
         case Args::PPM:
-          if (std::string filename = std::format("tmp_{:0>4}.ppm", iter);
+          if (std::string filename = std::format("frame_{:0>4}.ppm", iter);
               !canvas.to_ppm(filename)) {
             Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
           }
           break;
         case Args::JPEG:
-          if (std::string filename = std::format("tmp_{:0>4}.jpeg", iter);
+          if (std::string filename = std::format("frame_{:0>4}.jpeg", iter);
               !canvas.to_jpeg(filename)) {
             Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
           }
