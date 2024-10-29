@@ -275,8 +275,8 @@ class Solver {
     return FullInterface<ActiveFloat, DIM, PointType>{
         .left_value  = cell.get_cut().left_value,
         .right_value = cell.get_cut().right_value,
-        .begin       = cell.template cut1<coord_type>(),
-        .end         = cell.template cut2<coord_type>(),
+        .begin       = cell.template cut_entry<coord_type>(),
+        .end         = cell.template cut_exit<coord_type>(),
     };
   }
 

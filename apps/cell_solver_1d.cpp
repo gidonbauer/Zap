@@ -4,8 +4,10 @@
 #include <AD/ad.hpp>
 
 // #define ZAP_TANGENTIAL_CORRECTION
+// #define ZAP_STATIC_CUT
 
 #include "CellBased/EigenDecomp.hpp"
+#include "CellBased/ReconstructShock.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
@@ -19,6 +21,8 @@
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 
+using namespace std::string_view_literals;
+
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
 using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
@@ -30,13 +34,14 @@ constexpr PassiveFloat Y_MAX = 5.0;
 
 // - Available command line options ----------------------------------------------------------------
 struct Args {
-  size_t nx                      = 25;
-  size_t ny                      = 25;
-  PassiveFloat tend              = 1.0;
-  PassiveFloat eps               = 0.0;
-  PassiveFloat CFL_safety_factor = 0.25;
-  bool print_shock_curve         = false;
-  bool print_cuts                = false;
+  size_t nx                          = 25;
+  size_t ny                          = 25;
+  PassiveFloat tend                  = 1.0;
+  PassiveFloat eps                   = 0.0;
+  PassiveFloat CFL_safety_factor     = 0.25;
+  std::string_view print_shock_curve = ""sv;
+  size_t ns                          = 20;
+  bool print_cuts                    = false;
 };
 
 // - Print usage -----------------------------------------------------------------------------------
@@ -45,16 +50,23 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   Args args{};
 
   out << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--nx nx] [--ny ny] [--tend tend] [--eps eps] [--CFL CFL-safety-factor] [--print-shock] "
-         "[--print-cuts]\n";
+      << " [--nx nx] [--ny ny] [--tend tend] [--eps eps] [--CFL CFL-safety-factor] [--print-shock "
+         "method] "
+         "[--ns ns] [--print-cuts]\n";
   out << "\t--nx              Number of cells in x-direction, default is " << args.nx << '\n';
   out << "\t--ny              Number of cells in y-direction, default is " << args.ny << '\n';
   out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
   out << "\t--eps             Perturbation of initial condition, default is " << args.eps << '\n';
   out << "\t--CFL             Safety factor for CFL condition, must be in (0, 1), default is "
       << args.CFL_safety_factor << '\n';
-  out << "\t--print-shock     Print the final shock curve and its derivative, default is "
-      << std::boolalpha << args.print_shock_curve << '\n';
+  out << "\t--print-shock     Print the final shock curve and its derivative. Decide which "
+         "reconstruction is used. Available options are 'ALL', 'LINEAR', and 'SMOOTHSTEP' default "
+         "is "
+      << (args.print_shock_curve.empty() ? "not printing the shock" : args.print_shock_curve)
+      << '\n';
+  out << "\t--ns              Number of points at which the reconstruction of the shock is "
+         "evaluated, default is "
+      << args.ns << '\n';
   out << "\t--print-cuts      Print the final cut values and their derivative, default is "
       << std::boolalpha << args.print_cuts << '\n';
 }
@@ -86,6 +98,15 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
         return std::nullopt;
       }
       args.ny = parse_size_t(*arg);
+    } else if (arg == "--ns"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --ns.\n";
+        return std::nullopt;
+      }
+      args.ns = parse_size_t(*arg);
     } else if (arg == "--tend"sv) {
       arg = next_arg(argc, argv);
       if (!arg.has_value()) {
@@ -114,7 +135,14 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
       }
       args.CFL_safety_factor = parse_double(*arg);
     } else if (arg == "--print-shock"sv) {
-      args.print_shock_curve = true;
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide method for option --print-shock.\n";
+        return std::nullopt;
+      }
+      args.print_shock_curve = *arg;
     } else if (arg == "--print-cuts"sv) {
       args.print_cuts = true;
     } else if (arg == "-h"sv || arg == "--help"sv) {
@@ -132,7 +160,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 
 // -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  const auto args = parse_args(argc, argv);
+  const std::string_view prog = *argv;
+  const auto args             = parse_args(argc, argv);
   if (!args.has_value()) { return 1; }
   assert(args->nx < std::numeric_limits<int>::max());
   assert(args->ny < std::numeric_limits<int>::max());
@@ -233,7 +262,7 @@ auto main(int argc, char** argv) -> int {
 // #define SAVE_ONLY_INITIAL_STATE
 #ifdef SAVE_ONLY_INITIAL_STATE
   if (!grid_writer.write_data(grid)) { return 1; }
-  if (!t_writer.write_data(Float{0})) { return 1; }
+  if (!t_writer.write_data(PassiveFloat{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
     auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
@@ -244,8 +273,28 @@ auto main(int argc, char** argv) -> int {
       return 1;
     }
 
-    if (args->print_shock_curve) {
-      const auto final_shock = res->get_shock_curve();
+    if (!args->print_shock_curve.empty()) {
+      Igor::Info("ns = {}", args->ns);
+      Igor::Info("Reconsturction method = {}", args->print_shock_curve);
+
+      const auto final_shock = [&] {
+        if (args->print_shock_curve == "ALL"sv) { return res->get_shock_curve(); }
+
+        std::vector<PassiveFloat> ts(args->ns);
+        std::generate(std::begin(ts), std::end(ts), [i = 0UZ, &args]() mutable {
+          return static_cast<PassiveFloat>(i++) / static_cast<PassiveFloat>(args->ns - 1);
+        });
+        if (args->print_shock_curve == "LINEAR"sv) {
+          return Zap::CellBased::piecewise_linear(ts, res->get_shock_curve());
+        }
+        if (args->print_shock_curve == "SMOOTHSTEP"sv) {
+          return Zap::CellBased::smoothstep(ts, res->get_shock_curve());
+        }
+
+        usage<Igor::detail::Level::PANIC>(prog, std::cerr);
+        Igor::Panic("Invaild method `{}` to reconstruction the shock", args->print_shock_curve);
+        std::unreachable();
+      }();
 
       std::vector<Zap::CellBased::SimCoord<PassiveFloat>> x_shock(final_shock.size());
       std::transform(std::cbegin(final_shock),

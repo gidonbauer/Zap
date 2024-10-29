@@ -22,6 +22,15 @@ constexpr size_t HEADER_SIZE_F64 =
 
 enum struct CellType : char { Cartesian, Cut };
 
+enum struct CutType : char {
+  BOTTOM_LEFT,
+  BOTTOM_RIGHT,
+  TOP_RIGHT,
+  TOP_LEFT,
+  MIDDLE_HORI,
+  MIDDLE_VERT,
+};
+
 }  // namespace IncCellHeaderLayout
 
 template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
@@ -179,29 +188,77 @@ class IncCellWriter {
 
         // Cut
         const auto& cell_value = cell.get_cut();
-        m_out.put(static_cast<char>(cell_value.type));
+        switch (cell_value.entry_loc | cell_value.exit_loc) {
+          case CellBased::LEFT | CellBased::BOTTOM:
+            m_out.put(static_cast<char>(IncCellHeaderLayout::CutType::BOTTOM_LEFT));
+            break;
+          case CellBased::BOTTOM | CellBased::RIGHT:
+            m_out.put(static_cast<char>(IncCellHeaderLayout::CutType::BOTTOM_RIGHT));
+            break;
+          case CellBased::RIGHT | CellBased::TOP:
+            m_out.put(static_cast<char>(IncCellHeaderLayout::CutType::TOP_RIGHT));
+            break;
+          case CellBased::TOP | CellBased::LEFT:
+            m_out.put(static_cast<char>(IncCellHeaderLayout::CutType::TOP_LEFT));
+            break;
+          case CellBased::LEFT | CellBased::RIGHT:
+            m_out.put(static_cast<char>(IncCellHeaderLayout::CutType::MIDDLE_HORI));
+            break;
+          case CellBased::BOTTOM | CellBased::TOP:
+            m_out.put(static_cast<char>(IncCellHeaderLayout::CutType::MIDDLE_VERT));
+            break;
+          default:
+            Igor::Panic("Invalid combination entry_loc = {} and exit_loc = {}",
+                        cell_value.entry_loc,
+                        cell_value.exit_loc);
+            std::unreachable();
+        }
 
-        const auto cut1 = cell.template cut1<CellBased::SIM_C>();
-        const auto cut2 = cell.template cut2<CellBased::SIM_C>();
-        m_out.write(reinterpret_cast<const char*>(&cut1.x), sizeof(cut1.x));
-        m_out.write(reinterpret_cast<const char*>(&cut1.y), sizeof(cut1.y));
-        m_out.write(reinterpret_cast<const char*>(&cut2.x), sizeof(cut2.x));
-        m_out.write(reinterpret_cast<const char*>(&cut2.y), sizeof(cut2.y));
+        CellBased::SimCoord<ActiveFloat> cut1;
+        CellBased::SimCoord<ActiveFloat> cut2;
+        Eigen::Vector<ActiveFloat, DIM> left_value;
+        Eigen::Vector<ActiveFloat, DIM> right_value;
+        if (cell_value.entry_loc < cell_value.exit_loc) {
+          cut1        = cell.template cut_entry<CellBased::SIM_C>();
+          cut2        = cell.template cut_exit<CellBased::SIM_C>();
+          left_value  = cell_value.left_value;
+          right_value = cell_value.right_value;
+        } else {
+          cut1        = cell.template cut_exit<CellBased::SIM_C>();
+          cut2        = cell.template cut_entry<CellBased::SIM_C>();
+          left_value  = cell_value.right_value;
+          right_value = cell_value.left_value;
+        }
+
+        if constexpr (ad::mode<ActiveFloat>::is_ad_type) {
+          CellBased::SimCoord<PassiveFloat> passive_cut = {ad::value(cut1.x), ad::value(cut1.y)};
+          m_out.write(reinterpret_cast<const char*>(&passive_cut.x), sizeof(passive_cut.x));
+          m_out.write(reinterpret_cast<const char*>(&passive_cut.y), sizeof(passive_cut.y));
+
+          passive_cut = {ad::value(cut2.x), ad::value(cut2.y)};
+          m_out.write(reinterpret_cast<const char*>(&passive_cut.x), sizeof(passive_cut.x));
+          m_out.write(reinterpret_cast<const char*>(&passive_cut.y), sizeof(passive_cut.y));
+        } else {
+          m_out.write(reinterpret_cast<const char*>(&cut1.x), sizeof(cut1.x));
+          m_out.write(reinterpret_cast<const char*>(&cut1.y), sizeof(cut1.y));
+          m_out.write(reinterpret_cast<const char*>(&cut2.x), sizeof(cut2.x));
+          m_out.write(reinterpret_cast<const char*>(&cut2.y), sizeof(cut2.y));
+        }
 
         // Value
         if constexpr (ad::mode<ActiveFloat>::is_ad_type) {
           // TODO: Should we save the derivative values as well?
           Eigen::Vector<PassiveFloat, DIM> passive_value;
 
-          std::transform(std::cbegin(cell_value.left_value),
-                         std::cend(cell_value.left_value),
+          std::transform(std::cbegin(left_value),
+                         std::cend(left_value),
                          std::begin(passive_value),
                          [](const ActiveFloat& v) { return ad::value(v); });
           m_out.write(reinterpret_cast<const char*>(passive_value.data()),
                       DIM * sizeof(PassiveFloat));
 
-          std::transform(std::cbegin(cell_value.right_value),
-                         std::cend(cell_value.right_value),
+          std::transform(std::cbegin(right_value),
+                         std::cend(right_value),
                          std::begin(passive_value),
                          [](const ActiveFloat& v) { return ad::value(v); });
           m_out.write(reinterpret_cast<const char*>(passive_value.data()),
@@ -209,10 +266,8 @@ class IncCellWriter {
         } else {
           static_assert(std::is_floating_point_v<ActiveFloat>,
                         "We assume ActiveFloat is a floating point type.");
-          m_out.write(reinterpret_cast<const char*>(cell_value.left_value.data()),
-                      DIM * sizeof(ActiveFloat));
-          m_out.write(reinterpret_cast<const char*>(cell_value.right_value.data()),
-                      DIM * sizeof(ActiveFloat));
+          m_out.write(reinterpret_cast<const char*>(left_value.data()), DIM * sizeof(ActiveFloat));
+          m_out.write(reinterpret_cast<const char*>(right_value.data()), DIM * sizeof(ActiveFloat));
         }
         // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
       } else {
@@ -226,7 +281,7 @@ class IncCellWriter {
 
     return true;
   }
-};
+};  // namespace Zap::IO
 
 }  // namespace Zap::IO
 

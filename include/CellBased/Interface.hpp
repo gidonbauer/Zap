@@ -88,385 +88,216 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
             },
     };
   } else if (cell.is_cut()) {
-    switch (cell.get_cut().type) {
-      case CutType::BOTTOM_LEFT:
-        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
-            .left =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .right =
-                {
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .bottom =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>()},
-                    },
-                },
-            .top =
-                {
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin =
-                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-        };
+    CellHalfInterfaces<ActiveFloat, DIM, PointType> outer_interfaces;
 
-      case CutType::BOTTOM_RIGHT:
-        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
-            .left =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .right =
-                {
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template cut2<coord_type>().y},
-                    },
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .bottom =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>()},
-                    },
-                },
-            .top =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin =
-                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-        };
-
-      case CutType::TOP_RIGHT:
-        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
-            .left =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .right =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template cut1<coord_type>().y},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template cut1<coord_type>().y},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .bottom =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                    },
-                },
-            .top =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template cut2<coord_type>().x,
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin =
-                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                        .end = {cell.template cut2<coord_type>().x,
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-        };
-
-      case CutType::TOP_LEFT:
-        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
-            .left =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .right =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .bottom =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                    },
-                },
-            .top =
-                {
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin =
-                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                        .end = {cell.template cut1<coord_type>().x,
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-        };
-
-      case CutType::MIDDLE_HORI:
-        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
-            .left =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template cut2<coord_type>().y},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .right =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template cut1<coord_type>().y},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template cut1<coord_type>().y},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .bottom =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                    },
-                },
-            .top =
-                {
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin =
-                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                        .end = {cell.template x_min<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-        };
-
-      case CutType::MIDDLE_VERT:
-        return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
-            .left =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .right =
-                {
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-            .bottom =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin = {cell.template x_min<coord_type>() +
-                                      cell.template dx<coord_type>(),
-                                  cell.template y_min<coord_type>()},
-                        .end   = {cell.template cut1<coord_type>().x,
-                                  cell.template y_min<coord_type>()},
-                    },
-                },
-            .top =
-                {
-                    {
-                        .value = cell.get_cut().left_value,
-                        .begin = {cell.template cut2<coord_type>().x,
-                                  cell.template y_min<coord_type>() +
-                                      cell.template dy<coord_type>()},
-                        .end   = {cell.template x_min<coord_type>(),
-                                  cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                    {
-                        .value = cell.get_cut().right_value,
-                        .begin =
-                            {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                             cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                        .end = {cell.template cut2<coord_type>().x,
-                                cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
-                    },
-                },
-        };
-
-      default:
-        Igor::Panic("Unknown cut type with value {}", std::to_underlying(cell.get_cut().type));
-        std::unreachable();
+    // - Left-side ---------------------------------------------------------------------------------
+    if ((cell.get_cut().entry_loc & LEFT) > 0) {
+      outer_interfaces.left = {
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(), cell.template cut_entry<coord_type>().y},
+          },
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template x_min<coord_type>(), cell.template cut_entry<coord_type>().y},
+              .end   = {cell.template x_min<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    } else if ((cell.get_cut().exit_loc & LEFT) > 0) {
+      outer_interfaces.left = {
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(), cell.template cut_exit<coord_type>().y},
+          },
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>(), cell.template cut_exit<coord_type>().y},
+              .end   = {cell.template x_min<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    } else {
+      outer_interfaces.left = {
+          {
+              .value = cell.get_cut().entry_loc < cell.get_cut().exit_loc
+                           ? cell.get_cut().left_value
+                           : cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
     }
-    Igor::Panic("Unreachable");
-    std::unreachable();
+
+    // - Right-side --------------------------------------------------------------------------------
+    if ((cell.get_cut().entry_loc & RIGHT) > 0) {
+      outer_interfaces.right = {
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template cut_entry<coord_type>().y},
+          },
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template cut_entry<coord_type>().y},
+              .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    } else if ((cell.get_cut().exit_loc & RIGHT) > 0) {
+      outer_interfaces.right = {
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template cut_exit<coord_type>().y},
+          },
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template cut_exit<coord_type>().y},
+              .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    } else {
+      Eigen::Vector<ActiveFloat, DIM> value;
+      const auto cut_type = make_cut_type(cell.get_cut().entry_loc, cell.get_cut().exit_loc);
+      switch (cut_type) {
+        case make_cut_type(BOTTOM, TOP):
+        case make_cut_type(LEFT, TOP):
+        case make_cut_type(BOTTOM, LEFT): value = cell.get_cut().right_value; break;
+        case make_cut_type(TOP, BOTTOM):
+        case make_cut_type(TOP, LEFT):
+        case make_cut_type(LEFT, BOTTOM): value = cell.get_cut().left_value; break;
+        default:
+          Igor::Panic("Invalid combination of entry_loc = {} and exit_loc = {}",
+                      cell.get_cut().entry_loc,
+                      cell.get_cut().exit_loc);
+          std::unreachable();
+      }
+
+      outer_interfaces.right = {
+          {
+              .value = value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    }
+
+    // - Bottom-side -------------------------------------------------------------------------------
+    if ((cell.get_cut().entry_loc & BOTTOM) > 0) {
+      outer_interfaces.bottom = {
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template cut_entry<coord_type>().x, cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
+          },
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>()},
+              .end   = {cell.template cut_entry<coord_type>().x, cell.template y_min<coord_type>()},
+          },
+      };
+    } else if ((cell.get_cut().exit_loc & BOTTOM) > 0) {
+      outer_interfaces.bottom = {
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template cut_exit<coord_type>().x, cell.template y_min<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
+          },
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>()},
+              .end   = {cell.template cut_exit<coord_type>().x, cell.template y_min<coord_type>()},
+          },
+      };
+    } else {
+      outer_interfaces.bottom = {{
+          .value = cell.get_cut().entry_loc < cell.get_cut().exit_loc ? cell.get_cut().left_value
+                                                                      : cell.get_cut().right_value,
+          .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                    cell.template y_min<coord_type>()},
+          .end   = {cell.template x_min<coord_type>(), cell.template y_min<coord_type>()},
+      }};
+    }
+
+    // - Top-side ----------------------------------------------------------------------------------
+    if ((cell.get_cut().entry_loc & TOP) > 0) {
+      outer_interfaces.top = {
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template cut_entry<coord_type>().x,
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+              .end   = {cell.template cut_entry<coord_type>().x,
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    } else if ((cell.get_cut().exit_loc & TOP) > 0) {
+      outer_interfaces.top = {
+          {
+              .value = cell.get_cut().left_value,
+              .begin = {cell.template cut_exit<coord_type>().x,
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+          {
+              .value = cell.get_cut().right_value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+              .end   = {cell.template cut_exit<coord_type>().x,
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    } else {
+      Eigen::Vector<ActiveFloat, DIM> value;
+      const auto cut_type = make_cut_type(cell.get_cut().entry_loc, cell.get_cut().exit_loc);
+      switch (cut_type) {
+        case make_cut_type(RIGHT, LEFT):
+        case make_cut_type(BOTTOM, LEFT):
+        case make_cut_type(RIGHT, BOTTOM): value = cell.get_cut().right_value; break;
+        case make_cut_type(LEFT, RIGHT):
+        case make_cut_type(LEFT, BOTTOM):
+        case make_cut_type(BOTTOM, RIGHT): value = cell.get_cut().left_value; break;
+        default:
+          Igor::Panic("Invalid combination of entry_loc = {} and exit_loc = {}",
+                      cell.get_cut().entry_loc,
+                      cell.get_cut().exit_loc);
+          std::unreachable();
+      }
+
+      outer_interfaces.top = {
+          {
+              .value = value,
+              .begin = {cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+              .end   = {cell.template x_min<coord_type>(),
+                        cell.template y_min<coord_type>() + cell.template dy<coord_type>()},
+          },
+      };
+    }
+
+    return outer_interfaces;
   } else {
     Igor::Panic("Unknown cell type with variant index {}", cell.value.index());
     std::unreachable();

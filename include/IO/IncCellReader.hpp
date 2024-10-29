@@ -17,7 +17,7 @@ struct ReducedCartesianValue {
 
 template <typename Float, size_t DIM>
 struct ReducedCutValue {
-  CellBased::CutType type;
+  IncCellHeaderLayout::CutType type;
   CellBased::GenCoord<Float> cut1;
   CellBased::GenCoord<Float> cut2;
 
@@ -71,13 +71,13 @@ class ReducedCell {
       -> CellBased::SmallVector<CellBased::GenCoord<Float>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
-      case CellBased::CutType::BOTTOM_LEFT:
+      case IncCellHeaderLayout::CutType::BOTTOM_LEFT:
         return {
             CellBased::GenCoord<Float>{x_min(), y_min()},
             cell_value.cut1,
             cell_value.cut2,
         };
-      case CellBased::CutType::BOTTOM_RIGHT:
+      case IncCellHeaderLayout::CutType::BOTTOM_RIGHT:
         return {
             CellBased::GenCoord<Float>{x_min(), y_min()},
             cell_value.cut1,
@@ -85,7 +85,7 @@ class ReducedCell {
             CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
             CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
         };
-      case CellBased::CutType::TOP_RIGHT:
+      case IncCellHeaderLayout::CutType::TOP_RIGHT:
         return {
             CellBased::GenCoord<Float>{x_min(), y_min()},
             CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
@@ -93,7 +93,7 @@ class ReducedCell {
             cell_value.cut2,
             CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
         };
-      case CellBased::CutType::TOP_LEFT:
+      case IncCellHeaderLayout::CutType::TOP_LEFT:
         return {
             CellBased::GenCoord<Float>{x_min(), y_min()},
             CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
@@ -101,14 +101,14 @@ class ReducedCell {
             cell_value.cut1,
             cell_value.cut2,
         };
-      case CellBased::CutType::MIDDLE_HORI:
+      case IncCellHeaderLayout::CutType::MIDDLE_HORI:
         return {
             CellBased::GenCoord<Float>{x_min(), y_min()},
             CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
             cell_value.cut1,
             cell_value.cut2,
         };
-      case CellBased::CutType::MIDDLE_VERT:
+      case IncCellHeaderLayout::CutType::MIDDLE_VERT:
         return {
             CellBased::GenCoord<Float>{x_min(), y_min()},
             CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
@@ -126,7 +126,7 @@ class ReducedCell {
       -> CellBased::SmallVector<CellBased::GenCoord<Float>> {
     const auto& cell_value = get_cut();
     switch (cell_value.type) {
-      case CellBased::CutType::BOTTOM_LEFT:
+      case IncCellHeaderLayout::CutType::BOTTOM_LEFT:
         return {
             cell_value.cut1,
             cell_value.cut2,
@@ -134,32 +134,32 @@ class ReducedCell {
             CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
             CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
-      case CellBased::CutType::BOTTOM_RIGHT:
+      case IncCellHeaderLayout::CutType::BOTTOM_RIGHT:
         return {
             cell_value.cut1,
             cell_value.cut2,
             CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
         };
-      case CellBased::CutType::TOP_RIGHT:
+      case IncCellHeaderLayout::CutType::TOP_RIGHT:
         return {
             cell_value.cut1,
             cell_value.cut2,
             CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
-      case CellBased::CutType::TOP_LEFT:
+      case IncCellHeaderLayout::CutType::TOP_LEFT:
         return {
             cell_value.cut1,
             cell_value.cut2,
             CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
         };
-      case CellBased::CutType::MIDDLE_HORI:
+      case IncCellHeaderLayout::CutType::MIDDLE_HORI:
         return {
             cell_value.cut1,
             cell_value.cut2,
             CellBased::GenCoord<Float>{x_min(), y_min() + dy()},
             CellBased::GenCoord<Float>{x_min() + dx(), y_min() + dy()},
         };
-      case CellBased::CutType::MIDDLE_VERT:
+      case IncCellHeaderLayout::CutType::MIDDLE_VERT:
         return {
             cell_value.cut1,
             CellBased::GenCoord<Float>{x_min() + dx(), y_min()},
@@ -394,7 +394,7 @@ class IncCellReader {
                 return false;
               }
               assert(cut_type >= 0 && cut_type < 7);
-              cell.get_cut().type = static_cast<CellBased::CutType>(cut_type);
+              cell.get_cut().type = static_cast<IncCellHeaderLayout::CutType>(cut_type);
             }
             if (!read_next_float(cell.get_cut().cut1.x)) {
               if constexpr (WARN_END) {

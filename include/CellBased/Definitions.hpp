@@ -235,13 +235,17 @@ template <typename T>
 using Point = Eigen::Vector<T, POINT_SIZE>;
 
 // -------------------------------------------------------------------------------------------------
-enum Side : unsigned int {
+enum Side : uint8_t {
   BOTTOM = 0b0001,
   RIGHT  = 0b0010,
   TOP    = 0b0100,
   LEFT   = 0b1000,
   ALL    = LEFT | RIGHT | BOTTOM | TOP,
 };
+
+[[nodiscard]] constexpr auto make_cut_type(Side entry, Side exit) -> uint8_t {
+  return static_cast<uint8_t>((exit << 4) | entry);
+}
 
 }  // namespace Zap::CellBased
 

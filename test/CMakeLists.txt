@@ -5,6 +5,7 @@ set(executables
         test_small_vector
         test_cell_geometry
         test_cut_grid
+        test_outer_interfaces
 )
 
 include(GoogleTest)

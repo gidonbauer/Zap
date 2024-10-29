@@ -24,16 +24,6 @@ enum : size_t {
 };
 
 // -------------------------------------------------------------------------------------------------
-enum class CutType : char {
-  BOTTOM_LEFT,
-  BOTTOM_RIGHT,
-  TOP_RIGHT,
-  TOP_LEFT,
-  MIDDLE_HORI,
-  MIDDLE_VERT,
-};
-
-// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, size_t DIM>
 struct CartesianValue {
   static_assert(DIM > 0, "Dimension must be at least 1.");
@@ -48,9 +38,10 @@ struct CutValue {
   Eigen::Vector<ActiveFloat, DIM> right_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
 
   // Linear cut
-  CutType type{};
-  Point<ActiveFloat> rel_cut1{};  // Entry point
-  Point<ActiveFloat> rel_cut2{};  // Exit point
+  GenCoord<ActiveFloat> rel_cut_entry{};
+  Side entry_loc{};
+  GenCoord<ActiveFloat> rel_cut_exit{};
+  Side exit_loc{};
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -116,24 +107,24 @@ struct Cell {
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto cut1() const noexcept
+  [[nodiscard]] constexpr auto cut_entry() const noexcept
       -> CoordType2PointType<ActiveFloat, COORD_TYPE> {
     assert(is_cut());
 
     return CoordType2PointType<ActiveFloat, COORD_TYPE>{
-        get_cut().rel_cut1(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
-        get_cut().rel_cut1(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
+        get_cut().rel_cut_entry.x * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
+        get_cut().rel_cut_entry.y * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
   template <CoordType COORD_TYPE>
-  [[nodiscard]] constexpr auto cut2() const noexcept
+  [[nodiscard]] constexpr auto cut_exit() const noexcept
       -> CoordType2PointType<ActiveFloat, COORD_TYPE> {
     assert(is_cut());
 
     return CoordType2PointType<ActiveFloat, COORD_TYPE>{
-        get_cut().rel_cut2(X) * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
-        get_cut().rel_cut2(Y) * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
+        get_cut().rel_cut_exit.x * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
+        get_cut().rel_cut_exit.y * dy<COORD_TYPE>() + y_min<COORD_TYPE>(),
     };
   }
 
@@ -194,106 +185,123 @@ struct Cell {
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_left_points() const noexcept
       -> SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
-    const auto& cell_value = get_cut();
-    switch (cell_value.type) {
-      case CutType::BOTTOM_LEFT:
-        return {
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-        };
-      case CutType::BOTTOM_RIGHT:
-        return {
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-        };
-      case CutType::TOP_RIGHT:
-        return {
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-        };
-      case CutType::TOP_LEFT:
-        return {
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-        };
-      case CutType::MIDDLE_HORI:
-        return {
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-        };
-      case CutType::MIDDLE_VERT:
-        return {
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-        };
-      default:
-        Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
-        std::unreachable();
-    }
+    // Same order for entry_loc and exit_loc as is used in the implementation of get_subcell_points
+    const auto cut_type = static_cast<uint8_t>((get_cut().exit_loc << 4) | get_cut().entry_loc);
+    return get_subcell_points<COORD_TYPE>(cut_type);
   }
 
   // -----------------------------------------------------------------------------------------------
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_right_points() const noexcept
       -> SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
-    const auto& cell_value = get_cut();
-    switch (cell_value.type) {
-      case CutType::BOTTOM_LEFT:
+    // Inverse order for entry_loc and exit_loc as is used in the implementation of
+    // get_subcell_points
+    const auto cut_type = static_cast<uint8_t>((get_cut().entry_loc << 4) | get_cut().exit_loc);
+    return get_subcell_points<COORD_TYPE>(cut_type);
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_subcell_points(uint8_t cut_type) const noexcept
+      -> SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
+    switch (cut_type) {
+      case make_cut_type(BOTTOM, LEFT):
         return {
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+        };
+      case make_cut_type(LEFT, BOTTOM):
+        return {
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
             {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
             {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
             {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
-      case CutType::BOTTOM_RIGHT:
+
+      case make_cut_type(BOTTOM, RIGHT):
         return {
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
-            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
-        };
-      case CutType::TOP_RIGHT:
-        return {
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
             {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-        };
-      case CutType::TOP_LEFT:
-        return {
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
             {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
-      case CutType::MIDDLE_HORI:
+      case make_cut_type(RIGHT, BOTTOM):
         return {
-            cut1<COORD_TYPE>(),
-            cut2<COORD_TYPE>(),
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+        };
+
+      case make_cut_type(RIGHT, TOP):
+        return {
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+        };
+      case make_cut_type(TOP, RIGHT):
+        return {
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+        };
+
+      case make_cut_type(TOP, LEFT):
+        return {
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+        };
+      case make_cut_type(LEFT, TOP):
+        return {
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+        };
+
+      case make_cut_type(RIGHT, LEFT):
+        return {
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+        };
+      case make_cut_type(LEFT, RIGHT):
+        return {
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
             {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
             {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
-      case CutType::MIDDLE_VERT:
+
+      case make_cut_type(BOTTOM, TOP):
         return {
-            cut1<COORD_TYPE>(),
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+            {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+            cut_entry<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
+        };
+
+      case make_cut_type(TOP, BOTTOM):
+        return {
+            cut_entry<COORD_TYPE>(),
             {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
-            cut2<COORD_TYPE>(),
+            cut_exit<COORD_TYPE>(),
             {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
         };
+
       default:
-        Igor::Panic("Unknown cut type with value {}", static_cast<int>(cell_value.type));
+        Igor::Panic(
+            "Invalid cut type with value {}. Lower bits are side `{}`, upper bits are side `{}`.",
+            cut_type,
+            static_cast<Side>(cut_type & 0b1111),
+            static_cast<Side>(cut_type >> 4 & 0b1111));
         std::unreachable();
     }
   }
@@ -345,21 +353,17 @@ auto operator<<(std::ostream& out, const CutValue<ActiveFloat, DIM>& cut_value) 
   }
   out << " ]," << end_char;
 
-  out << double_indent << ".type = ";
-  switch (cut_value.type) {
-    case CutType::BOTTOM_LEFT:  out << "BOTTOM_LEFT"; break;
-    case CutType::BOTTOM_RIGHT: out << "BOTTOM_RIGHT"; break;
-    case CutType::TOP_RIGHT:    out << "TOP_RIGHT"; break;
-    case CutType::TOP_LEFT:     out << "TOP_LEFT"; break;
-    case CutType::MIDDLE_HORI:  out << "MIDDLE_HORI"; break;
-    case CutType::MIDDLE_VERT:  out << "MIDDLE_VERT"; break;
-  }
-  out << ',' << end_char;
+  // GenCoord<ActiveFloat> rel_cut_entry{};
+  // Side entry_loc{};
+  // GenCoord<ActiveFloat> rel_cut_exit{};
+  // Side exit_loc{};
 
-  out << double_indent << ".rel_cut1 = [" << cut_value.rel_cut1(X) << ", " << cut_value.rel_cut1(Y)
-      << ']' << end_char;
-  out << double_indent << ".rel_cut2 = [" << cut_value.rel_cut2(X) << ", " << cut_value.rel_cut2(Y)
-      << ']' << end_char;
+  out << double_indent << ".rel_cut_entry = [" << cut_value.rel_cut_entry.x << ", "
+      << cut_value.rel_cut_entry.y << ']' << end_char;
+  out << double_indent << ".entry_loc = " << std::format("{}", cut_value.entry_loc) << end_char;
+  out << double_indent << ".rel_cut_exit = [" << cut_value.rel_cut_exit.x << ", "
+      << cut_value.rel_cut_exit.y << ']' << end_char;
+  out << double_indent << ".exit_loc = " << std::format("{}", cut_value.exit_loc) << end_char;
 
   out << single_indent << '}';
 

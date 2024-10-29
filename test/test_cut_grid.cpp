@@ -6,6 +6,7 @@
 
 using namespace Zap::CellBased;
 
+// =================================================================================================
 TEST(CutGrid, CurveQuarterCircle) {
   using Float = double;
 
@@ -37,13 +38,29 @@ TEST(CutGrid, CurveQuarterCircle) {
   EXPECT_EQ(cut_idxs[3], 11UZ);
   EXPECT_EQ(cut_idxs[4], 10UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::MIDDLE_HORI);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().exit_loc, LEFT);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearSingleLine) {
   using Float = double;
 
@@ -71,14 +88,32 @@ TEST(CutGrid, PiecewiseLinearSingleLine) {
   EXPECT_EQ(cut_idxs[4], 5UZ);
   EXPECT_EQ(cut_idxs[5], 10UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[5]].get_cut().type, CutType::BOTTOM_LEFT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().exit_loc, LEFT);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearVertLineOnGrid) {
   using Float = double;
 
@@ -105,13 +140,19 @@ TEST(CutGrid, PiecewiseLinearVertLineOnGrid) {
   EXPECT_EQ(cut_idxs[3], 19UZ);
   EXPECT_EQ(cut_idxs[4], 24UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::MIDDLE_VERT);
+  for (size_t idx : cut_idxs) {
+    EXPECT_EQ(grid[idx].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[idx].get_cut().exit_loc, TOP);
+  }
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearHoriLineOnGrid) {
   using Float = double;
 
@@ -138,13 +179,19 @@ TEST(CutGrid, PiecewiseLinearHoriLineOnGrid) {
   EXPECT_EQ(cut_idxs[3], 23UZ);
   EXPECT_EQ(cut_idxs[4], 24UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::MIDDLE_HORI);
+  for (size_t idx : cut_idxs) {
+    EXPECT_EQ(grid[idx].get_cut().entry_loc, LEFT);
+    EXPECT_EQ(grid[idx].get_cut().exit_loc, RIGHT);
+  }
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearMultiplePointsNoExtend) {
   using Float = double;
 
@@ -172,13 +219,29 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsNoExtend) {
   EXPECT_EQ(cut_idxs[3], 11UZ);
   EXPECT_EQ(cut_idxs[4], 16UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::MIDDLE_VERT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().exit_loc, TOP);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearMultiplePointsExtendMax) {
   using Float = double;
 
@@ -208,15 +271,35 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendMax) {
   EXPECT_EQ(cut_idxs[5], 16UZ);
   EXPECT_EQ(cut_idxs[6], 21UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[5]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[6]].get_cut().type, CutType::MIDDLE_VERT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[6]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[6]].get_cut().exit_loc, TOP);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearMultiplePointsExtendNearest) {
   using Float = double;
 
@@ -245,14 +328,32 @@ TEST(CutGrid, PiecewiseLinearMultiplePointsExtendNearest) {
   EXPECT_EQ(cut_idxs[4], 16UZ);
   EXPECT_EQ(cut_idxs[5], 21UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[5]].get_cut().type, CutType::MIDDLE_VERT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().exit_loc, TOP);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, CutOnCorner) {
   using Float = double;
 
@@ -280,20 +381,26 @@ TEST(CutGrid, CutOnCorner) {
   EXPECT_EQ(cut_idxs[3], 15UZ);
 
   // Multiple acceptable cut types
-  EXPECT_TRUE(grid[cut_idxs[0]].get_cut().type == CutType::BOTTOM_LEFT ||
-              grid[cut_idxs[0]].get_cut().type == CutType::MIDDLE_HORI);
-  EXPECT_TRUE(grid[cut_idxs[1]].get_cut().type == CutType::TOP_RIGHT ||
-              grid[cut_idxs[1]].get_cut().type == CutType::MIDDLE_HORI);
-  EXPECT_TRUE(grid[cut_idxs[2]].get_cut().type == CutType::BOTTOM_LEFT ||
-              grid[cut_idxs[2]].get_cut().type == CutType::TOP_RIGHT ||
-              grid[cut_idxs[2]].get_cut().type == CutType::MIDDLE_VERT ||
-              grid[cut_idxs[2]].get_cut().type == CutType::MIDDLE_HORI);
-  EXPECT_TRUE(grid[cut_idxs[3]].get_cut().type == CutType::BOTTOM_LEFT ||
-              grid[cut_idxs[3]].get_cut().type == CutType::TOP_RIGHT ||
-              grid[cut_idxs[3]].get_cut().type == CutType::MIDDLE_VERT ||
-              grid[cut_idxs[3]].get_cut().type == CutType::MIDDLE_HORI);
+  EXPECT_GE(grid[cut_idxs[0]].get_cut().entry_loc & (BOTTOM | RIGHT), 0);
+  EXPECT_GE(grid[cut_idxs[0]].get_cut().exit_loc & LEFT, 0);
+
+  EXPECT_GE(grid[cut_idxs[1]].get_cut().entry_loc & RIGHT, 0);
+  EXPECT_GE(grid[cut_idxs[1]].get_cut().exit_loc & (LEFT | TOP), 0);
+
+  EXPECT_GE(grid[cut_idxs[2]].get_cut().entry_loc & (RIGHT | BOTTOM), 0);
+  EXPECT_GE(grid[cut_idxs[2]].get_cut().exit_loc & (TOP | LEFT), 0);
+
+  EXPECT_GE(grid[cut_idxs[3]].get_cut().entry_loc & (RIGHT | BOTTOM), 0);
+  EXPECT_GE(grid[cut_idxs[3]].get_cut().exit_loc & (TOP | LEFT), 0);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, PointsFullyInside) {
   using Float = double;
 
@@ -325,15 +432,35 @@ TEST(CutGrid, PointsFullyInside) {
   EXPECT_EQ(cut_idxs[5], 16UZ);
   EXPECT_EQ(cut_idxs[6], 21UZ);
 
-  EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::BOTTOM_LEFT);
-  EXPECT_EQ(grid[cut_idxs[3]].get_cut().type, CutType::MIDDLE_HORI);
-  EXPECT_EQ(grid[cut_idxs[4]].get_cut().type, CutType::TOP_RIGHT);
-  EXPECT_EQ(grid[cut_idxs[5]].get_cut().type, CutType::MIDDLE_VERT);
-  EXPECT_EQ(grid[cut_idxs[6]].get_cut().type, CutType::MIDDLE_VERT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[3]].get_cut().exit_loc, LEFT);
+
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().entry_loc, RIGHT);
+  EXPECT_EQ(grid[cut_idxs[4]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[5]].get_cut().exit_loc, TOP);
+
+  EXPECT_EQ(grid[cut_idxs[6]].get_cut().entry_loc, BOTTOM);
+  EXPECT_EQ(grid[cut_idxs[6]].get_cut().exit_loc, TOP);
+
+  for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
+    const auto p1 = grid[cut_idxs[i]].cut_exit<SIM_C>();
+    const auto p2 = grid[cut_idxs[i + 1]].cut_entry<SIM_C>();
+    EXPECT_DOUBLE_EQ((p1 - p2).norm(), 0.0);
+  }
 }
 
+// =================================================================================================
 TEST(CutGrid, HandleCutOnSingleSide) {
   // Synthetic example
   {
@@ -353,11 +480,13 @@ TEST(CutGrid, HandleCutOnSingleSide) {
     EXPECT_EQ(cut_idxs[0], 0UZ);
     EXPECT_EQ(cut_idxs[1], 2UZ);
 
-    EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_VERT);
-    EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::MIDDLE_VERT);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
 
-    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut2<SIM_C>() - grid[cut_idxs[1]].cut1<SIM_C>()).norm(),
-                     0.0);
+    EXPECT_DOUBLE_EQ(
+        (grid[cut_idxs[0]].cut_exit<SIM_C>() - grid[cut_idxs[1]].cut_entry<SIM_C>()).norm(), 0.0);
   }
 
   // Real example
@@ -376,7 +505,8 @@ TEST(CutGrid, HandleCutOnSingleSide) {
 
     for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
       EXPECT_DOUBLE_EQ(
-          (grid[cut_idxs[i]].cut2<SIM_C>() - grid[cut_idxs[i + 1]].cut1<SIM_C>()).norm(), 0.0);
+          (grid[cut_idxs[i]].cut_exit<SIM_C>() - grid[cut_idxs[i + 1]].cut_entry<SIM_C>()).norm(),
+          0.0);
     }
   }
 
@@ -398,12 +528,15 @@ TEST(CutGrid, HandleCutOnSingleSide) {
     EXPECT_EQ(cut_idxs[0], 0UZ);
     EXPECT_EQ(cut_idxs[1], 2UZ);
 
-    EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_VERT);
-    EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::MIDDLE_VERT);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
 
-    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut2<SIM_C>() - grid[cut_idxs[1]].cut1<SIM_C>()).norm(),
+    EXPECT_DOUBLE_EQ(
+        (grid[cut_idxs[0]].cut_exit<SIM_C>() - grid[cut_idxs[1]].cut_entry<SIM_C>()).norm(), 0.0);
+    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut_exit<SIM_C>() - SimCoord<double>{0.5, 0.5}).norm(),
                      0.0);
-    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut2<SIM_C>() - SimCoord<double>{0.5, 0.5}).norm(), 0.0);
   }
 
   // Exit point on corner
@@ -424,12 +557,15 @@ TEST(CutGrid, HandleCutOnSingleSide) {
     EXPECT_EQ(cut_idxs[0], 0UZ);
     EXPECT_EQ(cut_idxs[1], 2UZ);
 
-    EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_VERT);
-    EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::MIDDLE_VERT);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
 
-    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut2<SIM_C>() - grid[cut_idxs[1]].cut1<SIM_C>()).norm(),
+    EXPECT_DOUBLE_EQ(
+        (grid[cut_idxs[0]].cut_exit<SIM_C>() - grid[cut_idxs[1]].cut_entry<SIM_C>()).norm(), 0.0);
+    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut_exit<SIM_C>() - SimCoord<double>{0.5, 0.5}).norm(),
                      0.0);
-    EXPECT_DOUBLE_EQ((grid[cut_idxs[0]].cut2<SIM_C>() - SimCoord<double>{0.5, 0.5}).norm(), 0.0);
   }
 
   // Entry and exit point on corner
@@ -451,13 +587,17 @@ TEST(CutGrid, HandleCutOnSingleSide) {
     EXPECT_EQ(cut_idxs[1], 4UZ);
     EXPECT_EQ(cut_idxs[2], 6UZ);
 
-    EXPECT_EQ(grid[cut_idxs[0]].get_cut().type, CutType::MIDDLE_VERT);
-    EXPECT_EQ(grid[cut_idxs[1]].get_cut().type, CutType::MIDDLE_VERT);
-    EXPECT_EQ(grid[cut_idxs[2]].get_cut().type, CutType::MIDDLE_VERT);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[0]].get_cut().exit_loc, TOP);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[1]].get_cut().exit_loc, TOP);
+    EXPECT_EQ(grid[cut_idxs[2]].get_cut().entry_loc, BOTTOM);
+    EXPECT_EQ(grid[cut_idxs[2]].get_cut().exit_loc, TOP);
 
     for (size_t i = 0; i < cut_idxs.size() - 1; ++i) {
       EXPECT_DOUBLE_EQ(
-          (grid[cut_idxs[i]].cut2<SIM_C>() - grid[cut_idxs[i + 1]].cut1<SIM_C>()).norm(), 0.0);
+          (grid[cut_idxs[i]].cut_exit<SIM_C>() - grid[cut_idxs[i + 1]].cut_entry<SIM_C>()).norm(),
+          0.0);
     }
   }
 }
