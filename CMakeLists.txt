@@ -51,6 +51,17 @@ endif()
 
 option(ZAP_BUILD_RENDERER "Build renderer for the solution; adds dependencies on FFmpeg and FreeType" ON)
 
+find_package(OpenMP REQUIRED)
+include(FetchContent)
+
+FetchContent_Declare(
+  fmt
+  GIT_REPOSITORY https://github.com/fmtlib/fmt
+  GIT_TAG        11.0.2
+)
+FetchContent_MakeAvailable(fmt)
+add_compile_definitions(IGOR_USE_FMT)
+
 add_subdirectory(${CMAKE_SOURCE_DIR}/apps/)
 
 option(ZAP_BUILD_TESTS "Builds unit test" ON)
@@ -58,7 +69,6 @@ if (ZAP_BUILD_TESTS)
     enable_testing()
 
     set(BUILD_GMOCK OFF)
-    include(FetchContent)
     FetchContent_Declare(
         googletest
         GIT_REPOSITORY https://github.com/google/googletest.git

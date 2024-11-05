@@ -19,6 +19,7 @@ foreach(exec ${executables})
 
     # - Link libraries ---------
     target_link_libraries(${exec} PRIVATE GTest::gtest_main)
+    target_link_libraries(${exec} PRIVATE fmt::fmt)
 
     gtest_discover_tests(${exec})
 endforeach()

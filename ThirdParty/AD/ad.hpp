@@ -39,6 +39,10 @@ License
 #include <utility>      // for pair
 #include <vector>       // for vector
 
+#ifdef AD_FORMATTING
+#include <fmt/core.h>
+#endif  // AD_FORMATTING
+
 // define all DEPRECATED, to generate compiler-warnings,
 // if a marked function is instantiated
 // (only implemented for gnu compiler and visual C++)

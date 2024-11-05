@@ -353,17 +353,12 @@ auto operator<<(std::ostream& out, const CutValue<ActiveFloat, DIM>& cut_value) 
   }
   out << " ]," << end_char;
 
-  // GenCoord<ActiveFloat> rel_cut_entry{};
-  // Side entry_loc{};
-  // GenCoord<ActiveFloat> rel_cut_exit{};
-  // Side exit_loc{};
-
   out << double_indent << ".rel_cut_entry = [" << cut_value.rel_cut_entry.x << ", "
       << cut_value.rel_cut_entry.y << ']' << end_char;
-  out << double_indent << ".entry_loc = " << std::format("{}", cut_value.entry_loc) << end_char;
+  out << double_indent << ".entry_loc = " << fmt::format("{}", cut_value.entry_loc) << end_char;
   out << double_indent << ".rel_cut_exit = [" << cut_value.rel_cut_exit.x << ", "
       << cut_value.rel_cut_exit.y << ']' << end_char;
-  out << double_indent << ".exit_loc = " << std::format("{}", cut_value.exit_loc) << end_char;
+  out << double_indent << ".exit_loc = " << fmt::format("{}", cut_value.exit_loc) << end_char;
 
   out << single_indent << '}';
 
@@ -452,10 +447,8 @@ auto operator<<(std::ostream& out, const Cell<ActiveFloat, PassiveFloat, DIM>& c
 
 }  // namespace Zap::CellBased
 
-namespace std {
-
 template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
-struct formatter<Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>> {
+struct fmt::formatter<Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();
@@ -465,10 +458,8 @@ struct formatter<Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>> {
                                FormatContext& ctx) noexcept {
     std::stringstream s;
     s << cell;
-    return std::format_to(ctx.out(), "{}", s.str());
+    return fmt::format_to(ctx.out(), "{}", s.str());
   }
 };
-
-}  // namespace std
 
 #endif  // ZAP_CELL_BASED_CELL_HPP_

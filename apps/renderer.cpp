@@ -473,7 +473,7 @@ template <typename Float, size_t DIM>
             Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
           }
           break;
-        case Args::NO_SAVE:
+        case Args::NO_SAVE: break;
       }
 
       if (!canvas.to_raw_stream(ffmpeg.stream())) {
@@ -613,7 +613,7 @@ template <typename Float, size_t DIM>
             Igor::Warn("Could not write canvas to file `{}`: {}.", filename, std::strerror(errno));
           }
           break;
-        case Args::NO_SAVE:
+        case Args::NO_SAVE: break;
       }
 
       if (!canvas.to_raw_stream(ffmpeg.stream())) {

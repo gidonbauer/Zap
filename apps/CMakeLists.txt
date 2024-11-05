@@ -1,7 +1,5 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/")
 
-find_package(OpenMP REQUIRED)
-
 set(executables
   cell_solver_1d
   cell_solver_2d
@@ -27,6 +25,7 @@ foreach(exec ${executables})
 
     # - Link libraries -----------------
     target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
+    target_link_libraries(${exec} PRIVATE fmt::fmt)
 endforeach()
 
 # ================================================
@@ -47,5 +46,6 @@ if (ZAP_BUILD_RENDERER)
         # - Link libraries ---------------------
         target_link_libraries(${exec} PRIVATE ${FREETYPE_LIBRARIES})
         target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
+        target_link_libraries(${exec} PRIVATE fmt::fmt)
     endforeach()
 endif()

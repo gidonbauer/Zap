@@ -71,9 +71,9 @@ concept Point2D_c = requires(PointType t) {
     Scalar y;                                                                                      \
                                                                                                    \
     constexpr name() noexcept = default;                                                           \
-    constexpr name(Scalar x, Scalar y) noexcept                                                    \
-        : x(std::move(x)),                                                                         \
-          y(std::move(y)) {}                                                                       \
+    constexpr name(Scalar x_, Scalar y_) noexcept                                                  \
+        : x(std::move(x_)),                                                                        \
+          y(std::move(y_)) {}                                                                      \
     constexpr name(const name& other) noexcept                    = default;                       \
     constexpr name(name&& other) noexcept                         = default;                       \
     constexpr auto operator=(const name& other) noexcept -> name& = default;                       \
@@ -162,14 +162,14 @@ concept Point2D_c = requires(PointType t) {
 
 #define DEF_POINT2D_FORMATTER(name)                                                                \
   template <typename T, typename CharT>                                                            \
-  struct formatter<name<T>, CharT> {                                                               \
+  struct fmt::formatter<name<T>, CharT> {                                                          \
     template <typename ParseContext>                                                               \
     static constexpr auto parse(ParseContext& ctx) noexcept {                                      \
       return ctx.begin();                                                                          \
     }                                                                                              \
     template <typename FormatContext>                                                              \
     static constexpr auto format(const name<T>& p, FormatContext& ctx) noexcept {                  \
-      return std::format_to(ctx.out(), "[{}, {}]", p.x, p.y);                                      \
+      return fmt::format_to(ctx.out(), "[{}, {}]", p.x, p.y);                                      \
     }                                                                                              \
   }
 // NOLINTEND(cppcoreguidelines-macro-usage,bugprone-macro-parentheses)
@@ -201,21 +201,6 @@ static_assert(!is_GridCoord_v<SimCoord<double>>,
 static_assert(is_SimCoord_v<SimCoord<double>>, "is_SimCoord_v must evaluate to true for SimCoord.");
 static_assert(Point2D_c<SimCoord<double>>,
               "GridCoord must fulfill the Point2D concepts requirements.");
-}  // namespace Zap::CellBased
-
-namespace std {
-
-DEF_POINT2D_FORMATTER(Zap::CellBased::GenCoord);
-DEF_POINT2D_FORMATTER(Zap::CellBased::GridCoord);
-DEF_POINT2D_FORMATTER(Zap::CellBased::SimCoord);
-
-}  // namespace std
-
-#undef DEF_POINT2D_TYPE
-#undef DEFINE_TEMPLATE_CHECK
-#undef DEF_POINT2D_FORMATTER
-
-namespace Zap::CellBased {
 
 enum class CoordType : uint8_t { GRID_C, SIM_C };
 using enum CoordType;
@@ -247,20 +232,20 @@ enum Side : uint8_t {
   return static_cast<uint8_t>((exit << 4) | entry);
 }
 
+enum class ExtendType : uint8_t { NONE, NEAREST, MAX };
+
 }  // namespace Zap::CellBased
 
-namespace std {
-
 template <>
-struct formatter<Zap::CellBased::Side> {
+struct fmt::formatter<Zap::CellBased::Side> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();
   }
   template <typename FormatContext>
   static constexpr auto format(Zap::CellBased::Side side, FormatContext& ctx) noexcept {
-    if (side == Zap::CellBased::ALL) { return std::format_to(ctx.out(), "ALL"); }
-    if (side == 0) { return std::format_to(ctx.out(), "NONE"); }
+    if (side == Zap::CellBased::ALL) { return fmt::format_to(ctx.out(), "ALL"); }
+    if (side == 0) { return fmt::format_to(ctx.out(), "NONE"); }
 
     std::string s;
     if ((side & Zap::CellBased::BOTTOM) > 0) { s += "BOTTOM"; }
@@ -276,16 +261,16 @@ struct formatter<Zap::CellBased::Side> {
       if (!s.empty()) { s += " | "; }
       s += "LEFT";
     }
-    return std::format_to(ctx.out(), "{}", s);
+    return fmt::format_to(ctx.out(), "{}", s);
   }
 };
 
-}  // namespace std
+DEF_POINT2D_FORMATTER(Zap::CellBased::GenCoord);
+DEF_POINT2D_FORMATTER(Zap::CellBased::GridCoord);
+DEF_POINT2D_FORMATTER(Zap::CellBased::SimCoord);
 
-namespace Zap::CellBased {
-
-enum class ExtendType : uint8_t { NONE, NEAREST, MAX };
-
-}  // namespace Zap::CellBased
+#undef DEF_POINT2D_TYPE
+#undef DEFINE_TEMPLATE_CHECK
+#undef DEF_POINT2D_FORMATTER
 
 #endif  // ZAP_CELL_BASED_DEFINITIONS_HPP_

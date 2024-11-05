@@ -40,26 +40,26 @@ struct Box {
 }  // namespace Zap::Renderer
 
 template <>
-struct std::formatter<Zap::Renderer::Point, char> {
+struct fmt::formatter<Zap::Renderer::Point, char> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();
   }
   template <typename FormatContext>
   static constexpr auto format(const Zap::Renderer::Point& p, FormatContext& ctx) noexcept {
-    return std::format_to(ctx.out(), "{{.col = {}, .row = {}}}", p.col, p.row);
+    return fmt::format_to(ctx.out(), "{{.col = {}, .row = {}}}", p.col, p.row);
   }
 };
 
 template <>
-struct std::formatter<Zap::Renderer::Box, char> {
+struct fmt::formatter<Zap::Renderer::Box, char> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();
   }
   template <typename FormatContext>
   static constexpr auto format(const Zap::Renderer::Box& box, FormatContext& ctx) noexcept {
-    return std::format_to(ctx.out(),
+    return fmt::format_to(ctx.out(),
                           "{{.col = {}, .row = {}, .width = {}, .height = {}}}",
                           box.col,
                           box.row,

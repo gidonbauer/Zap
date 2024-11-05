@@ -868,7 +868,7 @@ class UniformGrid {
             Igor::Debug("exit_point = {}", exit_point);
             return false;
           }
-        case ClassifyError::OK:
+        case ClassifyError::OK: break;
       }
 
       Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();

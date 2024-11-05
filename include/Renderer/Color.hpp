@@ -180,7 +180,7 @@ template <Float2RGB conv = Float2RGB::COLORMAP, typename Float, bool WARN_ON_NAN
 }  // namespace Zap::Renderer
 
 template <>
-struct std::formatter<Zap::Renderer::RGB, char> {
+struct fmt::formatter<Zap::Renderer::RGB, char> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();

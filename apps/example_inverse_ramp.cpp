@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <optional>
 
 #include "CellBased/EigenDecomp.hpp"

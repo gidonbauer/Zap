@@ -1,3 +1,5 @@
+#include <filesystem>
+
 #include "IO/IncMatrixWriter.hpp"
 #include "MatBased/BoundaryConditions.hpp"
 #include "MatBased/Solver.hpp"
