@@ -3,7 +3,7 @@
 
 #include <AD/ad.hpp>
 
-// #define ZAP_TANGENTIAL_CORRECTION
+#define ZAP_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 
 #include "CellBased/EigenDecomp.hpp"
@@ -60,8 +60,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   out << "\t--CFL             Safety factor for CFL condition, must be in (0, 1), default is "
       << args.CFL_safety_factor << '\n';
   out << "\t--print-shock     Print the final shock curve and its derivative. Decide which "
-         "reconstruction is used. Available options are 'ALL', 'LINEAR', and 'SMOOTHSTEP' default "
-         "is "
+         "reconstruction is used. Available options are 'ALL', 'LINEAR', 'CUBIC', and 'SMOOTHSTEP' "
+         "default is "
       << (args.print_shock_curve.empty() ? "not printing the shock" : args.print_shock_curve)
       << '\n';
   out << "\t--ns              Number of points at which the reconstruction of the shock is "
@@ -286,6 +286,9 @@ auto main(int argc, char** argv) -> int {
         });
         if (args->print_shock_curve == "LINEAR"sv) {
           return Zap::CellBased::piecewise_linear(ts, res->get_shock_curve());
+        }
+        if (args->print_shock_curve == "CUBIC"sv) {
+          return Zap::CellBased::natural_cubic_spline(ts, res->get_shock_curve());
         }
         if (args->print_shock_curve == "SMOOTHSTEP"sv) {
           return Zap::CellBased::smoothstep(ts, res->get_shock_curve());

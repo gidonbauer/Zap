@@ -473,6 +473,9 @@ class Solver {
           }
         }
       }
+
+      // TODO: Consider purging cuts that are no longer at the shock front using the
+      //       RK-Jump-Condition
 #endif  // ZAP_STATIC_CUT
 
       // TODO: What happens when a subcell has area 0?

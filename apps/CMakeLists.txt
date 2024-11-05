@@ -7,7 +7,9 @@ set(executables
   cell_solver_2d
   
   mat_solver
-  
+
+  shock_approx
+
   example_quarter_circle
   example_full_circle
   example_x_ramp
