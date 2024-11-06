@@ -5,6 +5,7 @@
 
 #define ZAP_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
+#define X_RAMP
 
 #include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
@@ -139,14 +140,27 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   ActiveFloat eps     = eps_value;
   ad::derivative(eps) = 1;
 
+#define X_RAMP
+#ifndef X_RAMP
   constexpr PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
-  auto u0                  = [=](ActiveFloat x, ActiveFloat y) -> ActiveFloat {
+  auto u0                  = [&](ActiveFloat x, ActiveFloat y) -> ActiveFloat {
     static_assert(DIM == 1);
     return (1 + eps) * (std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) *
            static_cast<ActiveFloat>((std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) <=
                                     std::pow(r, 2));
   };
+#else
+  constexpr PassiveFloat r = (X_MIN + X_MAX) / 2;
+  auto u0                  = [&](ActiveFloat x, ActiveFloat /*y*/) -> ActiveFloat {
+    static_assert(DIM == 1);
+    return (1 + eps) * x * static_cast<ActiveFloat>(x <= r);
+  };
+#endif  // X_RAMP
 
+  UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  grid.periodic_boundary();
+
+#ifndef X_RAMP
   auto init_shock = [=]<typename T>(T t) -> SimCoord<T> {
     // assert(t >= 0 && t <= 1);
     return {
@@ -155,10 +169,11 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
     };
   };
 
-  UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
-  grid.periodic_boundary();
-
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
+#else
+  const std::vector<SimCoord<PassiveFloat>> points = {{r, Y_MIN}, {r, Y_MAX}};
+  if (!grid.cut_piecewise_linear<ExtendType::MAX>(points)) { return std::nullopt; }
+#endif  // X_RAMP
   grid.fill_four_point(u0);
 
   Zap::IO::NoopWriter grid_writer;
@@ -195,18 +210,6 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("CFL  = {}", args->CFL_safety_factor);
   Igor::Info("eps  = {}", args->eps);
 
-  // 0.0,
-  // 1e-5,
-  // 1e-4,
-  // 1e-3,
-  // 2e-3,
-  // 5e-3,
-  // 1e-2,
-  // 2e-2,
-  // 5e-2,
-  // 1e-1,
-  // 2e-1,
-  // 5e-1,
   const auto res = run(args->nx, args->ny, args->tend, args->eps, args->CFL_safety_factor);
   if (!res.has_value()) {
     Igor::Warn("Solver for eps={} failed.", args->eps);
