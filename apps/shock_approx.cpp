@@ -221,7 +221,7 @@ auto main(int argc, char** argv) -> int {
   Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> u_writer(u_filename, v_filename, *res);
   if (!u_writer.write_data(*res)) { Igor::Warn("Could not save grid data."); }
 
-  const std::string t_filename = fmt::format("{}t_{:.6f}.grid", OUTPUT_DIR, args->eps);
+  const std::string t_filename = fmt::format("{}t_{:.6f}.mat", OUTPUT_DIR, args->eps);
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
   if (!t_writer.write_data(args->tend)) { Igor::Warn("Could not save time data."); }
 
