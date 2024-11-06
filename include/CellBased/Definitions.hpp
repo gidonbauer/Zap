@@ -213,12 +213,6 @@ template <typename PointType>
 requires(is_GridCoord_v<PointType> || is_SimCoord_v<PointType>)
 constexpr CoordType PointType2CoordType = is_SimCoord_v<PointType> ? SIM_C : GRID_C;
 
-// - Generic 2D Point based on Eigen Vector --------------------------------------------------------
-enum : size_t { X, Y, POINT_SIZE };
-
-template <typename T>
-using Point = Eigen::Vector<T, POINT_SIZE>;
-
 // -------------------------------------------------------------------------------------------------
 enum Side : uint8_t {
   BOTTOM = 0b0001,

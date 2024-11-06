@@ -3,7 +3,7 @@
 
 #include <AD/ad.hpp>
 
-#define ZAP_TANGENTIAL_CORRECTION
+// #define ZAP_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 
 #include "CellBased/EigenDecomp.hpp"
