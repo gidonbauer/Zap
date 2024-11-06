@@ -332,7 +332,9 @@ template <typename Float, size_t DIM>
       graph_height = static_cast<size_t>(n_cols) * scale;
     }
 
-    Rd::Canvas canvas(graph_width + 4 * GRAPH_PADDING + COLORBAR_WIDTH, graph_height + TEXT_HEIGHT);
+    const size_t canvas_width  = graph_width + 4 * GRAPH_PADDING + COLORBAR_WIDTH;
+    const size_t canvas_height = graph_height + TEXT_HEIGHT;
+    Rd::Canvas canvas(canvas_width + canvas_width % 2, canvas_height + canvas_height % 2);
     const Rd::Box text_box{
         .col    = 0,
         .row    = 0,
