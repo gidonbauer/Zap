@@ -3,7 +3,6 @@
 
 // #define ZAP_TANGENTIAL_CORRECTION
 
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
@@ -18,9 +17,8 @@
 
 // -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
-  using ActiveFloat    = double;
-  using PassiveFloat   = double;
-  constexpr size_t DIM = 1;
+  using ActiveFloat  = double;
+  using PassiveFloat = double;
 
   if (argc < 4) {
     Igor::Warn("Usage: {} <nx> <ny> <tend>", *argv);
@@ -56,8 +54,7 @@ auto main(int argc, char** argv) -> int {
   const PassiveFloat y_min = 0.0;
   const PassiveFloat y_max = 5.0;
 
-  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(
-      x_min, x_max, nx, y_min, y_max, ny);
+  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(x_min, x_max, nx, y_min, y_max, ny);
   // grid.same_value_boundary();
   grid.periodic_boundary();
 
@@ -100,7 +97,7 @@ auto main(int argc, char** argv) -> int {
   // grid.dump_cells(std::cout);
 
   constexpr auto u_file = OUTPUT_DIR "u.grid";
-  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
+  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat> grid_writer{u_file, grid};
 
   constexpr auto t_file = OUTPUT_DIR "t.mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
@@ -111,8 +108,7 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(Float{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
-        Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+    Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
     const auto res =
         solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
     if (!res.has_value()) {

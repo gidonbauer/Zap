@@ -3,11 +3,10 @@
 
 #include <AD/ad.hpp>
 
-#define ZAP_TANGENTIAL_CORRECTION
+// #define ZAP_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 #define X_RAMP
 
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
 
 #include "IO/IncCellWriter.hpp"
@@ -29,7 +28,6 @@ using namespace std::string_view_literals;
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
 using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
-constexpr size_t DIM         = 1;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 2.0;
 constexpr PassiveFloat Y_MIN = 0.0;
@@ -134,7 +132,7 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
                        PassiveFloat tend,
                        PassiveFloat eps_value,
                        PassiveFloat CFL_safety_factor) noexcept
-    -> std::optional<UniformGrid<ActiveFloat, PassiveFloat, DIM>> {
+    -> std::optional<UniformGrid<ActiveFloat, PassiveFloat>> {
   Igor::ScopeTimer timer(std::format("Solver with nx={}, ny={}, eps={}", nx, ny, eps_value));
 
   ActiveFloat eps     = eps_value;
@@ -144,7 +142,6 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 #ifndef X_RAMP
   constexpr PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
   auto u0                  = [&](ActiveFloat x, ActiveFloat y) -> ActiveFloat {
-    static_assert(DIM == 1);
     return (1 + eps) * (std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) *
            static_cast<ActiveFloat>((std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) <=
                                     std::pow(r, 2));
@@ -152,12 +149,11 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 #else
   constexpr PassiveFloat r = (X_MIN + X_MAX) / 2;
   auto u0                  = [&](ActiveFloat x, ActiveFloat /*y*/) -> ActiveFloat {
-    static_assert(DIM == 1);
     return (1 + eps) * x * static_cast<ActiveFloat>(x <= r);
   };
 #endif  // X_RAMP
 
-  UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   grid.periodic_boundary();
 
 #ifndef X_RAMP
@@ -178,7 +174,7 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 
   Zap::IO::NoopWriter grid_writer;
   Zap::IO::NoopWriter t_writer;
-  auto solver = make_solver<ExtendType::NEAREST>(SingleEq::A{}, SingleEq::B{});
+  Solver<ExtendType::NEAREST> solver;
   return solver.solve(grid, tend, grid_writer, t_writer, CFL_safety_factor);
 }
 
@@ -221,7 +217,7 @@ auto main(int argc, char** argv) -> int {
   //  - Save final solution ------------------------------------------------------------------------
   const std::string u_filename = fmt::format("{}u_{:.6f}.grid", OUTPUT_DIR, args->eps);
   const std::string v_filename = fmt::format("{}v_{:.6f}.grid", OUTPUT_DIR, args->eps);
-  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> u_writer(u_filename, v_filename, *res);
+  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat> u_writer(u_filename, v_filename, *res);
   if (!u_writer.write_data(*res)) { Igor::Warn("Could not save grid data."); }
 
   const std::string t_filename = fmt::format("{}t_{:.6f}.mat", OUTPUT_DIR, args->eps);

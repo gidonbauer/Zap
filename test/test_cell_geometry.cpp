@@ -5,16 +5,15 @@
 
 using namespace Zap::CellBased;
 
-using Float          = double;
-constexpr size_t DIM = 2;
+using Float = double;
 
 // =================================================================================================
 TEST(CellGeometry, AreaBottomLeft) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.5, 0.0},
               .entry_loc     = BOTTOM,
               .rel_cut_exit  = {0.0, 0.5},
@@ -51,11 +50,11 @@ TEST(CellGeometry, AreaBottomLeft) {
 
 // -------------------------------------------------------------------------------------------------
 TEST(CellGeometry, AreaBottomLeftInverse) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.0, 0.5},
               .entry_loc     = LEFT,
               .rel_cut_exit  = {0.5, 0.0},
@@ -92,11 +91,11 @@ TEST(CellGeometry, AreaBottomLeftInverse) {
 
 // =================================================================================================
 TEST(CellGeometry, AreaBottomRight) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.5, 0.0},
               .entry_loc     = BOTTOM,
               .rel_cut_exit  = {1.0, 0.5},
@@ -134,11 +133,11 @@ TEST(CellGeometry, AreaBottomRight) {
 
 // -------------------------------------------------------------------------------------------------
 TEST(CellGeometry, AreaBottomRightInverse) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {1.0, 0.5},
               .entry_loc     = RIGHT,
               .rel_cut_exit  = {0.5, 0.0},
@@ -177,11 +176,11 @@ TEST(CellGeometry, AreaBottomRightInverse) {
 
 // =================================================================================================
 TEST(CellGeometry, AreaTopRight) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {1.0, 0.5},
               .entry_loc     = RIGHT,
               .rel_cut_exit  = {0.5, 1.0},
@@ -224,11 +223,11 @@ TEST(CellGeometry, AreaTopRight) {
 
 // -------------------------------------------------------------------------------------------------
 TEST(CellGeometry, AreaTopRightInverse) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.5, 1.0},
               .entry_loc     = TOP,
               .rel_cut_exit  = {1.0, 0.5},
@@ -271,11 +270,11 @@ TEST(CellGeometry, AreaTopRightInverse) {
 
 // =================================================================================================
 TEST(CellGeometry, AreaTopLeft) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.5, 1.0},
               .entry_loc     = TOP,
               .rel_cut_exit  = {0.0, 0.5},
@@ -318,11 +317,11 @@ TEST(CellGeometry, AreaTopLeft) {
 
 // -------------------------------------------------------------------------------------------------
 TEST(CellGeometry, AreaTopLeftInverse) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.0, 0.5},
               .entry_loc     = LEFT,
               .rel_cut_exit  = {0.5, 1.0},
@@ -365,11 +364,11 @@ TEST(CellGeometry, AreaTopLeftInverse) {
 
 // =================================================================================================
 TEST(CellGeometry, AreaMiddleHori) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {1.0, 0.5},
               .entry_loc     = RIGHT,
               .rel_cut_exit  = {0.0, 0.04},
@@ -402,11 +401,11 @@ TEST(CellGeometry, AreaMiddleHori) {
 
 // -------------------------------------------------------------------------------------------------
 TEST(CellGeometry, AreaMiddleHoriInverse) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.0, 0.04},
               .entry_loc     = LEFT,
               .rel_cut_exit  = {1.0, 0.5},
@@ -439,11 +438,11 @@ TEST(CellGeometry, AreaMiddleHoriInverse) {
 
 // =================================================================================================
 TEST(CellGeometry, AreaMiddleVert) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.5, 0.0},
               .entry_loc     = BOTTOM,
               .rel_cut_exit  = {0.2, 1.0},
@@ -476,11 +475,11 @@ TEST(CellGeometry, AreaMiddleVert) {
 
 // -------------------------------------------------------------------------------------------------
 TEST(CellGeometry, AreaMiddleVertInverse) {
-  const Cell<Float, Float, DIM> cell{
-      .value =
-          CutValue<Float, DIM>{
-              .left_value    = Eigen::Vector<Float, DIM>::Zero(),
-              .right_value   = Eigen::Vector<Float, DIM>::Zero(),
+  const Cell<Float, Float> cell{
+      .cell_type =
+          CutValue<Float>{
+              .left_value    = 0.0,
+              .right_value   = 0.0,
               .rel_cut_entry = {0.2, 1.0},
               .entry_loc     = TOP,
               .rel_cut_exit  = {0.5, 0.0},

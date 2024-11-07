@@ -6,7 +6,6 @@
 // #define ZAP_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/ReconstructShock.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
@@ -26,7 +25,6 @@ using namespace std::string_view_literals;
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
 using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
-constexpr size_t DIM         = 1;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 5.0;
 constexpr PassiveFloat Y_MIN = 0.0;
@@ -186,7 +184,7 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("eps  = {}", args->eps);
   Igor::Info("CFL  = {}", args->CFL_safety_factor);
 
-  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(
+  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(
       X_MIN, X_MAX, args->nx, Y_MIN, Y_MAX, args->ny);
   // grid.same_value_boundary();
   grid.periodic_boundary();
@@ -200,7 +198,6 @@ auto main(int argc, char** argv) -> int {
   const PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
 
   auto u0 = [=](ActiveFloat x, ActiveFloat y) -> ActiveFloat {
-    static_assert(DIM == 1);
     return (1 + eps) * (std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) *
            static_cast<ActiveFloat>((std::pow(x - X_MIN, 2) + std::pow(y - Y_MIN, 2)) <=
                                     std::pow(r, 2));
@@ -215,7 +212,6 @@ auto main(int argc, char** argv) -> int {
   };
 #elif defined(RAMP_X)
   auto u0 = [=](ActiveFloat x, ActiveFloat /*y*/) -> ActiveFloat {
-    static_assert(DIM == 1);
     // return (1+eps) * (x - x_min) * static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2);
 
     // TODO: Inverse ramp is not solved correctly
@@ -254,7 +250,7 @@ auto main(int argc, char** argv) -> int {
   grid.fill_four_point(u0);
 
   constexpr auto u_file = OUTPUT_DIR "u_1d.grid";
-  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
+  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat> grid_writer{u_file, grid};
 
   constexpr auto t_file = OUTPUT_DIR "t_1d.mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
@@ -265,8 +261,7 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(PassiveFloat{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
-        Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+    Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
     const auto res = solver.solve(grid, args->tend, grid_writer, t_writer, args->CFL_safety_factor);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");

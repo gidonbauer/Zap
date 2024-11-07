@@ -1,4 +1,3 @@
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/NoopWriter.hpp"
 
@@ -10,7 +9,6 @@ using Zap::IO::NoopWriter;
 
 // - Setup -----------------------------------------------------------------------------------------
 using Float           = double;
-constexpr size_t DIM  = 1;
 constexpr Float X_MIN = 0.0;
 constexpr Float X_MAX = 2.0;
 constexpr Float Y_MIN = 0.0;
@@ -43,10 +41,10 @@ constexpr Float Y_MAX = 2.0;
 
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] auto run(Float eps, size_t nx, size_t ny, Float tend) noexcept
-    -> UniformGrid<Float, Float, DIM> {
+    -> UniformGrid<Float, Float> {
   Igor::ScopeTimer timer(std::format("Solver (nx={}, ny={}, tend={}, eps={})", nx, ny, tend, eps));
 
-  UniformGrid<Float, Float, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  UniformGrid<Float, Float> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   grid.same_value_boundary();
 
   {
@@ -65,18 +63,18 @@ constexpr Float Y_MAX = 2.0;
   NoopWriter grid_writer;
   NoopWriter t_writer;
 
-  auto solver    = make_solver<ExtendType::MAX>(SingleEq::A{}, SingleEq::B{});
+  Solver<ExtendType::MAX> solver;
   const auto res = solver.solve(grid, tend, grid_writer, t_writer, 0.25);
   IGOR_ASSERT(res.has_value(), "Expected the solver to succeed, but did not.");
   return *res;
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto v_fd(const UniformGrid<Float, Float, DIM>& sol_p_eps,
-                        const UniformGrid<Float, Float, DIM>& sol_m_eps,
+[[nodiscard]] auto v_fd(const UniformGrid<Float, Float>& sol_p_eps,
+                        const UniformGrid<Float, Float>& sol_m_eps,
                         Float eps,
                         SimCoord<Float> p) -> Float {
-  return ((sol_p_eps.eval(p) - sol_m_eps.eval(p)) / (2 * eps))(0);
+  return (sol_p_eps.eval(p) - sol_m_eps.eval(p)) / (2 * eps);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -133,9 +131,9 @@ auto main() -> int {
   const auto xi_shock_fd = (avg_shock_x_p_eps - avg_shock_x_m_eps) / (2 * eps);
 
   const auto L1_err_u = L1_norm(
-      [&sol, tend](Float x) { return sol.eval(SimCoord<Float>{x, 1.0})(0) - u_eps(x, tend, 0.0); },
+      [&sol, tend](Float x) { return sol.eval(SimCoord<Float>{x, 1.0}) - u_eps(x, tend, 0.0); },
       n_L1);
-  const auto L1_u = L1_norm([&sol](Float x) { return sol.eval(SimCoord<Float>{x, 1.0})(0); }, n_L1);
+  const auto L1_u    = L1_norm([&sol](Float x) { return sol.eval(SimCoord<Float>{x, 1.0}); }, n_L1);
   const auto L1_u_ex = L1_norm([tend](Float x) { return u_eps(x, tend, 0.0); }, n_L1);
 
   const auto L1_err_v = L1_norm(

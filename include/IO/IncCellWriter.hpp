@@ -34,7 +34,7 @@ enum struct CutType : char {
 
 }  // namespace IncCellHeaderLayout
 
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+template <typename ActiveFloat, typename PassiveFloat>
 class IncCellWriter {
   std::string m_primal_filename;
   std::ofstream m_primal_out;
@@ -57,7 +57,7 @@ class IncCellWriter {
  public:
   // -----------------------------------------------------------------------------------------------
   IncCellWriter(const std::string& filename,
-                const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid)
+                const CellBased::UniformGrid<ActiveFloat, PassiveFloat>& grid)
       : IncCellWriter(filename) {
     if (!m_primal_out) {
       Igor::Warn("Could not open file `{}` for writing: {}", filename, std::strerror(errno));
@@ -81,7 +81,7 @@ class IncCellWriter {
   // -----------------------------------------------------------------------------------------------
   IncCellWriter(const std::string& primal_filename,
                 const std::string& tangent_filename,
-                const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid)
+                const CellBased::UniformGrid<ActiveFloat, PassiveFloat>& grid)
       : IncCellWriter(primal_filename, tangent_filename) {
     if constexpr (!ad::mode<ActiveFloat>::is_ad_type) {
       Igor::Warn("Cannot write derivative data when no AD type is present, ActiveFloat is {}",
@@ -186,8 +186,9 @@ class IncCellWriter {
       Igor::Warn("Could not write ny to `{}`", filename);
       return false;
     }
+    constexpr size_t DIM = 1;  // DIM is included for legacy reasons, we set it to 1
     static_assert(sizeof(DIM) == IncCellHeaderLayout::DIM_SIZE);
-    if (size_t dim = DIM; !out.write(reinterpret_cast<const char*>(&dim), sizeof(DIM))) {
+    if (!out.write(reinterpret_cast<const char*>(&DIM), sizeof(DIM))) {
       Igor::Warn("Could not write DIM to `{}`", filename);
       return false;
     }
@@ -216,11 +217,10 @@ class IncCellWriter {
   }
 
   template <typename Accessor>
-  [[nodiscard]] auto
-  write_data_impl(std::ofstream& out,
-                  const std::string& filename,
-                  const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid,
-                  Accessor accessor) noexcept -> bool {
+  [[nodiscard]] auto write_data_impl(std::ofstream& out,
+                                     const std::string& filename,
+                                     const CellBased::UniformGrid<ActiveFloat, PassiveFloat>& grid,
+                                     Accessor accessor) noexcept -> bool {
     for (const auto& cell : grid) {
       // Extend of cell
       const PassiveFloat x_min = cell.template x_min<CellBased::SIM_C>();
@@ -237,12 +237,8 @@ class IncCellWriter {
         out.write(reinterpret_cast<const char*>(&y_min), sizeof(y_min));
         out.write(reinterpret_cast<const char*>(&dy), sizeof(dy));
 
-        Eigen::Vector<PassiveFloat, DIM> passive_value;
-        std::transform(std::cbegin(cell.get_cartesian().value),
-                       std::cend(cell.get_cartesian().value),
-                       std::begin(passive_value),
-                       accessor);
-        out.write(reinterpret_cast<const char*>(passive_value.data()), DIM * sizeof(PassiveFloat));
+        const PassiveFloat passive_value = accessor(cell.get_cartesian().value);
+        out.write(reinterpret_cast<const char*>(&passive_value), sizeof(PassiveFloat));
         // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
       } else if (cell.is_cut()) {
         // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -283,8 +279,8 @@ class IncCellWriter {
 
         CellBased::SimCoord<ActiveFloat> cut1;
         CellBased::SimCoord<ActiveFloat> cut2;
-        Eigen::Vector<ActiveFloat, DIM> left_value;
-        Eigen::Vector<ActiveFloat, DIM> right_value;
+        ActiveFloat left_value;
+        ActiveFloat right_value;
         if (cell_value.entry_loc < cell_value.exit_loc) {
           cut1        = cell.template cut_entry<CellBased::SIM_C>();
           cut2        = cell.template cut_exit<CellBased::SIM_C>();
@@ -307,18 +303,16 @@ class IncCellWriter {
 
         // Value
         // TODO: Should we save the derivative values as well?
-        Eigen::Vector<PassiveFloat, DIM> passive_value;
+        PassiveFloat passive_value;
 
-        std::transform(
-            std::cbegin(left_value), std::cend(left_value), std::begin(passive_value), accessor);
-        out.write(reinterpret_cast<const char*>(passive_value.data()), DIM * sizeof(PassiveFloat));
+        passive_value = accessor(left_value);
+        out.write(reinterpret_cast<const char*>(&passive_value), sizeof(PassiveFloat));
 
-        std::transform(
-            std::cbegin(right_value), std::cend(right_value), std::begin(passive_value), accessor);
-        out.write(reinterpret_cast<const char*>(passive_value.data()), DIM * sizeof(PassiveFloat));
+        passive_value = accessor(right_value);
+        out.write(reinterpret_cast<const char*>(&passive_value), sizeof(PassiveFloat));
         // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
       } else {
-        Igor::Panic("Unknown cell type with variant index {}", cell.value.index());
+        Igor::Panic("Unknown cell type with variant index {}", cell.cell_type.index());
       }
     }
     if (!out) {
@@ -332,7 +326,7 @@ class IncCellWriter {
  public:
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] auto
-  write_data(const CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& grid) noexcept -> bool {
+  write_data(const CellBased::UniformGrid<ActiveFloat, PassiveFloat>& grid) noexcept -> bool {
     const auto success_primal = write_data_impl(
         m_primal_out, m_primal_filename, grid, [](const ActiveFloat& v) { return ad::value(v); });
 

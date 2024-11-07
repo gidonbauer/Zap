@@ -11,11 +11,11 @@
 
 namespace Zap::CellBased {
 
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+template <typename ActiveFloat, typename PassiveFloat>
 class UniformGrid {
   enum { ON_MIN = -1, NOT_ON = 0, ON_MAX = 1 };
 
-  std::vector<Cell<ActiveFloat, PassiveFloat, DIM>> m_cells;
+  std::vector<Cell<ActiveFloat, PassiveFloat>> m_cells;
   size_t m_nx;
   size_t m_ny;
 
@@ -84,7 +84,7 @@ class UniformGrid {
     for (size_t yi = 0; yi < ny; ++yi) {
       for (size_t xi = 0; xi < nx; ++xi) {
         // clang-format off
-        m_cells[to_vec_idx(xi, yi)] = Cell<ActiveFloat, PassiveFloat, DIM>{
+        m_cells[to_vec_idx(xi, yi)] = Cell<ActiveFloat, PassiveFloat>{
             .m_x_min    = m_x_min,
             .m_y_min    = m_y_min,
             .m_dx       = m_dx,
@@ -202,31 +202,19 @@ class UniformGrid {
     for (auto& cell : m_cells) {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
-        if constexpr (DIM == 1) {
-          value(0) = f(cell.template x_min<SIM_C>() +
-                           static_cast<PassiveFloat>(0.5) * cell.template dx<SIM_C>(),
-                       cell.template y_min<SIM_C>() +
-                           static_cast<PassiveFloat>(0.5) * cell.template dy<SIM_C>());
-        } else {
-          value = f(cell.template x_min<SIM_C>() +
-                        static_cast<PassiveFloat>(0.5) * cell.template dx<SIM_C>(),
-                    cell.template y_min<SIM_C>() +
-                        static_cast<PassiveFloat>(0.5) * cell.template dy<SIM_C>());
-        }
+        value       = f(cell.template x_min<SIM_C>() +
+                      static_cast<PassiveFloat>(0.5) * cell.template dx<SIM_C>(),
+                  cell.template y_min<SIM_C>() +
+                      static_cast<PassiveFloat>(0.5) * cell.template dy<SIM_C>());
       } else if (cell.is_cut()) {
         const auto left_centroid  = get_centroid(cell.template get_left_points<SIM_C>());
         const auto right_centroid = get_centroid(cell.template get_right_points<SIM_C>());
 
-        auto& cell_value = cell.get_cut();
-        if constexpr (DIM == 1) {
-          cell_value.left_value(0)  = f(left_centroid.x, left_centroid.y);
-          cell_value.right_value(0) = f(right_centroid.x, right_centroid.y);
-        } else {
-          cell_value.left_value  = f(left_centroid.x, left_centroid.y);
-          cell_value.right_value = f(right_centroid.x, right_centroid.y);
-        }
+        auto& cell_value       = cell.get_cut();
+        cell_value.left_value  = f(left_centroid.x, left_centroid.y);
+        cell_value.right_value = f(right_centroid.x, right_centroid.y);
       } else {
-        Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
+        Igor::Panic("Unknown cell type with variant index {}.", cell.cell_type.index());
       }
     }
   }
@@ -237,27 +225,15 @@ class UniformGrid {
     for (auto& cell : m_cells) {
       if (cell.is_cartesian()) {
         auto& value = cell.get_cartesian().value;
-        if constexpr (DIM == 1) {
-          value(0) = (f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
-                        cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
-                      f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
-                        cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
-                      f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
-                        cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4) +
-                      f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
-                        cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4)) /
-                     4;
-        } else {
-          value = (f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
-                     cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
-                   f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
-                     cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
-                   f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
-                     cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4) +
-                   f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
-                     cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4)) /
-                  4;
-        }
+        value       = (f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
+                   cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
+                 f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
+                   cell.template y_min<SIM_C>() + cell.template dy<SIM_C>() / 4) +
+                 f(cell.template x_min<SIM_C>() + cell.template dx<SIM_C>() / 4,
+                   cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4) +
+                 f(cell.template x_min<SIM_C>() + 3 * cell.template dx<SIM_C>() / 4,
+                   cell.template y_min<SIM_C>() + 3 * cell.template dy<SIM_C>() / 4)) /
+                4;
       } else if (cell.is_cut()) {
         auto& cut_value = cell.get_cut();
 
@@ -270,11 +246,7 @@ class UniformGrid {
               point += (1 + (i == j)) * corners[i] / static_cast<PassiveFloat>(corners.size() + 1);
             }
 
-            if constexpr (DIM == 1) {
-              cut_value.left_value(0) += f(point.x, point.y);
-            } else {
-              cut_value.left_value += f(point.x, point.y);
-            }
+            cut_value.left_value += f(point.x, point.y);
           }
           cut_value.left_value /= static_cast<PassiveFloat>(corners.size());
         }
@@ -288,16 +260,12 @@ class UniformGrid {
               point += (1 + (i == j)) * corners[i] / static_cast<PassiveFloat>(corners.size() + 1);
             }
 
-            if constexpr (DIM == 1) {
-              cut_value.right_value(0) += f(point.x, point.y);
-            } else {
-              cut_value.right_value += f(point.x, point.y);
-            }
+            cut_value.right_value += f(point.x, point.y);
           }
           cut_value.right_value /= static_cast<PassiveFloat>(corners.size());
         }
       } else {
-        Igor::Panic("Unknown cell type with variant index {}.", cell.value.index());
+        Igor::Panic("Unknown cell type with variant index {}.", cell.cell_type.index());
       }
     }
   }
@@ -305,7 +273,7 @@ class UniformGrid {
   // -------------------------------------------------------------------------------------------------
   template <typename PointType>
   [[nodiscard]] constexpr auto
-  find_sides(const PointType& p, const Cell<ActiveFloat, PassiveFloat, DIM>& cell) const noexcept
+  find_sides(const PointType& p, const Cell<ActiveFloat, PassiveFloat>& cell) const noexcept
       -> Side {
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
@@ -338,7 +306,7 @@ class UniformGrid {
   enum class ClassifyError : uint8_t { OK, BOTH_CUTS_ON_SAME_SIDE, CUT_ON_MULTIPLE_SIDES };
 
   template <Point2D_c PointType>
-  [[nodiscard]] constexpr auto classify_cut(const Cell<ActiveFloat, PassiveFloat, DIM>& cell,
+  [[nodiscard]] constexpr auto classify_cut(const Cell<ActiveFloat, PassiveFloat>& cell,
                                             PointType& cut_entry_point,
                                             PointType& cut_exit_point,
                                             Side& cut_entry_loc,
@@ -422,9 +390,9 @@ class UniformGrid {
 
   // -----------------------------------------------------------------------------------------------
   template <Point2D_c PointType>
-  [[nodiscard]] constexpr auto
-  find_next_cell_to_cut(const Cell<ActiveFloat, PassiveFloat, DIM>& cell,
-                        const PointType& exit_point) const noexcept -> size_t {
+  [[nodiscard]] constexpr auto find_next_cell_to_cut(const Cell<ActiveFloat, PassiveFloat>& cell,
+                                                     const PointType& exit_point) const noexcept
+      -> size_t {
     IGOR_ASSERT(point_in_cell(exit_point, cell), "Point {} is not in cell {}", exit_point, cell);
 
     constexpr CoordType coord_type = PointType2CoordType<PointType>;
@@ -510,7 +478,7 @@ class UniformGrid {
     using PointType = GridCoord<PassiveFloat>;
 
     const auto t_location = [this, curve](PassiveFloat t,
-                                          const Cell<ActiveFloat, PassiveFloat, DIM>& cell,
+                                          const Cell<ActiveFloat, PassiveFloat>& cell,
                                           PassiveFloat t_entry) -> int {
       const auto pos = to_grid_coord(curve(t));
       if (t <= t_entry || (point_in_cell(pos, cell) && !point_on_boundary(pos, cell))) {
@@ -609,10 +577,10 @@ class UniformGrid {
         return false;
       }
 
-      Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
+      ActiveFloat old_value = 0.0;
       if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
 
-      cell_to_cut.value = CutValue<ActiveFloat, DIM>{
+      cell_to_cut.cell_type = CutValue<ActiveFloat>{
           .left_value    = old_value,
           .right_value   = old_value,
           .rel_cut_entry = {cut_entry_point.x, cut_entry_point.y},
@@ -830,7 +798,7 @@ class UniformGrid {
               const auto last_cut_idx = m_cut_cell_idxs.back();
               m_cut_cell_idxs.pop_back();
               const auto old_value = m_cells[last_cut_idx].get_cut().left_value;  // == right_value
-              m_cells[last_cut_idx].value = CartesianValue<ActiveFloat, DIM>{.value = old_value};
+              m_cells[last_cut_idx].cell_type = CartesianValue<ActiveFloat>{.value = old_value};
             }
             // Entry point lays on corner => remove only exit point and leave last cut-cell
             else if (num_sides_entry == 2) {
@@ -855,7 +823,7 @@ class UniformGrid {
               const auto last_cut_idx = m_cut_cell_idxs.back();
               m_cut_cell_idxs.pop_back();
               const auto old_value = m_cells[last_cut_idx].get_cut().left_value;  // == right_value
-              m_cells[last_cut_idx].value = CartesianValue<ActiveFloat, DIM>{.value = old_value};
+              m_cells[last_cut_idx].cell_type = CartesianValue<ActiveFloat>{.value = old_value};
             }
 
             continue;
@@ -871,10 +839,10 @@ class UniformGrid {
         case ClassifyError::OK: break;
       }
 
-      Eigen::Vector<ActiveFloat, DIM> old_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
+      ActiveFloat old_value = 0.0;
       if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
 
-      cell_to_cut.value = CutValue<ActiveFloat, DIM>{
+      cell_to_cut.cell_type = CutValue<ActiveFloat>{
           .left_value    = old_value,
           .right_value   = old_value,
           .rel_cut_entry = {entry_point.x, entry_point.y},
@@ -906,7 +874,7 @@ class UniformGrid {
 
       const auto cell_polygon = cell.template get_cartesian_polygon<SIM_C>();
 
-      cell.value = CartesianValue<ActiveFloat, DIM>{
+      cell.cell_type = CartesianValue<ActiveFloat>{
           .value = (left_value * left_polygon.area() + right_value * right_polygon.area()) /
                    cell_polygon.area()};
     }
@@ -1091,8 +1059,7 @@ class UniformGrid {
 
   // -----------------------------------------------------------------------------------------------
   template <Point2D_c PointType>
-  [[nodiscard]] constexpr auto eval(const PointType& point) const noexcept
-      -> Eigen::Vector<ActiveFloat, DIM> {
+  [[nodiscard]] constexpr auto eval(const PointType& point) const noexcept -> ActiveFloat {
     const auto cell_idx = find_cell(point);
     if (cell_idx == NULL_INDEX) {
       Igor::Panic(
@@ -1124,14 +1091,14 @@ class UniformGrid {
         return (cell.get_cut().left_value + cell.get_cut().right_value) / 2;
       }
     } else {
-      Igor::Panic("Unknown cell type with variant index {}", cell.value.index());
+      Igor::Panic("Unknown cell type with variant index {}", cell.cell_type.index());
       std::unreachable();
     }
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto mass() const noexcept -> Eigen::Vector<ActiveFloat, DIM> {
-    Eigen::Vector<ActiveFloat, DIM> mass = Eigen::Vector<ActiveFloat, DIM>::Zero();
+  [[nodiscard]] constexpr auto mass() const noexcept -> ActiveFloat {
+    ActiveFloat mass = 0.0;
     for (const auto& cell : m_cells) {
       assert(cell.is_cartesian() || cell.is_cut());
       if (cell.is_cartesian()) {
@@ -1157,12 +1124,11 @@ class UniformGrid {
   [[nodiscard]] constexpr auto y_max() const noexcept -> PassiveFloat { return m_y_max; }
   [[nodiscard]] constexpr auto scale_x() const noexcept -> PassiveFloat { return 1 / m_dx; }
   [[nodiscard]] constexpr auto scale_y() const noexcept -> PassiveFloat { return 1 / m_dy; }
-  [[nodiscard]] constexpr auto cells() noexcept
-      -> std::vector<Cell<ActiveFloat, PassiveFloat, DIM>>& {
+  [[nodiscard]] constexpr auto cells() noexcept -> std::vector<Cell<ActiveFloat, PassiveFloat>>& {
     return m_cells;
   }
   [[nodiscard]] constexpr auto cells() const noexcept
-      -> const std::vector<Cell<ActiveFloat, PassiveFloat, DIM>>& {
+      -> const std::vector<Cell<ActiveFloat, PassiveFloat>>& {
     return m_cells;
   }
   [[nodiscard]] constexpr auto cut_cell_idxs() const noexcept -> const std::vector<size_t>& {
@@ -1174,14 +1140,13 @@ class UniformGrid {
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept
-      -> const Cell<ActiveFloat, PassiveFloat, DIM>& {
+      -> const Cell<ActiveFloat, PassiveFloat>& {
     assert(idx < m_nx * m_ny);
     return m_cells[idx];
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto operator[](size_t idx) noexcept
-      -> Cell<ActiveFloat, PassiveFloat, DIM>& {
+  [[nodiscard]] constexpr auto operator[](size_t idx) noexcept -> Cell<ActiveFloat, PassiveFloat>& {
     assert(idx < m_nx * m_ny);
     return m_cells[idx];
   }
@@ -1213,7 +1178,7 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  friend struct Cell<ActiveFloat, PassiveFloat, DIM>;
+  friend struct Cell<ActiveFloat, PassiveFloat>;
 };
 
 }  // namespace Zap::CellBased

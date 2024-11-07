@@ -6,7 +6,6 @@
 
 #include <AD/ad.hpp>
 
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
@@ -22,7 +21,6 @@
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
 using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
-constexpr size_t DIM         = 1;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 2.0;
 constexpr PassiveFloat Y_MIN = 0.0;
@@ -133,7 +131,7 @@ template <typename AT>
 
 // -------------------------------------------------------------------------------------------------
 void print_shock_error(
-    const Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& numerical_solution,
+    const Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat>& numerical_solution,
     PassiveFloat tend,
     std::ostream& out) noexcept {
   const auto final_shock = numerical_solution.get_shock_curve();
@@ -193,21 +191,21 @@ void print_shock_error(
 
 // -------------------------------------------------------------------------------------------------
 void print_solution_error(
-    const Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>& numerical_solution,
+    const Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat>& numerical_solution,
     PassiveFloat tend,
     size_t n,
     std::ostream& out) noexcept {
 
   auto L1_func_u = [&](PassiveFloat x) -> PassiveFloat {
     return std::abs(
-        ad::value(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0)) -
+        ad::value(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})) -
         u_eps(x, tend, PassiveFloat{0}));
   };
   const auto L1_err_u = simpsons_rule_1d(L1_func_u, X_MIN, X_MAX, n);
 
   auto L1_func_v = [&](PassiveFloat x) -> PassiveFloat {
     return std::abs(
-        ad::derivative(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})(0)) -
+        ad::derivative(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})) -
         v(x, tend));
   };
   const auto L1_err_v = simpsons_rule_1d(L1_func_v, X_MIN, X_MAX, n);
@@ -219,8 +217,7 @@ void print_solution_error(
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] auto run(size_t nx, size_t ny, PassiveFloat tend, std::ostream& out) noexcept
     -> bool {
-  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(
-      X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   grid.same_value_boundary();
 
   // if (!grid.cut_curve(init_shock)) { return false; }
@@ -239,13 +236,12 @@ void print_solution_error(
   grid.fill_four_point(u0);
 
   const auto u_file = OUTPUT_DIR "u_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
-  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat, DIM> grid_writer{u_file, grid};
+  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat> grid_writer{u_file, grid};
 
   const auto t_file = OUTPUT_DIR "t_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::MAX>(
-      Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+  Zap::CellBased::Solver<Zap::CellBased::ExtendType::MAX> solver;
   const auto res = solver.solve(grid, tend, grid_writer, t_writer, 0.25);
   if (!res.has_value()) {
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);

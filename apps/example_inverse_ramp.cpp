@@ -1,7 +1,6 @@
 #include <filesystem>
 #include <optional>
 
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
@@ -14,7 +13,6 @@
 
 // - Setup -----------------------------------------------------------------------------------------
 using Float           = double;
-constexpr size_t DIM  = 1;
 constexpr Float X_MIN = 0.0;
 constexpr Float X_MAX = 1.0;
 constexpr Float Y_MIN = 0.0;
@@ -27,7 +25,7 @@ constexpr Float Y_MAX = 1.0;
 
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] auto run(size_t nx, size_t ny, Float tend, Float CFL_safety_factor) noexcept -> bool {
-  Zap::CellBased::UniformGrid<Float, Float, DIM> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  Zap::CellBased::UniformGrid<Float, Float> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   grid.same_value_boundary();
 
   {
@@ -44,13 +42,12 @@ constexpr Float Y_MAX = 1.0;
   grid.fill_four_point(u0);
 
   const auto u_file = OUTPUT_DIR "u_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
-  Zap::IO::IncCellWriter<Float, Float, DIM> grid_writer{u_file, grid};
+  Zap::IO::IncCellWriter<Float, Float> grid_writer{u_file, grid};
 
   const auto t_file = OUTPUT_DIR "t_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::MAX>(
-      Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+  Zap::CellBased::Solver<Zap::CellBased::ExtendType::MAX> solver;
   const auto res = solver.solve(grid, tend, grid_writer, t_writer, CFL_safety_factor);
   if (!res.has_value()) {
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);

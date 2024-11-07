@@ -9,45 +9,45 @@ namespace Zap::CellBased {
 
 // TODO: Fix interfaces
 
-template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, Point2D_c PointType>
 struct HalfInterface {
-  Eigen::Vector<ActiveFloat, DIM> value;
+  ActiveFloat value;
   PointType begin;
   PointType end;
 };
 
-template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, Point2D_c PointType>
 struct FullInterface {
-  Eigen::Vector<ActiveFloat, DIM> left_value;
-  Eigen::Vector<ActiveFloat, DIM> right_value;
+  ActiveFloat left_value;
+  ActiveFloat right_value;
   PointType begin;
   PointType end;
 };
 
-template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, Point2D_c PointType>
 struct CellHalfInterfaces {
-  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> left;
-  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> right;
-  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> bottom;
-  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> top;
+  SmallVector<HalfInterface<ActiveFloat, PointType>> left;
+  SmallVector<HalfInterface<ActiveFloat, PointType>> right;
+  SmallVector<HalfInterface<ActiveFloat, PointType>> bottom;
+  SmallVector<HalfInterface<ActiveFloat, PointType>> top;
 };
 
-template <typename ActiveFloat, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
-same_interface(const HalfInterface<ActiveFloat, DIM, PointType>& i1,
-               const HalfInterface<ActiveFloat, DIM, PointType>& i2) noexcept -> bool {
+same_interface(const HalfInterface<ActiveFloat, PointType>& i1,
+               const HalfInterface<ActiveFloat, PointType>& i2) noexcept -> bool {
   return (i1.begin - i2.begin).norm() <= EPS<ActiveFloat> &&
          (i1.end - i2.end).norm() <= EPS<ActiveFloat>;
 }
 
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
-get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noexcept
-    -> CellHalfInterfaces<ActiveFloat, DIM, PointType> {
+get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat>& cell) noexcept
+    -> CellHalfInterfaces<ActiveFloat, PointType> {
   constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
   if (cell.is_cartesian()) {
-    return CellHalfInterfaces<ActiveFloat, DIM, PointType>{
+    return CellHalfInterfaces<ActiveFloat, PointType>{
         .left =
             {
                 {
@@ -88,7 +88,7 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
             },
     };
   } else if (cell.is_cut()) {
-    CellHalfInterfaces<ActiveFloat, DIM, PointType> outer_interfaces;
+    CellHalfInterfaces<ActiveFloat, PointType> outer_interfaces;
 
     // - Left-side ---------------------------------------------------------------------------------
     if ((cell.get_cut().entry_loc & LEFT) > 0) {
@@ -168,7 +168,7 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
           },
       };
     } else {
-      Eigen::Vector<ActiveFloat, DIM> value;
+      ActiveFloat value;
       const auto cut_type = make_cut_type(cell.get_cut().entry_loc, cell.get_cut().exit_loc);
       switch (cut_type) {
         case make_cut_type(BOTTOM, TOP):
@@ -270,7 +270,7 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
           },
       };
     } else {
-      Eigen::Vector<ActiveFloat, DIM> value;
+      ActiveFloat value;
       const auto cut_type = make_cut_type(cell.get_cut().entry_loc, cell.get_cut().exit_loc);
       switch (cut_type) {
         case make_cut_type(RIGHT, LEFT):
@@ -299,24 +299,23 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noex
 
     return outer_interfaces;
   } else {
-    Igor::Panic("Unknown cell type with variant index {}", cell.value.index());
+    Igor::Panic("Unknown cell type with variant index {}", cell.cell_type.index());
     std::unreachable();
   }
 }
 
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM, Point2D_c PointType>
+template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
-get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& center_cell,
-                      const Cell<ActiveFloat, PassiveFloat, DIM>& other_cell,
-                      Side side) noexcept
-    -> SmallVector<FullInterface<ActiveFloat, DIM, PointType>> {
+get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat>& center_cell,
+                      const Cell<ActiveFloat, PassiveFloat>& other_cell,
+                      Side side) noexcept -> SmallVector<FullInterface<ActiveFloat, PointType>> {
   const auto center_interfaces =
-      get_outer_cell_interfaces<ActiveFloat, PassiveFloat, DIM, PointType>(center_cell);
+      get_outer_cell_interfaces<ActiveFloat, PassiveFloat, PointType>(center_cell);
   const auto other_interfaces =
-      get_outer_cell_interfaces<ActiveFloat, PassiveFloat, DIM, PointType>(other_cell);
+      get_outer_cell_interfaces<ActiveFloat, PassiveFloat, PointType>(other_cell);
 
-  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> left_side{};
-  SmallVector<HalfInterface<ActiveFloat, DIM, PointType>> right_side{};
+  SmallVector<HalfInterface<ActiveFloat, PointType>> left_side{};
+  SmallVector<HalfInterface<ActiveFloat, PointType>> right_side{};
   bool left_is_center;
   switch (side) {
     case LEFT:
@@ -354,11 +353,11 @@ get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& center_cell,
 
   if (left_side.size() == right_side.size()) {
     const auto n = left_side.size();
-    SmallVector<FullInterface<ActiveFloat, DIM, PointType>> interfaces(n);
+    SmallVector<FullInterface<ActiveFloat, PointType>> interfaces(n);
     for (size_t i = 0; i < n; ++i) {
       // TODO: Is this necessary?
       // assert(same_interface(left_side[i], right_side[i]));
-      interfaces[i] = FullInterface<ActiveFloat, DIM, PointType>{
+      interfaces[i] = FullInterface<ActiveFloat, PointType>{
           .left_value  = left_side[i].value,
           .right_value = right_side[i].value,
           // TODO: Is this necessary?
@@ -369,9 +368,9 @@ get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& center_cell,
     return interfaces;
   } else {
     if (left_side.size() == 1) {
-      SmallVector<FullInterface<ActiveFloat, DIM, PointType>> interfaces(right_side.size());
+      SmallVector<FullInterface<ActiveFloat, PointType>> interfaces(right_side.size());
       for (size_t i = 0; i < right_side.size(); ++i) {
-        interfaces[i] = FullInterface<ActiveFloat, DIM, PointType>{
+        interfaces[i] = FullInterface<ActiveFloat, PointType>{
             .left_value  = left_side[0].value,
             .right_value = right_side[i].value,
             .begin       = right_side[i].begin,
@@ -380,9 +379,9 @@ get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat, DIM>& center_cell,
       }
       return interfaces;
     } else if (right_side.size() == 1) {
-      SmallVector<FullInterface<ActiveFloat, DIM, PointType>> interfaces(left_side.size());
+      SmallVector<FullInterface<ActiveFloat, PointType>> interfaces(left_side.size());
       for (size_t i = 0; i < left_side.size(); ++i) {
-        interfaces[i] = FullInterface<ActiveFloat, DIM, PointType>{
+        interfaces[i] = FullInterface<ActiveFloat, PointType>{
             .left_value  = left_side[i].value,
             .right_value = right_side[0].value,
             .begin       = left_side[i].begin,

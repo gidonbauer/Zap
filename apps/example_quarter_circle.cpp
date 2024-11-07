@@ -4,7 +4,6 @@
 // #define ZAP_STATIC_CUT
 // #define ZAP_TANGENTIAL_CORRECTION
 
-#include "CellBased/EigenDecomp.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Solver.hpp"
 
@@ -26,7 +25,6 @@
 // - Setup -----------------------------------------------------------------------------------------
 using ActiveFloat            = double;
 using PassiveFloat           = double;
-constexpr size_t DIM         = 1;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 5.0;
 constexpr PassiveFloat Y_MIN = 0.0;
@@ -150,7 +148,6 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] constexpr auto u0(PassiveFloat x, PassiveFloat y) noexcept -> ActiveFloat {
-  static_assert(DIM == 1);
   return (sqr(x - X_MIN) + sqr(y - Y_MIN)) *
          static_cast<ActiveFloat>((sqr(x - X_MIN) + sqr(y - Y_MIN)) <=
                                   sqr((X_MIN + X_MAX + Y_MIN + Y_MAX) / 4));
@@ -170,16 +167,14 @@ auto run_cell_based(size_t nx,
                     size_t ny,
                     PassiveFloat tend,
                     PassiveFloat CFL_safety_factor) noexcept
-    -> std::optional<Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM>> {
-  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat, DIM> grid(
-      X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+    -> std::optional<Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat>> {
+  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   // grid.same_value_boundary();
   grid.periodic_boundary();
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
   grid.fill_four_point(u0);
 
-  auto solver = Zap::CellBased::make_solver<Zap::CellBased::ExtendType::NEAREST>(
-      Zap::CellBased::SingleEq::A{}, Zap::CellBased::SingleEq::B{});
+  Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
 
   const std::string u_filename =
       OUTPUT_DIR "u_cell_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
@@ -273,45 +268,33 @@ auto run_mat_based(size_t nx, size_t ny, PassiveFloat tend, PassiveFloat CFL_saf
 
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] auto min_max_cell_value(
-    const std::vector<Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>>& cells) noexcept
-    -> std::pair<Eigen::Vector<ActiveFloat, DIM>, Eigen::Vector<ActiveFloat, DIM>> {
-  Eigen::Vector<ActiveFloat, DIM> min = [cell = cells.front()] {
+    const std::vector<Zap::CellBased::Cell<ActiveFloat, PassiveFloat>>& cells) noexcept
+    -> std::pair<ActiveFloat, ActiveFloat> {
+  ActiveFloat min = [cell = cells.front()] {
     assert(cell.is_cartesian() || cell.is_cut());
     if (cell.is_cartesian()) {
       return cell.get_cartesian().value;
     } else {
-      Eigen::Vector<ActiveFloat, DIM> res;
-      for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        res(i) = std::min(cell.get_cut().left_value(i), cell.get_cut().right_value(i));
-      }
-      return res;
+      return std::min(cell.get_cut().left_value, cell.get_cut().right_value);
     }
   }();
 
-  Eigen::Vector<ActiveFloat, DIM> max = [cell = cells.front()] {
+  ActiveFloat max = [cell = cells.front()] {
     assert(cell.is_cartesian() || cell.is_cut());
     if (cell.is_cartesian()) {
       return cell.get_cartesian().value;
     } else {
-      Eigen::Vector<ActiveFloat, DIM> res;
-      for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        res(i) = std::min(cell.get_cut().left_value(i), cell.get_cut().right_value(i));
-      }
-      return res;
+      return std::max(cell.get_cut().left_value, cell.get_cut().right_value);
     }
   }();
 
   for (const auto& cell : cells) {
     if (cell.is_cartesian()) {
-      for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        min(i) = std::min(min(i), cell.get_cartesian().value(i));
-        max(i) = std::max(max(i), cell.get_cartesian().value(i));
-      }
+      min = std::min(min, cell.get_cartesian().value);
+      max = std::max(max, cell.get_cartesian().value);
     } else {
-      for (Eigen::Index i = 0; i < static_cast<Eigen::Index>(DIM); ++i) {
-        min(i) = std::min({min(i), cell.get_cut().left_value(i), cell.get_cut().right_value(i)});
-        max(i) = std::max({max(i), cell.get_cut().left_value(i), cell.get_cut().right_value(i)});
-      }
+      min = std::min({min, cell.get_cut().left_value, cell.get_cut().right_value});
+      max = std::max({max, cell.get_cut().left_value, cell.get_cut().right_value});
     }
   }
 
@@ -381,8 +364,8 @@ auto compare(size_t nx,
   }
 
   out << nx << 'x' << ny << ":\n";
-  out << "min_cell = " << min_cell(0) << '\n';
-  out << "max_cell = " << max_cell(0) << '\n';
+  out << "min_cell = " << min_cell << '\n';
+  out << "max_cell = " << max_cell << '\n';
   out << "min_mat  = " << min_mat << '\n';
   out << "max_mat  = " << max_mat << '\n';
 
@@ -399,7 +382,7 @@ auto compare(size_t nx,
   // - L1 of cell-based ----------------------------------------------------------------------------
   {
     auto f = [&](PassiveFloat x, PassiveFloat y) {
-      return std::abs(cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y})(0));
+      return std::abs(cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y}));
     };
     const auto L1 = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
     out << "L1_cell = " << L1 << '\n';
@@ -412,7 +395,7 @@ auto compare(size_t nx,
   {
     auto f = [&](PassiveFloat x, PassiveFloat y) {
       return std::abs(
-          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y})(0) -
+          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y}) -
           eval_mat_at(x, y, std::get<0>(*mat_res), std::get<1>(*mat_res), std::get<2>(*mat_res)));
     };
     const auto L1_error = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);
@@ -423,7 +406,7 @@ auto compare(size_t nx,
   {
     auto f = [&](PassiveFloat x, PassiveFloat y) {
       return std::abs(
-          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y})(0) -
+          cell_res->eval(Zap::CellBased::SimCoord<PassiveFloat>{x, y}) -
           eval_mat_at(x, y, std::get<0>(hr_res), std::get<1>(hr_res), std::get<2>(hr_res)));
     };
     const auto L1_error = simpsons_rule_2d(f, X_MIN, X_MAX, Y_MIN, Y_MAX, 2'000, 2'000);

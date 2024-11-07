@@ -2,7 +2,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin/")
 
 set(executables
   cell_solver_1d
-  cell_solver_2d
+  # cell_solver_2d
   
   mat_solver
 

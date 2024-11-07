@@ -7,8 +7,6 @@
 #include <limits>
 #include <variant>
 
-#include <Eigen/Dense>
-
 #include "CellBased/Definitions.hpp"
 #include "CellBased/Geometry.hpp"
 #include "CellBased/SmallVector.hpp"
@@ -24,18 +22,16 @@ enum : size_t {
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, size_t DIM>
+template <typename ActiveFloat>
 struct CartesianValue {
-  static_assert(DIM > 0, "Dimension must be at least 1.");
-  Eigen::Vector<ActiveFloat, DIM> value = Eigen::Vector<ActiveFloat, DIM>::Zero();
+  ActiveFloat value{0};
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, size_t DIM>
+template <typename ActiveFloat>
 struct CutValue {
-  static_assert(DIM > 0, "Dimension must be at least 1.");
-  Eigen::Vector<ActiveFloat, DIM> left_value  = Eigen::Vector<ActiveFloat, DIM>::Zero();
-  Eigen::Vector<ActiveFloat, DIM> right_value = Eigen::Vector<ActiveFloat, DIM>::Zero();
+  ActiveFloat left_value{0};
+  ActiveFloat right_value{0};
 
   // Linear cut
   GenCoord<ActiveFloat> rel_cut_entry{};
@@ -45,13 +41,11 @@ struct CutValue {
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
+template <typename ActiveFloat, typename PassiveFloat>
 struct Cell {
-  static_assert(DIM > 0, "Dimension must be at least 1.");
-
   // Cell value
-  std::variant<CartesianValue<ActiveFloat, DIM>, CutValue<ActiveFloat, DIM>> value =
-      CartesianValue<ActiveFloat, DIM>{};
+  std::variant<CartesianValue<ActiveFloat>, CutValue<ActiveFloat>> cell_type =
+      CartesianValue<ActiveFloat>{};
 
   // Copy the cell dimension from grid; same for all cells
   PassiveFloat m_x_min;
@@ -130,27 +124,27 @@ struct Cell {
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto is_cartesian() const noexcept -> bool {
-    return std::holds_alternative<CartesianValue<ActiveFloat, DIM>>(value);
+    return std::holds_alternative<CartesianValue<ActiveFloat>>(cell_type);
   }
   [[nodiscard]] constexpr auto is_cut() const noexcept -> bool {
-    return std::holds_alternative<CutValue<ActiveFloat, DIM>>(value);
+    return std::holds_alternative<CutValue<ActiveFloat>>(cell_type);
   }
-  [[nodiscard]] constexpr auto get_cartesian() noexcept -> CartesianValue<ActiveFloat, DIM>& {
+  [[nodiscard]] constexpr auto get_cartesian() noexcept -> CartesianValue<ActiveFloat>& {
     assert(is_cartesian());
-    return std::get<CartesianValue<ActiveFloat, DIM>>(value);
+    return std::get<CartesianValue<ActiveFloat>>(cell_type);
   }
   [[nodiscard]] constexpr auto get_cartesian() const noexcept
-      -> const CartesianValue<ActiveFloat, DIM>& {
+      -> const CartesianValue<ActiveFloat>& {
     assert(is_cartesian());
-    return std::get<CartesianValue<ActiveFloat, DIM>>(value);
+    return std::get<CartesianValue<ActiveFloat>>(cell_type);
   }
-  [[nodiscard]] constexpr auto get_cut() noexcept -> CutValue<ActiveFloat, DIM>& {
+  [[nodiscard]] constexpr auto get_cut() noexcept -> CutValue<ActiveFloat>& {
     assert(is_cut());
-    return std::get<CutValue<ActiveFloat, DIM>>(value);
+    return std::get<CutValue<ActiveFloat>>(cell_type);
   }
-  [[nodiscard]] constexpr auto get_cut() const noexcept -> const CutValue<ActiveFloat, DIM>& {
+  [[nodiscard]] constexpr auto get_cut() const noexcept -> const CutValue<ActiveFloat>& {
     assert(is_cut());
-    return std::get<CutValue<ActiveFloat, DIM>>(value);
+    return std::get<CutValue<ActiveFloat>>(cell_type);
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -308,30 +302,16 @@ struct Cell {
 };
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, size_t DIM>
-auto operator<<(std::ostream& out, const CartesianValue<ActiveFloat, DIM>& cart_value) noexcept
+template <typename ActiveFloat>
+auto operator<<(std::ostream& out, const CartesianValue<ActiveFloat>& cart_value) noexcept
     -> std::ostream& {
-  constexpr auto end_char      = '\n';
-  constexpr auto single_indent = "  ";
-  constexpr auto double_indent = "    ";
-
-  out << '{' << end_char;
-
-  out << double_indent << ".value = [ ";
-  out << cart_value.value(0);
-  for (Eigen::Index i = 1; i < static_cast<Eigen::Index>(DIM); ++i) {
-    out << ", " << cart_value.value(i);
-  }
-  out << " ]," << end_char;
-
-  out << single_indent << '}';
-
+  out << "{ " << ".value = " << cart_value.value << " }";
   return out;
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, size_t DIM>
-auto operator<<(std::ostream& out, const CutValue<ActiveFloat, DIM>& cut_value) noexcept
+template <typename ActiveFloat>
+auto operator<<(std::ostream& out, const CutValue<ActiveFloat>& cut_value) noexcept
     -> std::ostream& {
   constexpr auto end_char      = '\n';
   constexpr auto single_indent = "  ";
@@ -339,19 +319,8 @@ auto operator<<(std::ostream& out, const CutValue<ActiveFloat, DIM>& cut_value) 
 
   out << '{' << end_char;
 
-  out << double_indent << ".left_value = [ ";
-  out << cut_value.left_value(0);
-  for (Eigen::Index i = 1; i < static_cast<Eigen::Index>(DIM); ++i) {
-    out << ", " << cut_value.left_value(i);
-  }
-  out << " ]," << end_char;
-
-  out << double_indent << ".right_value = [ ";
-  out << cut_value.right_value(0);
-  for (Eigen::Index i = 1; i < static_cast<Eigen::Index>(DIM); ++i) {
-    out << ", " << cut_value.right_value(i);
-  }
-  out << " ]," << end_char;
+  out << double_indent << ".left_value = " << cut_value.left_value << ',' << end_char;
+  out << double_indent << ".right_value = " << cut_value.right_value << ',' << end_char;
 
   out << double_indent << ".rel_cut_entry = [" << cut_value.rel_cut_entry.x << ", "
       << cut_value.rel_cut_entry.y << ']' << end_char;
@@ -366,21 +335,21 @@ auto operator<<(std::ostream& out, const CutValue<ActiveFloat, DIM>& cut_value) 
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
-auto operator<<(std::ostream& out, const Cell<ActiveFloat, PassiveFloat, DIM>& cell) noexcept
+template <typename ActiveFloat, typename PassiveFloat>
+auto operator<<(std::ostream& out, const Cell<ActiveFloat, PassiveFloat>& cell) noexcept
     -> std::ostream& {
   constexpr auto end_char = '\n';
   constexpr auto indent   = "  ";
 
   out << "{" << end_char;
 
-  out << indent << ".value = ";
+  out << indent << ".cell_type = ";
   if (cell.is_cartesian()) {
     out << cell.get_cartesian();
   } else if (cell.is_cut()) {
     out << cell.get_cut();
   } else {
-    Igor::Panic("Unknown cell type with index {}.", cell.value.index());
+    Igor::Panic("Unknown cell type with index {}.", cell.cell_type.index());
   }
   out << ',' << end_char;
 
@@ -447,14 +416,14 @@ auto operator<<(std::ostream& out, const Cell<ActiveFloat, PassiveFloat, DIM>& c
 
 }  // namespace Zap::CellBased
 
-template <typename ActiveFloat, typename PassiveFloat, size_t DIM>
-struct fmt::formatter<Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>> {
+template <typename ActiveFloat, typename PassiveFloat>
+struct fmt::formatter<Zap::CellBased::Cell<ActiveFloat, PassiveFloat>> {
   template <typename ParseContext>
   static constexpr auto parse(ParseContext& ctx) noexcept {
     return ctx.begin();
   }
   template <typename FormatContext>
-  static constexpr auto format(const Zap::CellBased::Cell<ActiveFloat, PassiveFloat, DIM>& cell,
+  static constexpr auto format(const Zap::CellBased::Cell<ActiveFloat, PassiveFloat>& cell,
                                FormatContext& ctx) noexcept {
     std::stringstream s;
     s << cell;
