@@ -6,6 +6,7 @@ set(executables
         test_cell_geometry
         test_cut_grid
         test_outer_interfaces
+        test_wave
 )
 
 include(GoogleTest)

@@ -297,11 +297,6 @@ class UniformGrid {
     return loc;
   };
 
-  // -------------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto count_sides(Side side) const noexcept {
-    return std::popcount(std::to_underlying(side));
-  }
-
   // -----------------------------------------------------------------------------------------------
   enum class ClassifyError : uint8_t { OK, BOTH_CUTS_ON_SAME_SIDE, CUT_ON_MULTIPLE_SIDES };
 

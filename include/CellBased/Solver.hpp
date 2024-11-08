@@ -1,13 +1,13 @@
 #ifndef ZAP_CELL_BASED_SOLVER_HPP_
 #define ZAP_CELL_BASED_SOLVER_HPP_
 
-#include <numbers>
 #include <numeric>
 #include <unordered_set>
 
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Interface.hpp"
+#include "CellBased/Wave.hpp"
 
 namespace Zap::CellBased {
 
@@ -37,176 +37,126 @@ class Solver {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <typename ActiveFloat, Point2D_c PointType>
-  struct WaveProperties {
-    ActiveFloat mass;
-    Geometry::Polygon<PointType> polygon;
-    ActiveFloat sign;
-  };
+  template <Side side, Point2D_c PointType, typename ActiveFloat, typename Wave>
+  constexpr void update_value_by_overlap(ActiveFloat& value,
+                                         const Geometry::Polygon<PointType>& cell_polygon,
+                                         const Geometry::Polygon<PointType>& wave_polygon,
+                                         const Wave& wave) {
+    // clang-format off
+    static_assert(
+      // x-aligned wave must come from left or right
+      (std::is_same_v<Wave, AxisAlignedWave<ActiveFloat, PointType, X>> && (side == LEFT || side == RIGHT)) ||
+      // y-aligned wave must come from bottom or top
+      (std::is_same_v<Wave, AxisAlignedWave<ActiveFloat, PointType, Y>> && (side == BOTTOM || side == TOP)) ||
+      // free wave cannot come from any side
+      (std::is_same_v<Wave, FreeWave<ActiveFloat, PointType>> && count_sides(side) == 0),
+       "Invalid combination of wave-type and side parameter.");
+    // clang-format on
 
-  // -----------------------------------------------------------------------------------------------
-  // TODO: Use this as reference
-  // - normal direction:     https://github.com/clawpack/riemann/blob/master/src/rpn2_burgers.f90
-  // - tangential direction: https://github.com/clawpack/riemann/blob/master/src/rpt2_burgers.f90
-  template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
-  [[nodiscard]] constexpr auto
-  calculate_interface(const FullInterface<ActiveFloat, PointType>& interface,
-                      ActiveFloat dt,
-                      PassiveFloat scale_x,
-                      PassiveFloat scale_y) const noexcept
-      -> WaveProperties<ActiveFloat, PointType> {
-    if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return {}; }
+    const auto cell_area = cell_polygon.area();
+    assert(cell_area > 0 || std::abs(cell_area) <= EPS<ActiveFloat>);
+    if (std::abs(cell_area) <= EPS<ActiveFloat>) { return; }
 
-    // Vector tangential to interface
-    const PointType tangent_vector = (interface.end - interface.begin).normalized();
+    const auto intersect_area = (cell_polygon & wave_polygon).area();
+    IGOR_ASSERT(intersect_area >= 0 || std::abs(intersect_area) < EPS<ActiveFloat>,
+                "Expect the intersection area to be greater or equal to zero but is {}",
+                intersect_area);
+    IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<ActiveFloat>,
+                "Expected area of intersection to be smaller or equal to the area of the cell, "
+                "but intersection area is {} and cell area is {}, intersection area is {} "
+                "larger than cell area.",
+                intersect_area,
+                cell_area,
+                static_cast<ActiveFloat>(intersect_area - cell_area));
 
-    // Vector normal to cut
-    const PointType normal_vector{tangent_vector.y, -tangent_vector.x};
-    IGOR_ASSERT(std::abs(tangent_vector.dot(normal_vector)) <= EPS<PassiveFloat>,
-                "tangent_vector {} is not orthogonal to normal_vector {}, tangent_vector^T * "
-                "normal_vector = {}.",
-                tangent_vector,
-                normal_vector,
-                tangent_vector.dot(normal_vector));
-
-    // Scale tangential vector when operating in grid coordinates
-    auto scale_if_grid_c = [=](const PointType& p) {
-      if constexpr (is_GridCoord_v<PointType>) {
-        return PointType{
-            p.x * scale_x,
-            p.y * scale_y,
-        };
-      } else {
-        return p;
-      }
-    };
-#ifdef ZAP_TANGENTIAL_CORRECTION
-    const PointType scaled_tangent_vector = scale_if_grid_c(tangent_vector);
-#endif  // ZAP_TANGENTIAL_CORRECTION
-    const PointType scaled_normal_vector = scale_if_grid_c(normal_vector);
-
-    const ActiveFloat u_mid = (interface.left_value + interface.right_value) / 2;
-
-    // Matrix for rotated PDE in normal direction to cut
-    // TODO: Why cos(interface_angle) * A + sin(interface_angle) * B and not -?
-    // Equivalent to `cos(interface_angle) * A + sin(interface_angle) * B`, but do not actually
-    // calculate the interface angle
-    const ActiveFloat normal_mat =
-        tangent_vector.y * u_mid +  //
-        -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y) * u_mid;
-
-    const ActiveFloat normal_wave_length = normal_mat * dt;
-
-    // Eigen expansion of jump; wave strength
-    const ActiveFloat normal_alpha = interface.right_value - interface.left_value;
-
-#ifndef ZAP_TANGENTIAL_CORRECTION
-    const WaveProperties<ActiveFloat, PointType> wave{
-        .mass    = normal_alpha,
-        .polygon = Geometry::Polygon<PointType>{{
-            interface.begin,
-            interface.begin + scaled_normal_vector * normal_wave_length,
-            interface.end,
-            interface.end + scaled_normal_vector * normal_wave_length,
-        }},
-        .sign    = sign(normal_mat),
-    };
-#else
-    // Matrix for rotated PDE in tangential direction to cut
-    // Equivalent to `-std::sin(interface_angle) * A + std::cos(interface_angle) * B`
-    const ActiveFloat tangent_mat =
-        sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y) * u_mid +
-        tangent_vector.y * u_mid;
-
-    const ActiveFloat tangent_wave_length = tangent_mat * dt;
-    const ActiveFloat tangent_beta        = normal_alpha;
-
-    const WaveProperties<ActiveFloat, PointType> wave = {
-        .mass    = tangent_beta,
-        .polygon = Geometry::Polygon<PointType>{{
-            interface.begin,
-            interface.begin + scaled_normal_vector * normal_wave_length +
-                scaled_tangent_vector * tangent_wave_length,
-            interface.end,
-            interface.end + scaled_normal_vector * normal_wave_length +
-                scaled_tangent_vector * tangent_wave_length,
-        }},
-        .sign    = sign(normal_mat),
-    };
-#endif  // ZAP_NOT_TANGENTIAL_CORRECTION
-
-    return wave;
+    value -= (intersect_area / cell_area) * wave.first_order_update;
+    // TODO: Maybe dont do that.
+    // if constexpr ((side == LEFT || side == BOTTOM)) {
+    //   value -= (intersect_area / cell_area) * wave.second_order_update;
+    // } else if constexpr ((side == RIGHT) || (side == TOP)) {
+    //   value -= (intersect_area / cell_area) * (-wave.second_order_update);
+    // }
   }
 
   // -----------------------------------------------------------------------------------------------
   template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
-  constexpr void update_cell_by_wave(Cell<ActiveFloat, PassiveFloat>& cell,
-                                     const WaveProperties<ActiveFloat, PointType>& wave) {
-    // TODO: Do something about periodic boundary conditions
-    assert(cell.is_cartesian() || cell.is_cut());
-    auto update_value = [&](ActiveFloat& value, const Geometry::Polygon<PointType>& cell_polygon) {
-      const auto cell_area = cell_polygon.area();
-      assert(cell_area > 0 || std::abs(cell_area) <= EPS<PassiveFloat>);
-      if (std::abs(cell_area) <= EPS<PassiveFloat>) { return; }
+  constexpr void update_cell_by_free_wave(Cell<ActiveFloat, PassiveFloat>& cell,
+                                          const FreeWave<ActiveFloat, PointType>& wave,
+                                          const ActiveFloat& dt) {
+    constexpr CoordType coord_type                  = PointType2CoordType<PointType>;
+    const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(wave, dt);
 
-      const auto intersect      = cell_polygon & wave.polygon;
-      const auto intersect_area = intersect.area();
-      IGOR_ASSERT(intersect_area >= 0 || std::abs(intersect_area) < EPS<PassiveFloat>,
-                  "Expect the intersection area to be greater or equal to zero but is {}",
-                  intersect_area);
-      IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<PassiveFloat>,
-                  "Expected area intersection of intersection to be smaller or equal to the area "
-                  "of the cell, but intersection area is {} and cell area is {}, intersection area "
-                  "is {} larger than cell area",
-                  intersect_area,
-                  cell_area,
-                  static_cast<ActiveFloat>(intersect_area - cell_area));
-
-      value += -wave.sign * (intersect_area / cell_area) * wave.mass;
-    };
-
-    constexpr CoordType coord_type = PointType2CoordType<PointType>;
     if (cell.is_cartesian()) {
-      update_value(cell.get_cartesian().value, cell.template get_cartesian_polygon<coord_type>());
+      update_value_by_overlap<static_cast<Side>(0)>(
+          cell.get_cartesian().value,
+          cell.template get_cartesian_polygon<coord_type>(),
+          wave_polygon,
+          wave);
     } else {
       // Left subcell
-      update_value(cell.get_cut().left_value, cell.template get_cut_left_polygon<coord_type>());
+      update_value_by_overlap<static_cast<Side>(0)>(
+          cell.get_cut().left_value,
+          cell.template get_cut_left_polygon<coord_type>(),
+          wave_polygon,
+          wave);
       // Right subcell
-      update_value(cell.get_cut().right_value, cell.template get_cut_right_polygon<coord_type>());
+      update_value_by_overlap<static_cast<Side>(0)>(
+          cell.get_cut().right_value,
+          cell.template get_cut_right_polygon<coord_type>(),
+          wave_polygon,
+          wave);
     }
   }
 
   // -----------------------------------------------------------------------------------------------
-#ifndef ZAP_TANGENTIAL_CORRECTION
-  template <typename ActiveFloat, typename PassiveFloat>
+  template <typename ActiveFloat,
+            typename PassiveFloat,
+            Point2D_c PointType,
+            Orientation orientation,
+            Side side>
   constexpr void
-  apply_side_interfaces_uncorrected(const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid,
-                                    Cell<ActiveFloat, PassiveFloat>& next_cell,
-                                    const Cell<ActiveFloat, PassiveFloat>& curr_cell,
-                                    size_t idx,
-                                    Side side,
-                                    ActiveFloat dt) {
-    if (curr_grid.is_cell(idx)) {
-      const auto& other_cell = curr_grid[idx];
-      const auto interfaces =
-          get_shared_interfaces<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(
-              curr_cell, other_cell, side);
-      for (const auto& interface : interfaces) {
-        const auto wave =
-            calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
-        update_cell_by_wave(next_cell, wave);
+  update_cell_by_axis_aligned_wave(Cell<ActiveFloat, PassiveFloat>& cell,
+                                   const AxisAlignedWave<ActiveFloat, PointType, orientation>& wave,
+                                   const ActiveFloat& dt) {
+    // clang-format off
+    static_assert(
+      // x-aligned wave must come from left or right
+      (orientation == X && (side == LEFT || side == RIGHT)) ||
+      // y-aligned wave must come from bottom or top
+      (orientation == Y && (side == BOTTOM || side == TOP)),
+       "Invalid combination of orientation and side parameter.");
+    // clang-format on
+
+    const auto ds = orientation == X ? cell.template dx<SIM_C>() : cell.template dy<SIM_C>();
+    if (cell.is_cartesian()) {
+      if constexpr ((side == LEFT || side == BOTTOM)) {
+        if (wave.is_right_going) {
+          cell.get_cartesian().value -= (dt / ds) * wave.first_order_update;
+        }
+        cell.get_cartesian().value -= (dt / ds) * wave.second_order_update;
+      } else {
+        if (!wave.is_right_going) {
+          cell.get_cartesian().value -= (dt / ds) * wave.first_order_update;
+        }
+        cell.get_cartesian().value -= (dt / ds) * (-wave.second_order_update);
       }
-    } else if (idx == SAME_VALUE_INDEX || idx == ZERO_FLUX_INDEX) {
-      // TODO: Noop? Same?
-    } else if (idx == NULL_INDEX) {
-      Igor::Debug("cell = {}", curr_cell);
-      Igor::Panic("cell has NULL index.");
     } else {
-      Igor::Debug("cell = {}", curr_cell);
-      Igor::Panic("cell has unknown index with value {}.", idx);
+      const Geometry::Polygon<PointType> wave_polygon =
+          calc_wave_polygon(wave, cell.template dx<SIM_C>(), cell.template dy<SIM_C>(), dt);
+
+      constexpr CoordType coord_type = PointType2CoordType<PointType>;
+      // Left subcell
+      update_value_by_overlap<side>(cell.get_cut().left_value,
+                                    cell.template get_cut_left_polygon<coord_type>(),
+                                    wave_polygon,
+                                    wave);
+      // Right subcell
+      update_value_by_overlap<side>(cell.get_cut().right_value,
+                                    cell.template get_cut_right_polygon<coord_type>(),
+                                    wave_polygon,
+                                    wave);
     }
-  };
-#endif  // ZAP_TANGENTIAL_CORRECTION
+  }
 
   // -----------------------------------------------------------------------------------------------
   template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
@@ -300,6 +250,8 @@ class Solver {
                            TimeWriter& time_writer,
                            PassiveFloat CFL_safety_factor = 0.5) noexcept
       -> std::optional<UniformGrid<ActiveFloat, PassiveFloat>> {
+    using PointType = GridCoord<ActiveFloat>;
+
     if (!(CFL_safety_factor > 0 && CFL_safety_factor <= 1)) {
       Igor::Warn("CFL_safety_factor must be in (0, 1], is {}", CFL_safety_factor);
       return std::nullopt;
@@ -403,236 +355,98 @@ class Solver {
       // TODO: What happens when a subcell has area 0?
       //   -> cannot "uncut" the cell because that would loose shock position information
 
+      // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
 #pragma omp parallel for
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
         const auto& curr_cell = curr_grid[cell_idx];
         auto& next_cell       = next_grid[cell_idx];
 
-        // = Cut cell ==============================================================================
-        if (next_cell.is_cut()) {
-#ifndef ZAP_TANGENTIAL_CORRECTION
-          // Left interface
-          apply_side_interfaces_uncorrected(
-              curr_grid, next_cell, curr_cell, curr_cell.left_idx, LEFT, dt);
-          // Right interface
-          apply_side_interfaces_uncorrected(
-              curr_grid, next_cell, curr_cell, curr_cell.right_idx, RIGHT, dt);
-          // Bottom interface
-          apply_side_interfaces_uncorrected(
-              curr_grid, next_cell, curr_cell, curr_cell.bottom_idx, BOTTOM, dt);
-          // Top interface
-          apply_side_interfaces_uncorrected(
-              curr_grid, next_cell, curr_cell, curr_cell.top_idx, TOP, dt);
-#else
-          continue;
-#endif  // ZAP_TANGENTIAL_CORRECTION
-        }
-        // = Cut cell ==============================================================================
-        // = Cartesian cell ========================================================================
-        else {
-          // - Handle left interface ---------------------------------------------------------------
-          if (curr_grid.is_cell(curr_cell.left_idx)) {
-            const auto& other_cell = curr_grid[curr_cell.left_idx];
-            const auto interfaces =
-                get_shared_interfaces<ActiveFloat, PassiveFloat, SimCoord<ActiveFloat>>(
-                    curr_cell, other_cell, LEFT);
-
-            for (const auto& interface : interfaces) {
-              const ActiveFloat u_mid  = (interface.left_value + interface.right_value) / 2;
-              const ActiveFloat A_plus = std::max(u_mid, ActiveFloat{0});
-
-              next_cell.get_cartesian().value -=
-                  A_plus *
-                  ((interface.end - interface.begin).norm() / curr_cell.template dy<SIM_C>()) *
-                  (dt / curr_cell.template dx<SIM_C>()) *
-                  (interface.right_value - interface.left_value);
-            }
-          } else if (curr_cell.left_idx == SAME_VALUE_INDEX ||
-                     curr_cell.left_idx == ZERO_FLUX_INDEX) {
-            // No-op
-          } else {
-            Igor::Debug("cell = {}", curr_cell);
-            Igor::Panic("Invalid left-index.");
-          }
-          // - Handle left interface ---------------------------------------------------------------
-
-          // - Handle right interface --------------------------------------------------------------
-          if (curr_grid.is_cell(curr_cell.right_idx)) {
-            const auto& other_cell = curr_grid[curr_cell.right_idx];
-            const auto interfaces =
-                get_shared_interfaces<ActiveFloat, PassiveFloat, SimCoord<ActiveFloat>>(
-                    curr_cell, other_cell, RIGHT);
-
-            for (const auto& interface : interfaces) {
-              const ActiveFloat u_mid   = (interface.left_value + interface.right_value) / 2;
-              const ActiveFloat A_minus = std::min(u_mid, ActiveFloat{0.0});
-
-              // TODO: This might need to be `-=`, but the flux is always zero so it does not show
-              // up
-              next_cell.get_cartesian().value +=
-                  A_minus *
-                  ((interface.end - interface.begin).norm() / curr_cell.template dy<SIM_C>()) *
-                  (dt / curr_cell.template dx<SIM_C>()) *
-                  (interface.right_value - interface.left_value);
-            }
-          } else if (curr_cell.right_idx == SAME_VALUE_INDEX ||
-                     curr_cell.right_idx == ZERO_FLUX_INDEX) {
-            // No-op
-          } else {
-            Igor::Debug("cell = {}", curr_cell);
-            Igor::Panic("Invalid right-index.");
-          }
-          // - Handle right interface --------------------------------------------------------------
-
-          // - Handle bottom interface -------------------------------------------------------------
-          if (curr_grid.is_cell(curr_cell.bottom_idx)) {
-            const auto& other_cell = curr_grid[curr_cell.bottom_idx];
-            const auto interfaces =
-                get_shared_interfaces<ActiveFloat, PassiveFloat, SimCoord<ActiveFloat>>(
-                    curr_cell, other_cell, BOTTOM);
-
-            for (const auto& interface : interfaces) {
-              const ActiveFloat u_mid  = (interface.left_value + interface.right_value) / 2;
-              const ActiveFloat A_plus = std::max(u_mid, ActiveFloat{0.0});
-
-              next_cell.get_cartesian().value -=
-                  A_plus *
-                  ((interface.end - interface.begin).norm() / curr_cell.template dx<SIM_C>()) *
-                  (dt / curr_cell.template dy<SIM_C>()) *
-                  (interface.right_value - interface.left_value);
-            }
-          } else if (curr_cell.bottom_idx == SAME_VALUE_INDEX ||
-                     curr_cell.bottom_idx == ZERO_FLUX_INDEX) {
-            // No-op
-          } else {
-            Igor::Debug("cell = {}", curr_cell);
-            Igor::Panic("Invalid bottom-index.");
-          }
-          // - Handle bottom interface -------------------------------------------------------------
-
-          // - Handle top interface ----------------------------------------------------------------
-          if (curr_grid.is_cell(curr_cell.top_idx)) {
-            const auto& other_cell = curr_grid[curr_cell.top_idx];
-            const auto interfaces =
-                get_shared_interfaces<ActiveFloat, PassiveFloat, SimCoord<ActiveFloat>>(
-                    curr_cell, other_cell, TOP);
-
-            for (const auto& interface : interfaces) {
-              const ActiveFloat u_mid   = (interface.left_value + interface.right_value) / 2;
-              const ActiveFloat A_minus = std::min(u_mid, 0.0);
-
-              // TODO: This might need to be `-=`, but the flux is always zero so it does not show
-              next_cell.get_cartesian().value +=
-                  A_minus *
-                  ((interface.end - interface.begin).norm() / curr_cell.template dx<SIM_C>()) *
-                  (dt / curr_cell.template dy<SIM_C>()) *
-                  (interface.right_value - interface.left_value);
-            }
-          } else if (curr_cell.top_idx == SAME_VALUE_INDEX ||
-                     curr_cell.top_idx == ZERO_FLUX_INDEX) {
-            // No-op
-          } else {
-            Igor::Debug("cell = {}", curr_cell);
-            Igor::Panic("Invalid top-index.");
-          }
-          // - Handle top interface ----------------------------------------------------------------
-        }
-        // = Cartesian cell ========================================================================
-      }
-
-#ifdef ZAP_TANGENTIAL_CORRECTION
-      auto pair_hasher = [](const std::pair<size_t, size_t>& p) { return p.first ^ p.second; };
-      auto pair_equal  = [](const std::pair<size_t, size_t>& p1,
-                           const std::pair<size_t, size_t>& p2) {
-        return (p1.first == p2.first && p1.second == p2.second) ||
-               (p1.first == p2.second && p1.second == p2.first);
-      };
-      std::unordered_set<std::pair<size_t, size_t>, decltype(pair_hasher), decltype(pair_equal)>
-          calculated_interfaces;
-      for (size_t cell_idx : next_grid.cut_cell_idxs()) {
-        const auto& curr_cell      = curr_grid[cell_idx];
-        auto& next_cell            = next_grid[cell_idx];
-        const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
-
-        // - Left outer interface ------------------------------------------------------------------
-        if (curr_grid.is_cell(curr_cell.left_idx) &&
-            !calculated_interfaces.contains({cell_idx, curr_cell.left_idx})) {
+        // - Handle left interface ---------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.left_idx)) {
           const auto& other_cell = curr_grid[curr_cell.left_idx];
-          const auto interfaces =
-              get_shared_interfaces<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(
-                  curr_cell, other_cell, LEFT);
+          const auto interfaces  = get_shared_interfaces<ActiveFloat, PassiveFloat, PointType>(
+              curr_cell, other_cell, LEFT);
 
           for (const auto& interface : interfaces) {
-            const auto wave =
-                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
-            for (size_t neighbour_idx : cell_neighbours) {
-              update_cell_by_wave(next_grid[neighbour_idx], wave);
-            }
-            update_cell_by_wave(next_cell, wave);
+            const auto wave = normal_wave<X>(
+                interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+            update_cell_by_axis_aligned_wave<ActiveFloat, PassiveFloat, PointType, X, LEFT>(
+                next_cell, wave, dt);
           }
-          calculated_interfaces.emplace(cell_idx, curr_cell.left_idx);
+        } else if (curr_cell.left_idx == SAME_VALUE_INDEX ||
+                   curr_cell.left_idx == ZERO_FLUX_INDEX) {
+          // No-op
+        } else {
+          Igor::Debug("cell = {}", curr_cell);
+          Igor::Panic("Invalid left-index.");
         }
+        // - Handle left interface ---------------------------------------------------------------
 
-        // - Right outer interface -----------------------------------------------------------------
-        if (curr_grid.is_cell(curr_cell.right_idx) &&
-            !calculated_interfaces.contains({cell_idx, curr_cell.right_idx})) {
+        // - Handle right interface --------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.right_idx)) {
           const auto& other_cell = curr_grid[curr_cell.right_idx];
-          const auto interfaces =
-              get_shared_interfaces<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(
-                  curr_cell, other_cell, RIGHT);
+          const auto interfaces  = get_shared_interfaces<ActiveFloat, PassiveFloat, PointType>(
+              curr_cell, other_cell, RIGHT);
 
           for (const auto& interface : interfaces) {
-            const auto wave =
-                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
-            for (size_t neighbour_idx : cell_neighbours) {
-              update_cell_by_wave(next_grid[neighbour_idx], wave);
-            }
-            update_cell_by_wave(next_cell, wave);
+            const auto wave = normal_wave<X>(
+                interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+            update_cell_by_axis_aligned_wave<ActiveFloat, PassiveFloat, PointType, X, RIGHT>(
+                next_cell, wave, dt);
           }
-          calculated_interfaces.emplace(cell_idx, curr_cell.right_idx);
+        } else if (curr_cell.right_idx == SAME_VALUE_INDEX ||
+                   curr_cell.right_idx == ZERO_FLUX_INDEX) {
+          // No-op
+        } else {
+          Igor::Debug("cell = {}", curr_cell);
+          Igor::Panic("Invalid right-index.");
         }
+        // - Handle right interface --------------------------------------------------------------
 
-        // - Bottom outer interface ----------------------------------------------------------------
-        if (curr_grid.is_cell(curr_cell.bottom_idx) &&
-            !calculated_interfaces.contains({cell_idx, curr_cell.bottom_idx})) {
+        // - Handle bottom interface -------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.bottom_idx)) {
           const auto& other_cell = curr_grid[curr_cell.bottom_idx];
-          const auto interfaces =
-              get_shared_interfaces<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(
-                  curr_cell, other_cell, BOTTOM);
+          const auto interfaces  = get_shared_interfaces<ActiveFloat, PassiveFloat, PointType>(
+              curr_cell, other_cell, BOTTOM);
 
           for (const auto& interface : interfaces) {
-            const auto wave =
-                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
-            for (size_t neighbour_idx : cell_neighbours) {
-              update_cell_by_wave(next_grid[neighbour_idx], wave);
-            }
-            update_cell_by_wave(next_cell, wave);
+            const auto wave = normal_wave<Y>(
+                interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+            update_cell_by_axis_aligned_wave<ActiveFloat, PassiveFloat, PointType, Y, BOTTOM>(
+                next_cell, wave, dt);
           }
-          calculated_interfaces.emplace(cell_idx, curr_cell.bottom_idx);
+        } else if (curr_cell.bottom_idx == SAME_VALUE_INDEX ||
+                   curr_cell.bottom_idx == ZERO_FLUX_INDEX) {
+          // No-op
+        } else {
+          Igor::Debug("cell = {}", curr_cell);
+          Igor::Panic("Invalid bottom-index.");
         }
+        // - Handle bottom interface -------------------------------------------------------------
 
-        // - Top outer interface -------------------------------------------------------------------
-        if (curr_grid.is_cell(curr_cell.top_idx) &&
-            !calculated_interfaces.contains({cell_idx, curr_cell.top_idx})) {
+        // - Handle top interface ---------------------------------------------------------------
+        if (curr_grid.is_cell(curr_cell.top_idx)) {
           const auto& other_cell = curr_grid[curr_cell.top_idx];
-          const auto interfaces =
-              get_shared_interfaces<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(
-                  curr_cell, other_cell, TOP);
+          const auto interfaces  = get_shared_interfaces<ActiveFloat, PassiveFloat, PointType>(
+              curr_cell, other_cell, TOP);
 
           for (const auto& interface : interfaces) {
-            const auto wave =
-                calculate_interface(interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
-            for (size_t neighbour_idx : cell_neighbours) {
-              update_cell_by_wave(next_grid[neighbour_idx], wave);
-            }
-            update_cell_by_wave(next_cell, wave);
+            const auto wave = normal_wave<Y>(
+                interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+            update_cell_by_axis_aligned_wave<ActiveFloat, PassiveFloat, PointType, Y, TOP>(
+                next_cell, wave, dt);
           }
-          calculated_interfaces.emplace(cell_idx, curr_cell.top_idx);
+        } else if (curr_cell.top_idx == SAME_VALUE_INDEX || curr_cell.top_idx == ZERO_FLUX_INDEX) {
+          // No-op
+        } else {
+          Igor::Debug("cell = {}", curr_cell);
+          Igor::Panic("Invalid top-index.");
         }
+        // - Handle top interface ---------------------------------------------------------------
       }
-#endif  // ZAP_TANGENTIAL_CORRECTION
+      // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
 
-      // - Handle internal interface ---------------------------------------------------------------
+      // = Handle internal interface ===============================================================
       for (size_t cell_idx : curr_grid.cut_cell_idxs()) {
         const auto& curr_cell = curr_grid[cell_idx];
         assert(curr_cell.is_cut());
@@ -640,21 +454,19 @@ class Solver {
         assert(next_cell.is_cartesian() || next_cell.is_cut());
 
         const auto internal_interface =
-            get_internal_interface<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(curr_cell);
-        const auto internal_wave =
-            calculate_interface<ActiveFloat, PassiveFloat, GridCoord<ActiveFloat>>(
-                internal_interface, dt, curr_grid.scale_x(), curr_grid.scale_y());
+            get_internal_interface<ActiveFloat, PassiveFloat, PointType>(curr_cell);
+        const auto internal_wave = normal_wave<FREE>(
+            internal_interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
         const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
-
         // Neighbouring cells
         for (size_t neighbour_idx : cell_neighbours) {
-          update_cell_by_wave(next_grid[neighbour_idx], internal_wave);
+          update_cell_by_free_wave(next_grid[neighbour_idx], internal_wave, dt);
         }
         // This cell
-        update_cell_by_wave(next_cell, internal_wave);
+        update_cell_by_free_wave(next_cell, internal_wave, dt);
       }
-      // - Handle internal interface ---------------------------------------------------------------
+      // = Handle internal interface ===============================================================
 
       // Update time
       t += dt;
@@ -664,6 +476,7 @@ class Solver {
       if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
         return std::nullopt;
       }
+      break;
     }
 
     return curr_grid;

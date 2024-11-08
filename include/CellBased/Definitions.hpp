@@ -3,15 +3,15 @@
 
 #include <concepts>
 #include <cstddef>
-#include <format>
-
-#include <Eigen/Core>
-
-#include "Igor/Logging.hpp"
 
 #include <AD/ad.hpp>
 
+#include "Igor/Logging.hpp"
+
 namespace Zap::CellBased {
+
+enum class Orientation : uint8_t { X, Y, FREE };
+using enum Orientation;
 
 // - Tolerances for given floating point accuracy --------------------------------------------------
 template <typename Float>
@@ -226,6 +226,11 @@ enum Side : uint8_t {
   return static_cast<uint8_t>((exit << 4) | entry);
 }
 
+[[nodiscard]] constexpr auto count_sides(Side side) noexcept {
+  return std::popcount(std::to_underlying(side));
+}
+
+// -------------------------------------------------------------------------------------------------
 enum class ExtendType : uint8_t { NONE, NEAREST, MAX };
 
 }  // namespace Zap::CellBased
