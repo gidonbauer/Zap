@@ -1,6 +1,8 @@
 #ifndef ZAP_CELL_BASED_WAVE_HPP
 #define ZAP_CELL_BASED_WAVE_HPP
 
+#include <fmt/format.h>
+
 #include "CellBased/Definitions.hpp"
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Interface.hpp"
@@ -81,7 +83,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
                   interface.end);
 
       return AxisAlignedWave<ActiveFloat, PointType, X>{
-          .first_order_update = wave_speed * wave,
+          .first_order_update = sign(wave_speed) * wave,
 #ifdef ZAP_2ND_ORDER_CORRECTION
           .second_order_update =
               0.5 * std::abs(wave_speed) * (1 - dt / dx * std::abs(wave_speed)) * wave,
@@ -100,7 +102,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
                   interface.end);
 
       return AxisAlignedWave<ActiveFloat, PointType, Y>{
-          .first_order_update = wave_speed * wave,
+          .first_order_update = sign(wave_speed) * wave,
 #ifdef ZAP_2ND_ORDER_CORRECTION
           .second_order_update =
               0.5 * std::abs(wave_speed) * (1 - dt / dy * std::abs(wave_speed)) * wave,
@@ -128,7 +130,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
                  -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y));
 
     return FreeWave<ActiveFloat, PointType>{
-        .first_order_update  = wave_speed * wave,
+        .first_order_update  = sign(wave_speed) * wave,
         .second_order_update = 0,  // TODO: How does the second_order_update work here?
         .speed               = wave_speed,
         .is_right_going      = wave_speed >= 0,
@@ -174,5 +176,68 @@ calc_wave_polygon(const AxisAlignedWave<ActiveFloat, PointType, orientation>& wa
 }
 
 }  // namespace Zap::CellBased
+
+// -------------------------------------------------------------------------------------------------
+template <typename ActiveFloat,
+          Zap::CellBased::Point2D_c PointType,
+          Zap::CellBased::Orientation orientation>
+struct fmt::formatter<Zap::CellBased::AxisAlignedWave<ActiveFloat, PointType, orientation>> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) const noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  constexpr auto
+  format(const Zap::CellBased::AxisAlignedWave<ActiveFloat, PointType, orientation>& wave,
+         FormatContext& ctx) const noexcept {
+    return fmt::format_to(ctx.out(),
+                          "{{\n"
+                          "  .first_order_update = {}\n"
+                          "  .second_order_update = {}\n"
+                          "  .speed = {}\n"
+                          "  .is_right_going = {}\n"
+                          "  .begin = {}\n"
+                          "  .end = {}\n"
+                          "  .orientation = {}\n"
+                          "}}",
+                          wave.first_order_update,
+                          wave.second_order_update,
+                          wave.speed,
+                          wave.is_right_going,
+                          wave.begin,
+                          wave.end,
+                          orientation == Zap::CellBased::X ? 'X' : 'Y');
+  }
+};
+
+// -------------------------------------------------------------------------------------------------
+template <typename ActiveFloat, Zap::CellBased::Point2D_c PointType>
+struct fmt::formatter<Zap::CellBased::FreeWave<ActiveFloat, PointType>> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) const noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  constexpr auto format(const Zap::CellBased::FreeWave<ActiveFloat, PointType>& wave,
+                        FormatContext& ctx) const noexcept {
+    return fmt::format_to(ctx.out(),
+                          "{{\n"
+                          "  .first_order_update = {}\n"
+                          "  .second_order_update = {}\n"
+                          "  .speed = {}\n"
+                          "  .is_right_going = {}\n"
+                          "  .begin = {}\n"
+                          "  .end = {}\n"
+                          "  .normal = {}\n"
+                          "}}",
+                          wave.first_order_update,
+                          wave.second_order_update,
+                          wave.speed,
+                          wave.is_right_going,
+                          wave.begin,
+                          wave.end,
+                          wave.normal);
+  }
+};
 
 #endif  // ZAP_CELL_BASED_WAVE_HPP
