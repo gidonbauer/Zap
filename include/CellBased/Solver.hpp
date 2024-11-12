@@ -11,6 +11,8 @@
 
 namespace Zap::CellBased {
 
+// TODO: Fix periodic boundary conditions
+
 /*
  * Solve 2D Burgers equation of from d_t u + u * d_x u + u * d_y u = 0
  */
@@ -201,8 +203,8 @@ class Solver {
         const auto wave = normal_wave<orientation>(
             interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
-        if (((side == LEFT || side == BOTTOM) && wave.normal_speed <= 0) ||
-            ((side == RIGHT || side == TOP) && wave.normal_speed >= 0)) {
+        if (!wave.has_value() || ((side == LEFT || side == BOTTOM) && wave->normal_speed <= 0) ||
+            ((side == RIGHT || side == TOP) && wave->normal_speed >= 0)) {
           continue;
         }
 
@@ -211,39 +213,39 @@ class Solver {
           const auto ds =
               orientation == X ? curr_cell.template dy<SIM_C>() : curr_cell.template dx<SIM_C>();
           const ActiveFloat overlap_area =
-              std::abs(wave.normal_speed) * dt * (ds - 0.5 * std::abs(wave.tangent_speed) * dt);
+              std::abs(wave->normal_speed) * dt * (ds - 0.5 * std::abs(wave->tangent_speed) * dt);
           const ActiveFloat cell_area =
               curr_cell.template dx<SIM_C>() * curr_cell.template dy<SIM_C>();
 
-          next_cell.get_cartesian().value -= (overlap_area / cell_area) * wave.first_order_update;
+          next_cell.get_cartesian().value -= (overlap_area / cell_area) * wave->first_order_update;
         } else {
           const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
-              wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+              *wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
           constexpr CoordType coord_type = PointType2CoordType<PointType>;
           // Left subcell
           update_value_by_overlap<side>(next_cell.get_cut().left_value,
                                         next_cell.template get_cut_left_polygon<coord_type>(),
                                         wave_polygon,
-                                        wave);
+                                        *wave);
           // Right subcell
           update_value_by_overlap<side>(next_cell.get_cut().right_value,
                                         next_cell.template get_cut_right_polygon<coord_type>(),
                                         wave_polygon,
-                                        wave);
+                                        *wave);
         }
         // = Update this cell ==============================
 
         // = Update tangentally affected cell ==============
         const size_t tangent_update_idx = [&curr_cell, &wave] {
           if constexpr (orientation == X) {
-            if (wave.tangent_speed >= 0.0) {
+            if (wave->tangent_speed >= 0.0) {
               return curr_cell.top_idx;
             } else {
               return curr_cell.bottom_idx;
             }
           } else {
-            if (wave.tangent_speed >= 0.0) {
+            if (wave->tangent_speed >= 0.0) {
               return curr_cell.right_idx;
             } else {
               return curr_cell.left_idx;
@@ -255,27 +257,27 @@ class Solver {
           auto& tangent_cell = next_grid[tangent_update_idx];
           if (tangent_cell.is_cartesian()) {
             const ActiveFloat overlap_area =
-                0.5 * std::abs(wave.tangent_speed) * dt * std::abs(wave.normal_speed) * dt;
+                0.5 * std::abs(wave->tangent_speed) * dt * std::abs(wave->normal_speed) * dt;
             const ActiveFloat cell_area =
                 curr_cell.template dx<SIM_C>() * curr_cell.template dy<SIM_C>();
 
             tangent_cell.get_cartesian().value -=
-                (overlap_area / cell_area) * wave.first_order_update;
+                (overlap_area / cell_area) * wave->first_order_update;
           } else {
             const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
-                wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+                *wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
             constexpr CoordType coord_type = PointType2CoordType<PointType>;
             // Left subcell
             update_value_by_overlap<side>(tangent_cell.get_cut().left_value,
                                           tangent_cell.template get_cut_left_polygon<coord_type>(),
                                           wave_polygon,
-                                          wave);
+                                          *wave);
             // Right subcell
             update_value_by_overlap<side>(tangent_cell.get_cut().right_value,
                                           tangent_cell.template get_cut_right_polygon<coord_type>(),
                                           wave_polygon,
-                                          wave);
+                                          *wave);
           }
         }
         // = Update tangentally affected cell ==============
@@ -461,8 +463,14 @@ class Solver {
         const auto& curr_cell = curr_grid[cell_idx];
         const auto internal_interface =
             get_internal_interface<ActiveFloat, PassiveFloat, PointType>(curr_cell);
-        internal_waves[i] = normal_wave<FREE>(
+        auto wave = normal_wave<FREE>(
             internal_interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+        IGOR_ASSERT(wave.has_value(),
+                    "Internal wave must exist, i.e. internal interface must have length > EPS but "
+                    "internal interface has begin={} and end={}",
+                    internal_interface.begin,
+                    internal_interface.end);
+        internal_waves[i] = std::move(*wave);
       }
       // = Pre-calculate internal interface waves ==================================================
 

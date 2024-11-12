@@ -1,6 +1,12 @@
 #ifndef ZAP_CELL_BASED_WAVE_HPP
 #define ZAP_CELL_BASED_WAVE_HPP
 
+#ifndef ZAP_NO_TANGENTIAL_CORRECTION
+#define ZAP_TANGENTIAL_CORRECTION
+#endif  //  ZAP_NO_TANGENTIAL_CORRECTION
+
+#include <optional>
+
 #include <fmt/format.h>
 
 #include "CellBased/Definitions.hpp"
@@ -22,8 +28,9 @@ scale_if_grid_coord(const PointType& p, PassiveFloat dx, PassiveFloat dy) noexce
 
 // -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, Point2D_c PointType, Orientation orientation>
-requires(orientation == X || orientation == Y)
 struct AxisAlignedWave {
+  static_assert(orientation == X || orientation == Y, "Orientation must be `X` or `Y`.");
+
   ActiveFloat first_order_update;
   ActiveFloat second_order_update;
 
@@ -60,11 +67,11 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 [[nodiscard]] constexpr auto normal_wave(const FullInterface<ActiveFloat, PointType>& interface,
                                          PassiveFloat dx,
                                          PassiveFloat dy,
-                                         [[maybe_unused]] ActiveFloat dt) noexcept {
-  IGOR_ASSERT((interface.end - interface.begin).norm() >= EPS<PassiveFloat>,
-              "Empty interface with begin={} and end={}",
-              interface.begin,
-              interface.end);
+                                         [[maybe_unused]] ActiveFloat dt) noexcept
+    -> std::optional<std::conditional_t<orientation == FREE,
+                                        FreeWave<ActiveFloat, PointType>,
+                                        AxisAlignedWave<ActiveFloat, PointType, orientation>>> {
+  if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return std::nullopt; }
 
   const ActiveFloat wave = interface.right_value - interface.left_value;  // As in LeVeque Book
 
@@ -81,7 +88,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
                   interface.begin,
                   interface.end);
 
-      return AxisAlignedWave<ActiveFloat, PointType, X>{
+      return std::make_optional(AxisAlignedWave<ActiveFloat, PointType, X>{
           .first_order_update = sign(wave_speed) * wave,
 #ifdef ZAP_2ND_ORDER_CORRECTION
           .second_order_update =
@@ -89,18 +96,25 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 #else
           .second_order_update = 0,
 #endif  //  ZAP_2ND_ORDER_CORRECTION
-          .normal_speed  = wave_speed,
+
+          .normal_speed = wave_speed,
+
+#ifdef ZAP_TANGENTIAL_CORRECTION
           .tangent_speed = wave_speed,
-          .begin         = interface.begin,
-          .end           = interface.end,
-      };
+#else
+          .tangent_speed = 0,
+#endif  //  ZAP_TANGENTIAL_CORRECTION
+
+          .begin = interface.begin,
+          .end   = interface.end,
+      });
     } else {
       IGOR_ASSERT(approx_eq(interface.begin.y, interface.end.y),
                   "Interface is not aligned to y-axis, begin={}, end={}",
                   interface.begin,
                   interface.end);
 
-      return AxisAlignedWave<ActiveFloat, PointType, Y>{
+      return std::make_optional(AxisAlignedWave<ActiveFloat, PointType, Y>{
           .first_order_update = sign(wave_speed) * wave,
 #ifdef ZAP_2ND_ORDER_CORRECTION
           .second_order_update =
@@ -108,11 +122,18 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 #else
           .second_order_update = 0,
 #endif  //  ZAP_2ND_ORDER_CORRECTION
-          .normal_speed  = wave_speed,
+
+          .normal_speed = wave_speed,
+
+#ifdef ZAP_TANGENTIAL_CORRECTION
           .tangent_speed = wave_speed,
-          .begin         = interface.begin,
-          .end           = interface.end,
-      };
+#else
+          .tangent_speed = 0,
+#endif  //  ZAP_TANGENTIAL_CORRECTION
+
+          .begin = interface.begin,
+          .end   = interface.end,
+      });
     }
   }
   // - Free wave -----------------------------------------------------------------------------------
@@ -130,17 +151,24 @@ requires(orientation == X || orientation == Y || orientation == FREE)
     const ActiveFloat normal_speed  = u_mid * (cos_angle + sin_angle);
     const ActiveFloat tangent_speed = u_mid * (-sin_angle + cos_angle);
 
-    return FreeWave<ActiveFloat, PointType>{
+    return std::make_optional(FreeWave<ActiveFloat, PointType>{
         .first_order_update =
             sign(normal_speed) * wave,  // TODO: Double check if sign(normal_speed) is correct
         .second_order_update = 0,       // TODO: How does the second_order_update work here?
-        .normal_speed        = normal_speed,
-        .normal              = scale_if_grid_coord(normal_vector, dx, dy),
-        .tangent_speed       = tangent_speed,
-        .tangent             = scale_if_grid_coord(tangent_vector, dx, dy),
-        .begin               = interface.begin,
-        .end                 = interface.end,
-    };
+
+        .normal_speed = normal_speed,
+        .normal       = scale_if_grid_coord(normal_vector, dx, dy),
+
+#ifdef ZAP_TANGENTIAL_CORRECTION
+        .tangent_speed = tangent_speed,
+#else
+        .tangent_speed = 0,
+#endif  //  ZAP_TANGENTIAL_CORRECTION
+        .tangent = scale_if_grid_coord(tangent_vector, dx, dy),
+
+        .begin = interface.begin,
+        .end   = interface.end,
+    });
   }
 }
 

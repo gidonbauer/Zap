@@ -4,7 +4,7 @@
 #include <AD/ad.hpp>
 
 // #define ZAP_2ND_ORDER_CORRECTION
-// #define ZAP_TANGENTIAL_CORRECTION
+#define ZAP_NO_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 
 #include "CellBased/ReconstructShock.hpp"
@@ -193,8 +193,8 @@ auto main(int argc, char** argv) -> int {
   ActiveFloat eps     = args->eps;
   ad::derivative(eps) = 1;
 
-  // #define RAMP_X
-#define QUARTER_CIRCLE
+#define RAMP_X
+// #define QUARTER_CIRCLE
 #ifdef QUARTER_CIRCLE
   const PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
 
@@ -213,10 +213,10 @@ auto main(int argc, char** argv) -> int {
   };
 #elif defined(RAMP_X)
   auto u0 = [=](ActiveFloat x, ActiveFloat /*y*/) -> ActiveFloat {
-    // return (1+eps) * (x - x_min) * static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2);
+    return (1 + eps) * (x - X_MIN) * static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2);
 
     // TODO: Inverse ramp is not solved correctly
-    return (X_MAX - x) * (1.0 - static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2));
+    // return (X_MAX - x) * (1.0 - static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2));
   };
 
   [[maybe_unused]] auto init_shock = [=](PassiveFloat t) -> Zap::CellBased::SimCoord<PassiveFloat> {
