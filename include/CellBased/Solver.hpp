@@ -446,41 +446,54 @@ class Solver {
 
 #ifndef ZAP_NO_PARALLEL
     // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    auto divisor_pair = [](size_t number) {
+      auto lower = static_cast<size_t>(std::floor(std::sqrt(number)));
+      while (number % lower > 0) {
+        lower -= 1;
+      }
+      return std::make_pair(lower, number / lower);
+    };
+
     struct Chunk {
       size_t xi_min, xi_max, yi_min, yi_max;
     };
 
-    constexpr size_t NUM_CHUNKS   = 8;
-    constexpr size_t NUM_CHUNKS_X = 4;
-    constexpr size_t NUM_CHUNKS_Y = 2;
-    static_assert(NUM_CHUNKS == NUM_CHUNKS_X * NUM_CHUNKS_Y);
-    const auto chunk_width     = curr_grid.nx() / NUM_CHUNKS_X;
-    const auto chunk_height    = curr_grid.ny() / NUM_CHUNKS_Y;
-    const auto chunk_missing_x = curr_grid.nx() - chunk_width * NUM_CHUNKS_X;
-    const auto chunk_missing_y = curr_grid.ny() - chunk_height * NUM_CHUNKS_Y;
+    const size_t num_threads = [] {
+      int n = -1;
+#pragma omp parallel
+#pragma omp single
+      { n = omp_get_num_threads(); }
+      IGOR_ASSERT(n > 0, "Number of threads must be larger than zero but is {}", n);
+      return static_cast<size_t>(n);
+    }();
 
-    std::array<Chunk, NUM_CHUNKS> chunks;
-    for (size_t chunk_yi = 0; chunk_yi < NUM_CHUNKS_Y; ++chunk_yi) {
-      for (size_t chunk_xi = 0; chunk_xi < NUM_CHUNKS_X; ++chunk_xi) {
-        const auto i = chunk_xi + chunk_yi * NUM_CHUNKS_X;
+    const size_t num_chunks                 = num_threads;
+    const auto [num_chunks_y, num_chunks_x] = divisor_pair(num_chunks);
+
+    Igor::Info("Number of chunks for parallel computation: {}", num_chunks);
+    Igor::Info("Number of chunks in x-direction: {}", num_chunks_x);
+    Igor::Info("Number of chunks in y-direction: {}", num_chunks_y);
+
+    IGOR_ASSERT(num_chunks == num_chunks_x * num_chunks_y,
+                "Number of chunks in x and y direction does not match number of overall chunks.");
+
+    const auto chunk_width     = curr_grid.nx() / num_chunks_x;
+    const auto chunk_height    = curr_grid.ny() / num_chunks_y;
+    const auto chunk_missing_x = curr_grid.nx() - chunk_width * num_chunks_x;
+    const auto chunk_missing_y = curr_grid.ny() - chunk_height * num_chunks_y;
+
+    std::vector<Chunk> chunks(num_chunks);
+    for (size_t chunk_yi = 0; chunk_yi < num_chunks_y; ++chunk_yi) {
+      for (size_t chunk_xi = 0; chunk_xi < num_chunks_x; ++chunk_xi) {
+        const auto i = chunk_xi + chunk_yi * num_chunks_x;
         chunks[i]    = Chunk{
                .xi_min = chunk_xi * chunk_width,
                .xi_max =
-                (chunk_xi + 1) * chunk_width + chunk_missing_x * (chunk_xi + 1 == NUM_CHUNKS_X),
+                (chunk_xi + 1) * chunk_width + chunk_missing_x * (chunk_xi + 1 == num_chunks_x),
                .yi_min = chunk_yi * chunk_height,
                .yi_max =
-                (chunk_yi + 1) * chunk_height + chunk_missing_y * (chunk_yi + 1 == NUM_CHUNKS_Y),
+                (chunk_yi + 1) * chunk_height + chunk_missing_y * (chunk_yi + 1 == num_chunks_y),
         };
-      }
-    }
-
-#pragma omp parallel
-    {
-#pragma omp single
-      if (omp_get_num_threads() != static_cast<int>(NUM_CHUNKS)) {
-        Igor::Warn("The solver is optimized for {} threads, found {} threads.",
-                   NUM_CHUNKS,
-                   omp_get_num_threads());
       }
     }
     // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
