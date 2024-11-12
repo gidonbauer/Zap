@@ -3,8 +3,9 @@
 
 #include <AD/ad.hpp>
 
+// #define ZAP_NO_PARALLEL
 // #define ZAP_2ND_ORDER_CORRECTION
-#define ZAP_NO_TANGENTIAL_CORRECTION
+// #define ZAP_NO_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 
 #include "CellBased/ReconstructShock.hpp"
@@ -193,8 +194,8 @@ auto main(int argc, char** argv) -> int {
   ActiveFloat eps     = args->eps;
   ad::derivative(eps) = 1;
 
-#define RAMP_X
-// #define QUARTER_CIRCLE
+// #define RAMP_X
+#define QUARTER_CIRCLE
 #ifdef QUARTER_CIRCLE
   const PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
 

@@ -28,6 +28,7 @@ class UniformGrid {
 
   std::vector<size_t> m_cut_cell_idxs;
 
+ public:
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto to_vec_idx(size_t xi, size_t yi) const noexcept -> size_t {
     assert(xi < m_nx);
@@ -61,7 +62,6 @@ class UniformGrid {
     };
   }
 
- public:
   // -----------------------------------------------------------------------------------------------
   constexpr UniformGrid(PassiveFloat x_min,
                         PassiveFloat x_max,

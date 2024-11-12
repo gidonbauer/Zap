@@ -4,6 +4,10 @@
 #include <numeric>
 #include <unordered_set>
 
+#ifndef ZAP_NO_PARALLEL
+#include <omp.h>
+#endif  // ZAP_NO_PARALLEL
+
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Interface.hpp"
@@ -12,10 +16,11 @@
 namespace Zap::CellBased {
 
 // TODO: Fix periodic boundary conditions
+// TODO: Fix bug in parallelization -> order of cell that are updated matters
 
-/*
- * Solve 2D Burgers equation of from d_t u + u * d_x u + u * d_y u = 0
- */
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +              Solve 2D Burgers equation of from d_t u + u * d_x u + u * d_y u = 0              +
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 template <ExtendType extend_type>
 class Solver {
   // -----------------------------------------------------------------------------------------------
@@ -439,6 +444,48 @@ class Solver {
     auto& curr_grid = grid;
     auto next_grid  = grid;
 
+#ifndef ZAP_NO_PARALLEL
+    // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    struct Chunk {
+      size_t xi_min, xi_max, yi_min, yi_max;
+    };
+
+    constexpr size_t NUM_CHUNKS   = 8;
+    constexpr size_t NUM_CHUNKS_X = 4;
+    constexpr size_t NUM_CHUNKS_Y = 2;
+    static_assert(NUM_CHUNKS == NUM_CHUNKS_X * NUM_CHUNKS_Y);
+    const auto chunk_width     = curr_grid.nx() / NUM_CHUNKS_X;
+    const auto chunk_height    = curr_grid.ny() / NUM_CHUNKS_Y;
+    const auto chunk_missing_x = curr_grid.nx() - chunk_width * NUM_CHUNKS_X;
+    const auto chunk_missing_y = curr_grid.ny() - chunk_height * NUM_CHUNKS_Y;
+
+    std::array<Chunk, NUM_CHUNKS> chunks;
+    for (size_t chunk_yi = 0; chunk_yi < NUM_CHUNKS_Y; ++chunk_yi) {
+      for (size_t chunk_xi = 0; chunk_xi < NUM_CHUNKS_X; ++chunk_xi) {
+        const auto i = chunk_xi + chunk_yi * NUM_CHUNKS_X;
+        chunks[i]    = Chunk{
+               .xi_min = chunk_xi * chunk_width,
+               .xi_max =
+                (chunk_xi + 1) * chunk_width + chunk_missing_x * (chunk_xi + 1 == NUM_CHUNKS_X),
+               .yi_min = chunk_yi * chunk_height,
+               .yi_max =
+                (chunk_yi + 1) * chunk_height + chunk_missing_y * (chunk_yi + 1 == NUM_CHUNKS_Y),
+        };
+      }
+    }
+
+#pragma omp parallel
+    {
+#pragma omp single
+      if (omp_get_num_threads() != static_cast<int>(NUM_CHUNKS)) {
+        Igor::Warn("The solver is optimized for {} threads, found {} threads.",
+                   NUM_CHUNKS,
+                   omp_get_num_threads());
+      }
+    }
+    // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#endif  // ZAP_NO_PARALLEL
+
     if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(PassiveFloat{0})) {
       return std::nullopt;
     }
@@ -492,13 +539,14 @@ class Solver {
       // TODO: Consider purging cuts that are no longer at the shock front using the
       //       RK-Jump-Condition
 #endif  // ZAP_STATIC_CUT
+      assert(curr_grid.cut_cell_idxs().size() == internal_waves.size());
 
       // TODO: What happens when a subcell has area 0?
       //   -> cannot "uncut" the cell because that would loose shock position information
 
-      // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
       // TODO: Do parallelization that handles tangential correction
-      // #pragma omp parallel for
+
+#ifdef ZAP_NO_PARALLEL
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
         const auto& curr_cell = curr_grid[cell_idx];
         auto& next_cell       = next_grid[cell_idx];
@@ -529,6 +577,76 @@ class Solver {
         update_cell_by_free_wave(next_cell, internal_wave, dt);
       }
       // = Handle internal interface ===============================================================
+#else
+      // ~ Parallelization of grid update ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      auto do_update = [&](size_t xi, size_t yi) {
+        const size_t cell_idx = curr_grid.to_vec_idx(xi, yi);
+        const auto& curr_cell = curr_grid[cell_idx];
+        auto& next_cell       = next_grid[cell_idx];
+
+        // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP =================================
+        handle_side_iterface<PointType, LEFT>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, RIGHT>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, BOTTOM>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, TOP>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP =================================
+
+        // = Handle internal interface =============================================================
+        // TODO: Why does the result change if I merge the loops?
+        if (curr_cell.is_cut()) {
+          // TODO: Can we do better than linear search?
+          const auto it = std::find(
+              curr_grid.cut_cell_idxs().cbegin(), curr_grid.cut_cell_idxs().cend(), cell_idx);
+          IGOR_ASSERT(it != curr_grid.cut_cell_idxs().cend(),
+                      "Did not find cell_idx {} in array of cut cell indices {}",
+                      cell_idx,
+                      curr_grid.cut_cell_idxs());
+          const auto iw_idx =
+              static_cast<size_t>(std::distance(curr_grid.cut_cell_idxs().cbegin(), it));
+
+          const auto& internal_wave  = internal_waves[iw_idx];
+          const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
+          // Neighbouring cells
+          for (size_t neighbour_idx : cell_neighbours) {
+            update_cell_by_free_wave(next_grid[neighbour_idx], internal_wave, dt);
+          }
+          // This cell
+          update_cell_by_free_wave(next_cell, internal_wave, dt);
+        }
+        // = Handle internal interface =============================================================
+      };
+
+      auto update_chunk = [&](const Chunk& chunk) {
+        for (size_t yi = chunk.yi_min + 1; yi < chunk.yi_max - 1; ++yi) {
+          for (size_t xi = chunk.xi_min + 1; xi < chunk.xi_max - 1; ++xi) {
+            do_update(xi, yi);
+          }
+        }
+      };
+
+      auto stich_chunk = [&](const Chunk& chunk) {
+        for (size_t xi = chunk.xi_min; xi < chunk.xi_max; ++xi) {
+          do_update(xi, chunk.yi_min);
+          do_update(xi, chunk.yi_max - 1);
+        }
+        for (size_t yi = chunk.yi_min; yi < chunk.yi_max; ++yi) {
+          do_update(chunk.xi_min, yi);
+          do_update(chunk.xi_max - 1, yi);
+        }
+      };
+
+#pragma omp parallel
+#pragma omp single
+      for (const auto& chunk : chunks) {
+#pragma omp task
+        update_chunk(chunk);
+      }
+
+      for (const auto& chunk : chunks) {
+        stich_chunk(chunk);
+      }
+      // ~ Parallelization of grid update ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#endif  // ZAP_NO_PARALLEL
 
       // Update time
       t += dt;
