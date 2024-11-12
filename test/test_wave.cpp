@@ -32,11 +32,15 @@ TEST(Wave, XDirection) {
   EXPECT_LE((wave.begin - interface.begin).norm(), EPS<double>);
   EXPECT_LE((wave.end - interface.end).norm(), EPS<double>);
 
-  EXPECT_TRUE(wave.is_right_going) << "Expected wave to move to the right but is not.";
-  EXPECT_DOUBLE_EQ(wave.speed,
+  EXPECT_GE(wave.normal_speed, 0.0) << "Expected wave to move to the right but is not.";
+  EXPECT_DOUBLE_EQ(wave.normal_speed,
                    (f(interface.right_value) - f(interface.left_value)) /
                        (interface.right_value - interface.left_value))
-      << "Wave speed does not match with Rankine-Hugoniot condition";
+      << "Normal wave speed does not match with Rankine-Hugoniot condition";
+  EXPECT_DOUBLE_EQ(wave.tangent_speed,
+                   (f(interface.right_value) - f(interface.left_value)) /
+                       (interface.right_value - interface.left_value))
+      << "Tangential wave speed does not match with Rankine-Hugoniot condition";
 
   // Igor::Info("wave.first_order_update  = {}", wave.first_order_update);
   // Igor::Info("wave.second_order_update = {}", wave.second_order_update);
@@ -62,11 +66,15 @@ TEST(Wave, YDirection) {
   EXPECT_LE((wave.begin - interface.begin).norm(), EPS<double>);
   EXPECT_LE((wave.end - interface.end).norm(), EPS<double>);
 
-  EXPECT_TRUE(wave.is_right_going) << "Expected wave to move to the right but is not.";
-  EXPECT_DOUBLE_EQ(wave.speed,
+  EXPECT_GE(wave.normal_speed, 0.0) << "Expected wave to move to the right but is not.";
+  EXPECT_DOUBLE_EQ(wave.normal_speed,
                    (f(interface.right_value) - f(interface.left_value)) /
                        (interface.right_value - interface.left_value))
-      << "Wave speed does not match with Rankine-Hugoniot condition";
+      << "Normal wave speed does not match with Rankine-Hugoniot condition";
+  EXPECT_DOUBLE_EQ(wave.tangent_speed,
+                   (f(interface.right_value) - f(interface.left_value)) /
+                       (interface.right_value - interface.left_value))
+      << "Tangential wave speed does not match with Rankine-Hugoniot condition";
 
   // Igor::Info("wave.first_order_update  = {}", wave.first_order_update);
   // Igor::Info("wave.second_order_update = {}", wave.second_order_update);
@@ -96,12 +104,19 @@ TEST(Wave, FourtyFiveDegree) {
                 .norm(),
             EPS<double>);
 
-  EXPECT_TRUE(wave.is_right_going) << "Expected wave to move to the right but is not.";
-  EXPECT_DOUBLE_EQ(wave.speed,
-                   (std::cos(std::numbers::pi / 4) + std::sin(std::numbers::pi / 4)) *
+  EXPECT_GE(wave.normal_speed, 0.0) << "Expected wave to move to the right but is not.";
+  constexpr auto angle = std::numbers::pi / 4.0;
+  EXPECT_DOUBLE_EQ(wave.normal_speed,
+                   (std::cos(angle) + std::sin(angle)) *
                        (f(interface.right_value) - f(interface.left_value)) /
                        (interface.right_value - interface.left_value))
-      << "Wave speed does not match with Rankine-Hugoniot condition";
+      << "Normal wave speed does not match with Rankine-Hugoniot condition";
+  EXPECT_NEAR(wave.tangent_speed,
+              (-std::sin(angle) + std::cos(angle)) *
+                  (f(interface.right_value) - f(interface.left_value)) /
+                  (interface.right_value - interface.left_value),
+              EPS<double>)
+      << "Tangential wave speed does not match with Rankine-Hugoniot condition";
 
   // Igor::Info("wave.first_order_update  = {}", wave.first_order_update);
   // Igor::Info("wave.second_order_update = {}", wave.second_order_update);
@@ -131,13 +146,19 @@ TEST(Wave, TwohundredTwentyFiveDegree) {
                 .norm(),
             EPS<double>);
 
-  EXPECT_FALSE(wave.is_right_going) << "Expected wave to move to the left but is not.";
-  EXPECT_DOUBLE_EQ(wave.speed,
-                   (std::cos(5 * std::numbers::pi / 4) + std::sin(5 * std::numbers::pi / 4)) *
+  EXPECT_LT(wave.normal_speed, 0.0) << "Expected wave to move to the left but is not.";
+  const auto angle = 5.0 * std::numbers::pi / 4.0;
+  EXPECT_DOUBLE_EQ(wave.normal_speed,
+                   (std::cos(angle) + std::sin(angle)) *
                        (f(interface.right_value) - f(interface.left_value)) /
                        (interface.right_value - interface.left_value))
-      << "Wave speed does not match with Rankine-Hugoniot condition";
-  EXPECT_LT(wave.speed, 0.0) << "Expected negative wave speed";
+      << "Normal wave speed does not match with Rankine-Hugoniot condition";
+  EXPECT_NEAR(wave.tangent_speed,
+              (-std::sin(angle) + std::cos(angle)) *
+                  (f(interface.right_value) - f(interface.left_value)) /
+                  (interface.right_value - interface.left_value),
+              EPS<double>)
+      << "Tangential wave speed does not match with Rankine-Hugoniot condition";
 
   // Igor::Info("wave.first_order_update  = {}", wave.first_order_update);
   // Igor::Info("wave.second_order_update = {}", wave.second_order_update);

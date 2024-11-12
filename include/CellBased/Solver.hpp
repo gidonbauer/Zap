@@ -127,16 +127,23 @@ class Solver {
        "Invalid combination of orientation and side parameter.");
     // clang-format on
 
-    const auto ds = orientation == X ? cell.template dx<SIM_C>() : cell.template dy<SIM_C>();
+    IGOR_ASSERT(approx_eq(wave.tangent_speed, ActiveFloat{0}),
+                "This function may only be called if the tangential speed is zero, but the "
+                "tangential speed is {}",
+                wave.tangent_speed);
+
     if (cell.is_cartesian()) {
+      const auto ds = orientation == X ? cell.template dx<SIM_C>() : cell.template dy<SIM_C>();
       if constexpr ((side == LEFT || side == BOTTOM)) {
-        if (wave.is_right_going) {
-          cell.get_cartesian().value -= (dt / ds) * std::abs(wave.speed) * wave.first_order_update;
+        if (wave.normal_speed >= 0) {
+          cell.get_cartesian().value -=
+              (dt / ds) * std::abs(wave.normal_speed) * wave.first_order_update;
         }
         cell.get_cartesian().value -= (dt / ds) * wave.second_order_update;
       } else {
-        if (!wave.is_right_going) {
-          cell.get_cartesian().value -= (dt / ds) * std::abs(wave.speed) * wave.first_order_update;
+        if (!(wave.normal_speed >= 0)) {
+          cell.get_cartesian().value -=
+              (dt / ds) * std::abs(wave.normal_speed) * wave.first_order_update;
         }
         cell.get_cartesian().value -= (dt / ds) * (-wave.second_order_update);
       }
@@ -161,10 +168,11 @@ class Solver {
   // -----------------------------------------------------------------------------------------------
   template <Point2D_c PointType, Side side, typename ActiveFloat, typename PassiveFloat>
   requires(side == BOTTOM || side == RIGHT || side == TOP || side == LEFT)
-  constexpr void handle_side_iterface(Cell<ActiveFloat, PassiveFloat>& next_cell,
-                                      const Cell<ActiveFloat, PassiveFloat>& curr_cell,
-                                      const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid,
-                                      const ActiveFloat& dt) const noexcept {
+  void handle_side_iterface(Cell<ActiveFloat, PassiveFloat>& next_cell,
+                            const Cell<ActiveFloat, PassiveFloat>& curr_cell,
+                            UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
+                            const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid,
+                            const ActiveFloat& dt) const noexcept {
     size_t idx = NULL_INDEX;
     switch (side) {
       case BOTTOM: idx = curr_cell.bottom_idx; break;
@@ -192,8 +200,85 @@ class Solver {
       for (const auto& interface : interfaces) {
         const auto wave = normal_wave<orientation>(
             interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
-        update_cell_by_axis_aligned_wave<ActiveFloat, PassiveFloat, PointType, orientation, side>(
-            next_cell, wave, dt);
+
+        if (((side == LEFT || side == BOTTOM) && wave.normal_speed <= 0) ||
+            ((side == RIGHT || side == TOP) && wave.normal_speed >= 0)) {
+          continue;
+        }
+
+        // = Update this cell =========================================
+        if (next_cell.is_cartesian()) {
+          const auto ds =
+              orientation == X ? curr_cell.template dy<SIM_C>() : curr_cell.template dx<SIM_C>();
+          const ActiveFloat overlap_area =
+              std::abs(wave.normal_speed) * dt * (ds - 0.5 * std::abs(wave.tangent_speed) * dt);
+          const ActiveFloat cell_area =
+              curr_cell.template dx<SIM_C>() * curr_cell.template dy<SIM_C>();
+
+          next_cell.get_cartesian().value -= (overlap_area / cell_area) * wave.first_order_update;
+        } else {
+          const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
+              wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+
+          constexpr CoordType coord_type = PointType2CoordType<PointType>;
+          // Left subcell
+          update_value_by_overlap<side>(next_cell.get_cut().left_value,
+                                        next_cell.template get_cut_left_polygon<coord_type>(),
+                                        wave_polygon,
+                                        wave);
+          // Right subcell
+          update_value_by_overlap<side>(next_cell.get_cut().right_value,
+                                        next_cell.template get_cut_right_polygon<coord_type>(),
+                                        wave_polygon,
+                                        wave);
+        }
+        // = Update this cell ==============================
+
+        // = Update tangentally affected cell ==============
+        const size_t tangent_update_idx = [&curr_cell, &wave] {
+          if constexpr (orientation == X) {
+            if (wave.tangent_speed >= 0.0) {
+              return curr_cell.top_idx;
+            } else {
+              return curr_cell.bottom_idx;
+            }
+          } else {
+            if (wave.tangent_speed >= 0.0) {
+              return curr_cell.right_idx;
+            } else {
+              return curr_cell.left_idx;
+            }
+          }
+        }();
+
+        if (curr_grid.is_cell(tangent_update_idx)) {
+          auto& tangent_cell = next_grid[tangent_update_idx];
+          if (tangent_cell.is_cartesian()) {
+            const ActiveFloat overlap_area =
+                0.5 * std::abs(wave.tangent_speed) * dt * std::abs(wave.normal_speed) * dt;
+            const ActiveFloat cell_area =
+                curr_cell.template dx<SIM_C>() * curr_cell.template dy<SIM_C>();
+
+            tangent_cell.get_cartesian().value -=
+                (overlap_area / cell_area) * wave.first_order_update;
+          } else {
+            const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
+                wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
+
+            constexpr CoordType coord_type = PointType2CoordType<PointType>;
+            // Left subcell
+            update_value_by_overlap<side>(tangent_cell.get_cut().left_value,
+                                          tangent_cell.template get_cut_left_polygon<coord_type>(),
+                                          wave_polygon,
+                                          wave);
+            // Right subcell
+            update_value_by_overlap<side>(tangent_cell.get_cut().right_value,
+                                          tangent_cell.template get_cut_right_polygon<coord_type>(),
+                                          wave_polygon,
+                                          wave);
+          }
+        }
+        // = Update tangentally affected cell ==============
       }
     } else if (idx == SAME_VALUE_INDEX || idx == ZERO_FLUX_INDEX) {
       // No-op
@@ -230,19 +315,26 @@ class Solver {
     avg_new_shock_points.clear();
     if (internal_waves.empty()) { return; }
 
-    avg_new_shock_points.push_back(internal_waves[0].begin +
-                                   dt * internal_waves[0].speed * internal_waves[0].normal);
+    avg_new_shock_points.push_back(
+        internal_waves.front().begin +
+        dt * internal_waves.front().normal_speed * internal_waves.front().normal +
+        dt * internal_waves.front().tangent_speed * internal_waves.front().tangent);
 
     for (size_t i = 0; i < internal_waves.size() - 1; ++i) {
-      const auto p1 =
-          internal_waves[i].end + dt * internal_waves[i].speed * internal_waves[i].normal;
+      const auto p1 = internal_waves[i].end +
+                      dt * internal_waves[i].normal_speed * internal_waves[i].normal +
+                      dt * internal_waves[i].tangent_speed * internal_waves[i].tangent;
       const auto p2 = internal_waves[i + 1].begin +
-                      dt * internal_waves[i + 1].speed * internal_waves[i + 1].normal;
+                      dt * internal_waves[i + 1].normal_speed * internal_waves[i + 1].normal +
+                      dt * internal_waves[i + 1].tangent_speed * internal_waves[i + 1].tangent;
       avg_new_shock_points.push_back((p1 + p2) / 2);
     }
-    avg_new_shock_points.push_back(internal_waves.back().end +
-                                   dt * internal_waves.back().speed * internal_waves.back().normal);
+    avg_new_shock_points.push_back(
+        internal_waves.back().end +
+        dt * internal_waves.back().normal_speed * internal_waves.back().normal +
+        dt * internal_waves.back().tangent_speed * internal_waves.back().tangent);
 
+    // TODO: Is this necessary?
     // Remove first and last point if they are to close to the next point
     if ((avg_new_shock_points[0] - avg_new_shock_points[1]).norm() < 1e-2) {
       avg_new_shock_points.erase(std::next(std::begin(avg_new_shock_points)));
@@ -397,15 +489,16 @@ class Solver {
       //   -> cannot "uncut" the cell because that would loose shock position information
 
       // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
-#pragma omp parallel for
+      // TODO: Do parallelization that handles tangential correction
+      // #pragma omp parallel for
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
         const auto& curr_cell = curr_grid[cell_idx];
         auto& next_cell       = next_grid[cell_idx];
 
-        handle_side_iterface<PointType, LEFT>(next_cell, curr_cell, curr_grid, dt);
-        handle_side_iterface<PointType, RIGHT>(next_cell, curr_cell, curr_grid, dt);
-        handle_side_iterface<PointType, BOTTOM>(next_cell, curr_cell, curr_grid, dt);
-        handle_side_iterface<PointType, TOP>(next_cell, curr_cell, curr_grid, dt);
+        handle_side_iterface<PointType, LEFT>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, RIGHT>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, BOTTOM>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, TOP>(next_cell, curr_cell, next_grid, curr_grid, dt);
       }
       // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
 

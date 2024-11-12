@@ -3,9 +3,8 @@
 
 #include <AD/ad.hpp>
 
-// #define ZAP_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
-#define X_RAMP
+// #define X_RAMP
 
 #include "CellBased/Solver.hpp"
 
@@ -138,7 +137,6 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   ActiveFloat eps     = eps_value;
   ad::derivative(eps) = 1;
 
-#define X_RAMP
 #ifndef X_RAMP
   constexpr PassiveFloat r = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
   auto u0                  = [&](ActiveFloat x, ActiveFloat y) -> ActiveFloat {

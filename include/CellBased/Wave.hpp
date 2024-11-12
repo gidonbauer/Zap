@@ -9,14 +9,6 @@
 
 namespace Zap::CellBased {
 
-// template <typename ActiveFloat>
-// [[nodiscard]] constexpr auto minmod(const ActiveFloat& a, const ActiveFloat& b) noexcept
-//     -> ActiveFloat {
-//   if (a * b <= 0.0) { return 0.0; }
-//   if (std::abs(a) < std::abs(b)) { return a; }
-//   return b;
-// }
-
 // - Scale vector when operating in grid coordinates -----------------------------------------------
 template <typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
@@ -34,8 +26,11 @@ requires(orientation == X || orientation == Y)
 struct AxisAlignedWave {
   ActiveFloat first_order_update;
   ActiveFloat second_order_update;
-  ActiveFloat speed;
-  bool is_right_going;
+
+  ActiveFloat normal_speed;
+
+  ActiveFloat tangent_speed;
+
   PointType begin;
   PointType end;
 };
@@ -45,11 +40,15 @@ template <typename ActiveFloat, Point2D_c PointType>
 struct FreeWave {
   ActiveFloat first_order_update;
   ActiveFloat second_order_update;
-  ActiveFloat speed;
-  bool is_right_going;
+
+  ActiveFloat normal_speed;
+  PointType normal;
+
+  ActiveFloat tangent_speed;
+  PointType tangent;
+
   PointType begin;
   PointType end;
-  PointType normal;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -90,10 +89,10 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 #else
           .second_order_update = 0,
 #endif  //  ZAP_2ND_ORDER_CORRECTION
-          .speed          = wave_speed,
-          .is_right_going = wave_speed >= 0,
-          .begin          = interface.begin,
-          .end            = interface.end,
+          .normal_speed  = wave_speed,
+          .tangent_speed = wave_speed,
+          .begin         = interface.begin,
+          .end           = interface.end,
       };
     } else {
       IGOR_ASSERT(approx_eq(interface.begin.y, interface.end.y),
@@ -109,10 +108,10 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 #else
           .second_order_update = 0,
 #endif  //  ZAP_2ND_ORDER_CORRECTION
-          .speed          = wave_speed,
-          .is_right_going = wave_speed >= 0,
-          .begin          = interface.begin,
-          .end            = interface.end,
+          .normal_speed  = wave_speed,
+          .tangent_speed = wave_speed,
+          .begin         = interface.begin,
+          .end           = interface.end,
       };
     }
   }
@@ -124,19 +123,23 @@ requires(orientation == X || orientation == Y || orientation == FREE)
     // Rotate PDE if interface does not align with an axis:
     //  tangent.y                                     = cos(interface_angle)
     //  -sign(tangent.x) * std::sqrt(1 - tangent.y^2) = sin(interface_angle)
-    const ActiveFloat u_mid = (interface.left_value + interface.right_value) / 2;
-    const ActiveFloat wave_speed =
-        u_mid * (tangent_vector.y +
-                 -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y));
+    const ActiveFloat cos_angle = tangent_vector.y;
+    const ActiveFloat sin_angle =
+        -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y);
+    const ActiveFloat u_mid         = (interface.left_value + interface.right_value) / 2;
+    const ActiveFloat normal_speed  = u_mid * (cos_angle + sin_angle);
+    const ActiveFloat tangent_speed = u_mid * (-sin_angle + cos_angle);
 
     return FreeWave<ActiveFloat, PointType>{
-        .first_order_update  = sign(wave_speed) * wave,
-        .second_order_update = 0,  // TODO: How does the second_order_update work here?
-        .speed               = wave_speed,
-        .is_right_going      = wave_speed >= 0,
+        .first_order_update =
+            sign(normal_speed) * wave,  // TODO: Double check if sign(normal_speed) is correct
+        .second_order_update = 0,       // TODO: How does the second_order_update work here?
+        .normal_speed        = normal_speed,
+        .normal              = scale_if_grid_coord(normal_vector, dx, dy),
+        .tangent_speed       = tangent_speed,
+        .tangent             = scale_if_grid_coord(tangent_vector, dx, dy),
         .begin               = interface.begin,
         .end                 = interface.end,
-        .normal              = scale_if_grid_coord(normal_vector, dx, dy),
     };
   }
 }
@@ -148,9 +151,9 @@ template <typename ActiveFloat, typename PointType>
     -> Geometry::Polygon<PointType> {
   return Geometry::Polygon<PointType>({
       wave.begin,
-      wave.begin + dt * wave.speed * wave.normal,
+      wave.begin + dt * wave.normal_speed * wave.normal + dt * wave.tangent_speed * wave.tangent,
       wave.end,
-      wave.end + dt * wave.speed * wave.normal,
+      wave.end + dt * wave.normal_speed * wave.normal + dt * wave.tangent_speed * wave.tangent,
   });
 }
 
@@ -167,11 +170,17 @@ calc_wave_polygon(const AxisAlignedWave<ActiveFloat, PointType, orientation>& wa
                           dx,
                           dy);
 
+  const PointType tangent =
+      scale_if_grid_coord(PointType{-static_cast<PassiveFloat>(orientation == Y),
+                                    static_cast<PassiveFloat>(orientation == X)},
+                          dx,
+                          dy);
+
   return Geometry::Polygon<PointType>({
       wave.begin,
-      wave.begin + dt * wave.speed * normal,
+      wave.begin + dt * wave.normal_speed * normal + dt * wave.tangent_speed * tangent,
       wave.end,
-      wave.end + dt * wave.speed * normal,
+      wave.end + dt * wave.normal_speed * normal + dt * wave.tangent_speed * tangent,
   });
 }
 

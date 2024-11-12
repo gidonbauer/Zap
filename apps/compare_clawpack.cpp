@@ -177,7 +177,7 @@ void compare(const ClawpackSolution<Float>& refernce_sol,
     // Igor::Info("Mat based: nx={}, ny={}, tend={} => L1={}", nx, ny, tend, L1_error);
     out << "L1_error_mat = " << L1_error << '\n';
   }
-  out << "------------------------------------------------------------\n";
+  out << "------------------------------------------------------------\n" << std::flush;
   std::cout << '\n';
 }
 
@@ -216,8 +216,8 @@ auto main() -> int {
       301UZ,
       351UZ,
       401UZ,
-      451UZ,
-      501UZ,
+      // 451UZ,
+      // 501UZ,
   };
 
   constexpr auto result_file = "clawpack_compare_res.txt";
