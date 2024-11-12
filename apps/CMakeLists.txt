@@ -13,6 +13,8 @@ set(executables
   example_x_ramp
   example_x_ramp_fd
   example_inverse_ramp
+
+  compare_clawpack
 )
 
 foreach(exec ${executables})

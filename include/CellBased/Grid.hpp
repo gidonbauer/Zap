@@ -783,6 +783,7 @@ class UniformGrid {
                   std::next(std::begin(intersect_points), static_cast<ptrdiff_t>(i + 2)));
 
               // Reset i to continue at the correct index
+              // TODO: This assert fails very often
               IGOR_ASSERT(i >= 1,
                           "Index must be greater or equal to 1, but is {}. I don't think we can do "
                           "anything in this case.",

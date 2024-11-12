@@ -1,0 +1,7 @@
+    1.00000000e+00     time
+    1                  num_eqn
+    1                  nstates
+    0                  num_aux
+    2                  num_dim
+    0                  num_ghost
+ascii                  file_format
