@@ -231,16 +231,16 @@ struct fmt::formatter<Zap::CellBased::AxisAlignedWave<ActiveFloat, PointType, or
                           "{{\n"
                           "  .first_order_update = {}\n"
                           "  .second_order_update = {}\n"
-                          "  .speed = {}\n"
-                          "  .is_right_going = {}\n"
+                          "  .normal_speed = {}\n"
+                          "  .tangent_speed = {}\n"
                           "  .begin = {}\n"
                           "  .end = {}\n"
                           "  .orientation = {}\n"
                           "}}",
                           wave.first_order_update,
                           wave.second_order_update,
-                          wave.speed,
-                          wave.is_right_going,
+                          wave.normal_speed,
+                          wave.tangent_speed,
                           wave.begin,
                           wave.end,
                           orientation == Zap::CellBased::X ? 'X' : 'Y');
@@ -261,16 +261,19 @@ struct fmt::formatter<Zap::CellBased::FreeWave<ActiveFloat, PointType>> {
                           "{{\n"
                           "  .first_order_update = {}\n"
                           "  .second_order_update = {}\n"
-                          "  .speed = {}\n"
-                          "  .is_right_going = {}\n"
+                          "  .normal_speed = {}\n"
+                          "  .normal = {}\n"
+                          "  .tangent_speed = {}\n"
+                          "  .tangent = {}\n"
                           "  .begin = {}\n"
                           "  .end = {}\n"
-                          "  .normal = {}\n"
                           "}}",
                           wave.first_order_update,
                           wave.second_order_update,
-                          wave.speed,
-                          wave.is_right_going,
+                          wave.normal_speed,
+                          wave.normal,
+                          wave.tangent_speed,
+                          wave.tangent,
                           wave.begin,
                           wave.end,
                           wave.normal);
