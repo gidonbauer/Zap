@@ -642,7 +642,7 @@ class Solver {
           do_update(xi, chunk.yi_min);
           do_update(xi, chunk.yi_max - 1);
         }
-        for (size_t yi = chunk.yi_min; yi < chunk.yi_max; ++yi) {
+        for (size_t yi = chunk.yi_min + 1; yi < chunk.yi_max - 1; ++yi) {
           do_update(chunk.xi_min, yi);
           do_update(chunk.xi_max - 1, yi);
         }
