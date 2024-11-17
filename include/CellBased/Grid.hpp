@@ -1004,52 +1004,77 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto get_existing_neighbours(size_t idx) const noexcept
-      -> SmallVector<size_t> {
-    if (!is_cell(idx)) { return {}; }
+  static constexpr std::array<Side, 8UZ> NEIGHBOUR_ORDER = {
+      static_cast<Side>(BOTTOM | RIGHT),
+      RIGHT,
+      static_cast<Side>(TOP | RIGHT),
+      TOP,
+      static_cast<Side>(TOP | LEFT),
+      LEFT,
+      static_cast<Side>(BOTTOM | LEFT),
+  };
 
+  // Order is bottom, bottom-right, right, top-right, top, top-left, left, bottom-left
+  [[nodiscard]] constexpr auto get_neighbours(size_t idx) const noexcept -> SmallVector<size_t> {
+    SmallVector<size_t> neighbours(8UZ, NULL_INDEX);
+    if (!is_cell(idx)) { return neighbours; }
     const auto& center_cell = m_cells[idx];
-    SmallVector<size_t> neighbours{};
+    size_t counter          = 0UZ;
 
-    // Left cell
-    if (is_cell(center_cell.left_idx)) { neighbours.push_back(center_cell.left_idx); }
     // Bottom cell
-    if (is_cell(center_cell.bottom_idx)) { neighbours.push_back(center_cell.bottom_idx); }
-    // Right cell
-    if (is_cell(center_cell.right_idx)) { neighbours.push_back(center_cell.right_idx); }
-    // Top cell
-    if (is_cell(center_cell.top_idx)) { neighbours.push_back(center_cell.top_idx); }
+    if (is_cell(center_cell.bottom_idx)) { neighbours[counter] = center_cell.bottom_idx; }
+    counter += 1;
 
-    // Bottom left diagonal cell
-    if (is_cell(center_cell.left_idx) && is_cell(center_cell.bottom_idx)) {
-      assert(m_cells[center_cell.left_idx].bottom_idx == m_cells[center_cell.bottom_idx].left_idx);
-      if (is_cell(m_cells[center_cell.left_idx].bottom_idx)) {
-        neighbours.push_back(m_cells[center_cell.left_idx].bottom_idx);
-      }
-    }
     // Bottom right diagonal cell
     if (is_cell(center_cell.right_idx) && is_cell(center_cell.bottom_idx)) {
       assert(m_cells[center_cell.right_idx].bottom_idx ==
              m_cells[center_cell.bottom_idx].right_idx);
       if (is_cell(m_cells[center_cell.right_idx].bottom_idx)) {
-        neighbours.push_back(m_cells[center_cell.right_idx].bottom_idx);
+        neighbours[counter] = m_cells[center_cell.right_idx].bottom_idx;
       }
     }
-    // Top left diagonal cell
-    if (is_cell(center_cell.left_idx) && is_cell(center_cell.top_idx)) {
-      assert(m_cells[center_cell.left_idx].top_idx == m_cells[center_cell.top_idx].left_idx);
-      if (is_cell(m_cells[center_cell.left_idx].top_idx)) {
-        neighbours.push_back(m_cells[center_cell.left_idx].top_idx);
-      }
-    }
+    counter += 1;
+
+    // Right cell
+    if (is_cell(center_cell.right_idx)) { neighbours[counter] = center_cell.right_idx; }
+    counter += 1;
+
     // Top right diagonal cell
     if (is_cell(center_cell.right_idx) && is_cell(center_cell.top_idx)) {
       assert(m_cells[center_cell.right_idx].top_idx == m_cells[center_cell.top_idx].right_idx);
       if (is_cell(m_cells[center_cell.right_idx].top_idx)) {
-        neighbours.push_back(m_cells[center_cell.right_idx].top_idx);
+        neighbours[counter] = m_cells[center_cell.right_idx].top_idx;
       }
     }
+    counter += 1;
 
+    // Top cell
+    if (is_cell(center_cell.top_idx)) { neighbours[counter] = center_cell.top_idx; }
+    counter += 1;
+
+    // Top left diagonal cell
+    if (is_cell(center_cell.left_idx) && is_cell(center_cell.top_idx)) {
+      assert(m_cells[center_cell.left_idx].top_idx == m_cells[center_cell.top_idx].left_idx);
+      if (is_cell(m_cells[center_cell.left_idx].top_idx)) {
+        neighbours[counter] = m_cells[center_cell.left_idx].top_idx;
+      }
+    }
+    counter += 1;
+
+    // Left cell
+    if (is_cell(center_cell.left_idx)) { neighbours[counter] = center_cell.left_idx; }
+    counter += 1;
+
+    // Bottom left diagonal cell
+    if (is_cell(center_cell.left_idx) && is_cell(center_cell.bottom_idx)) {
+      assert(m_cells[center_cell.left_idx].bottom_idx == m_cells[center_cell.bottom_idx].left_idx);
+      if (is_cell(m_cells[center_cell.left_idx].bottom_idx)) {
+        neighbours[counter] = m_cells[center_cell.left_idx].bottom_idx;
+      }
+    }
+    counter += 1;
+
+    assert(counter == 8UZ);
     return neighbours;
   }
 
@@ -1158,6 +1183,58 @@ class UniformGrid {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto is_cell(size_t idx) const noexcept -> bool {
     return idx < m_cells.size();
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto on_boundary(size_t idx) const noexcept -> Side {
+    const auto [xi, yi] = to_mat_idx(idx);
+    // clang-format off
+    return static_cast<Side>(
+        LEFT   * (xi == 0)        |
+        RIGHT  * (xi == m_nx - 1) |
+        BOTTOM * (yi == 0)        |
+        TOP    * (yi == m_ny - 1)
+    );
+    // clang-format on
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto translate(SmallVector<GridCoord<ActiveFloat>> points,
+                                         Side side) const noexcept
+      -> SmallVector<GridCoord<ActiveFloat>> {
+    IGOR_ASSERT(m_nx > 1 && m_ny > 1,
+                "This function assumes that both nx and ny are greater than one, but they are {} "
+                "and {} respectively",
+                m_nx,
+                m_ny);
+
+    if (side == 0) { return points; }
+
+    if ((side & LEFT) > 0) {
+      for (auto& p : points) {
+        p.x -= static_cast<PassiveFloat>(m_nx);
+      }
+    }
+
+    if ((side & RIGHT) > 0) {
+      for (auto& p : points) {
+        p.x += static_cast<PassiveFloat>(m_nx);
+      }
+    }
+
+    if ((side & BOTTOM) > 0) {
+      for (auto& p : points) {
+        p.y -= static_cast<PassiveFloat>(m_ny);
+      }
+    }
+
+    if ((side & TOP) > 0) {
+      for (auto& p : points) {
+        p.y += static_cast<PassiveFloat>(m_ny);
+      }
+    }
+
+    return points;
   }
 
   // -----------------------------------------------------------------------------------------------

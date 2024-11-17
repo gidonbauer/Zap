@@ -64,10 +64,10 @@ struct FreeWave {
 // - tangential direction: https://github.com/clawpack/riemann/blob/master/src/rpt2_burgers.f90
 template <Orientation orientation, typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 requires(orientation == X || orientation == Y || orientation == FREE)
-[[nodiscard]] constexpr auto normal_wave(const FullInterface<ActiveFloat, PointType>& interface,
-                                         PassiveFloat dx,
-                                         PassiveFloat dy,
-                                         [[maybe_unused]] ActiveFloat dt) noexcept
+[[nodiscard]] constexpr auto calc_wave(const FullInterface<ActiveFloat, PointType>& interface,
+                                       PassiveFloat dx,
+                                       PassiveFloat dy,
+                                       [[maybe_unused]] ActiveFloat dt) noexcept
     -> std::optional<std::conditional_t<orientation == FREE,
                                         FreeWave<ActiveFloat, PointType>,
                                         AxisAlignedWave<ActiveFloat, PointType, orientation>>> {

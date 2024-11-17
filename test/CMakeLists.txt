@@ -7,6 +7,7 @@ set(executables
         test_cut_grid
         test_outer_interfaces
         test_wave
+        test_periodic_boundary
 )
 
 include(GoogleTest)

@@ -24,7 +24,7 @@ TEST(Wave, XDirection) {
   const double dy = 0.2;
   const double dt = 0.03;
 
-  const auto wave = normal_wave<X>(interface, dx, dy, dt);
+  const auto wave = calc_wave<X>(interface, dx, dy, dt);
   ASSERT_TRUE(wave.has_value());
 
   static_assert(std::is_same_v<std::remove_cvref_t<decltype(*wave)>,
@@ -60,7 +60,7 @@ TEST(Wave, YDirection) {
   const double dy = 0.2;
   const double dt = 0.03;
 
-  const auto wave = normal_wave<Y>(interface, dx, dy, dt);
+  const auto wave = calc_wave<Y>(interface, dx, dy, dt);
   ASSERT_TRUE(wave.has_value());
 
   static_assert(std::is_same_v<std::remove_cvref_t<decltype(*wave)>,
@@ -96,7 +96,7 @@ TEST(Wave, FourtyFiveDegree) {
   const double dy = 0.2;
   const double dt = 0.03;
 
-  const auto wave = normal_wave<FREE>(interface, dx, dy, dt);
+  const auto wave = calc_wave<FREE>(interface, dx, dy, dt);
   ASSERT_TRUE(wave.has_value());
 
   static_assert(
@@ -140,7 +140,7 @@ TEST(Wave, TwohundredTwentyFiveDegree) {
   const double dy = 0.2;
   const double dt = 0.03;
 
-  const auto wave = normal_wave<FREE>(interface, dx, dy, dt);
+  const auto wave = calc_wave<FREE>(interface, dx, dy, dt);
   ASSERT_TRUE(wave.has_value());
 
   static_assert(

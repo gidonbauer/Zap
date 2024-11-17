@@ -45,6 +45,17 @@ class SmallVector {
     m_size = size;
   }
 
+  constexpr SmallVector(size_t size, Element init) noexcept {
+    if (size > SMALL_VECTOR_CAPACITY) {
+      Igor::Panic("Size {} is larger than maximal capacity {}. Consider increasing the capacity "
+                  "with the `ZAP_SMALL_VECTOR_CAPACITY` macro.",
+                  size,
+                  SMALL_VECTOR_CAPACITY);
+    }
+    m_size = size;
+    std::fill(begin(), end(), init);
+  }
+
   constexpr SmallVector(std::initializer_list<Element> init) noexcept {
     if (init.size() > SMALL_VECTOR_CAPACITY) {
       Igor::Panic("Size {} is larger than maximal capacity {}. Consider increasing the capacity "

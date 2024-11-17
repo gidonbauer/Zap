@@ -248,6 +248,7 @@ Assert(detail::format_string<Args...>, Args&&...) -> Assert<Args...>;
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define IGOR_ASSERT(cond, ...)                                                                     \
   do {                                                                                             \
+    /* NOLINTNEXTLINE(readability-simplify-boolean-expr) */                                        \
     if (!(cond)) [[unlikely]] {                                                                    \
       using va_args_tuple__ = decltype(std::make_tuple(__VA_ARGS__));                              \
       static_assert(std::tuple_size_v<va_args_tuple__> > 0,                                        \

@@ -4,9 +4,9 @@
 #include <numeric>
 #include <unordered_set>
 
-#ifndef ZAP_NO_PARALLEL
+#ifndef ZAP_SERIAL
 #include <omp.h>
-#endif  // ZAP_NO_PARALLEL
+#endif  // ZAP_SERIAL
 
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
@@ -87,105 +87,58 @@ class Solver {
 
   // -----------------------------------------------------------------------------------------------
   template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
-  constexpr void update_cell_by_free_wave(Cell<ActiveFloat, PassiveFloat>& cell,
+  constexpr void update_cell_by_free_wave(UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
+                                          size_t cell_idx,
                                           const FreeWave<ActiveFloat, PointType>& wave,
-                                          const ActiveFloat& dt) const noexcept {
+                                          const ActiveFloat& dt,
+                                          const Side translate) const noexcept {
+    auto& cell = next_grid[cell_idx];
+
+    // TODO: Handle periodic boundary
     constexpr CoordType coord_type                  = PointType2CoordType<PointType>;
     const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(wave, dt);
 
     if (cell.is_cartesian()) {
       update_value_by_overlap<static_cast<Side>(0)>(
           cell.get_cartesian().value,
-          cell.template get_cartesian_polygon<coord_type>(),
+          Geometry::Polygon<PointType>{
+              next_grid.translate(cell.template get_cartesian_points<coord_type>(), translate)},
           wave_polygon,
           wave);
     } else {
       // Left subcell
       update_value_by_overlap<static_cast<Side>(0)>(
           cell.get_cut().left_value,
-          cell.template get_cut_left_polygon<coord_type>(),
+          Geometry::Polygon<PointType>{
+              next_grid.translate(cell.template get_left_points<coord_type>(), translate)},
           wave_polygon,
           wave);
       // Right subcell
       update_value_by_overlap<static_cast<Side>(0)>(
           cell.get_cut().right_value,
-          cell.template get_cut_right_polygon<coord_type>(),
+          Geometry::Polygon<PointType>{
+              next_grid.translate(cell.template get_right_points<coord_type>(), translate)},
           wave_polygon,
           wave);
-    }
-  }
-
-  // -----------------------------------------------------------------------------------------------
-  template <typename ActiveFloat,
-            typename PassiveFloat,
-            Point2D_c PointType,
-            Orientation orientation,
-            Side side>
-  constexpr void
-  update_cell_by_axis_aligned_wave(Cell<ActiveFloat, PassiveFloat>& cell,
-                                   const AxisAlignedWave<ActiveFloat, PointType, orientation>& wave,
-                                   const ActiveFloat& dt) const noexcept {
-    // clang-format off
-    static_assert(
-      // x-aligned wave must come from left or right
-      (orientation == X && (side == LEFT || side == RIGHT)) ||
-      // y-aligned wave must come from bottom or top
-      (orientation == Y && (side == BOTTOM || side == TOP)),
-       "Invalid combination of orientation and side parameter.");
-    // clang-format on
-
-    IGOR_ASSERT(approx_eq(wave.tangent_speed, ActiveFloat{0}),
-                "This function may only be called if the tangential speed is zero, but the "
-                "tangential speed is {}",
-                wave.tangent_speed);
-
-    if (cell.is_cartesian()) {
-      const auto ds = orientation == X ? cell.template dx<SIM_C>() : cell.template dy<SIM_C>();
-      if constexpr ((side == LEFT || side == BOTTOM)) {
-        if (wave.normal_speed >= 0) {
-          cell.get_cartesian().value -=
-              (dt / ds) * std::abs(wave.normal_speed) * wave.first_order_update;
-        }
-        cell.get_cartesian().value -= (dt / ds) * wave.second_order_update;
-      } else {
-        if (!(wave.normal_speed >= 0)) {
-          cell.get_cartesian().value -=
-              (dt / ds) * std::abs(wave.normal_speed) * wave.first_order_update;
-        }
-        cell.get_cartesian().value -= (dt / ds) * (-wave.second_order_update);
-      }
-    } else {
-      const Geometry::Polygon<PointType> wave_polygon =
-          calc_wave_polygon(wave, cell.template dx<SIM_C>(), cell.template dy<SIM_C>(), dt);
-
-      constexpr CoordType coord_type = PointType2CoordType<PointType>;
-      // Left subcell
-      update_value_by_overlap<side>(cell.get_cut().left_value,
-                                    cell.template get_cut_left_polygon<coord_type>(),
-                                    wave_polygon,
-                                    wave);
-      // Right subcell
-      update_value_by_overlap<side>(cell.get_cut().right_value,
-                                    cell.template get_cut_right_polygon<coord_type>(),
-                                    wave_polygon,
-                                    wave);
     }
   }
 
   // -----------------------------------------------------------------------------------------------
   template <Point2D_c PointType, Side side, typename ActiveFloat, typename PassiveFloat>
   requires(side == BOTTOM || side == RIGHT || side == TOP || side == LEFT)
-  void handle_side_iterface(Cell<ActiveFloat, PassiveFloat>& next_cell,
-                            const Cell<ActiveFloat, PassiveFloat>& curr_cell,
+  void handle_side_iterface(size_t cell_idx,
                             UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
                             const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid,
                             const ActiveFloat& dt) const noexcept {
-    size_t idx = NULL_INDEX;
+    const auto& curr_cell = curr_grid[cell_idx];
+    auto& next_cell       = next_grid[cell_idx];
+
+    size_t other_idx = NULL_INDEX;
     switch (side) {
-      case BOTTOM: idx = curr_cell.bottom_idx; break;
-      case RIGHT:  idx = curr_cell.right_idx; break;
-      case TOP:    idx = curr_cell.top_idx; break;
-      case LEFT:   idx = curr_cell.left_idx; break;
+      case BOTTOM: other_idx = curr_cell.bottom_idx; break;
+      case RIGHT:  other_idx = curr_cell.right_idx; break;
+      case TOP:    other_idx = curr_cell.top_idx; break;
+      case LEFT:   other_idx = curr_cell.left_idx; break;
     }
 
     constexpr auto orientation = [] -> Orientation {
@@ -199,13 +152,13 @@ class Solver {
     }();
 
     // - Handle side interface ---------------------------------------------------------------
-    if (curr_grid.is_cell(idx)) {
-      const auto& other_cell = curr_grid[idx];
+    if (curr_grid.is_cell(other_idx)) {
+      const auto& other_cell = curr_grid[other_idx];
       const auto interfaces =
           get_shared_interfaces<ActiveFloat, PassiveFloat, PointType>(curr_cell, other_cell, side);
 
       for (const auto& interface : interfaces) {
-        const auto wave = normal_wave<orientation>(
+        const auto wave = calc_wave<orientation>(
             interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
         if (!wave.has_value() || ((side == LEFT || side == BOTTOM) && wave->normal_speed <= 0) ||
@@ -224,6 +177,7 @@ class Solver {
 
           next_cell.get_cartesian().value -= (overlap_area / cell_area) * wave->first_order_update;
         } else {
+          // TODO: Handle periodic boundary
           const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
               *wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
@@ -242,21 +196,25 @@ class Solver {
         // = Update this cell ==============================
 
         // = Update tangentally affected cell ==============
-        const size_t tangent_update_idx = [&curr_cell, &wave] {
-          if constexpr (orientation == X) {
-            if (wave->tangent_speed >= 0.0) {
-              return curr_cell.top_idx;
-            } else {
-              return curr_cell.bottom_idx;
-            }
+        size_t tangent_update_idx = NULL_INDEX;
+        Side tangent_side         = side;
+        if constexpr (orientation == X) {
+          if (wave->tangent_speed >= 0.0) {
+            tangent_update_idx = curr_cell.top_idx;
+            tangent_side       = static_cast<Side>(tangent_side | TOP);
           } else {
-            if (wave->tangent_speed >= 0.0) {
-              return curr_cell.right_idx;
-            } else {
-              return curr_cell.left_idx;
-            }
+            tangent_update_idx = curr_cell.bottom_idx;
+            tangent_side       = static_cast<Side>(tangent_side | BOTTOM);
           }
-        }();
+        } else {
+          if (wave->tangent_speed >= 0.0) {
+            tangent_update_idx = curr_cell.right_idx;
+            tangent_side       = static_cast<Side>(tangent_side | RIGHT);
+          } else {
+            tangent_update_idx = curr_cell.left_idx;
+            tangent_side       = static_cast<Side>(tangent_side | LEFT);
+          }
+        }
 
         if (curr_grid.is_cell(tangent_update_idx)) {
           auto& tangent_cell = next_grid[tangent_update_idx];
@@ -269,25 +227,32 @@ class Solver {
             tangent_cell.get_cartesian().value -=
                 (overlap_area / cell_area) * wave->first_order_update;
           } else {
+            const Side boundary = curr_grid.on_boundary(cell_idx);
+
+            // TODO: Handle periodic boundary
             const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
                 *wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
             constexpr CoordType coord_type = PointType2CoordType<PointType>;
             // Left subcell
             update_value_by_overlap<side>(tangent_cell.get_cut().left_value,
-                                          tangent_cell.template get_cut_left_polygon<coord_type>(),
+                                          Geometry::Polygon<PointType>(curr_grid.translate(
+                                              tangent_cell.template get_left_points<coord_type>(),
+                                              static_cast<Side>(boundary & tangent_side))),
                                           wave_polygon,
                                           *wave);
             // Right subcell
             update_value_by_overlap<side>(tangent_cell.get_cut().right_value,
-                                          tangent_cell.template get_cut_right_polygon<coord_type>(),
+                                          Geometry::Polygon<PointType>(curr_grid.translate(
+                                              tangent_cell.template get_right_points<coord_type>(),
+                                              static_cast<Side>(boundary & tangent_side))),
                                           wave_polygon,
                                           *wave);
           }
         }
         // = Update tangentally affected cell ==============
       }
-    } else if (idx == SAME_VALUE_INDEX || idx == ZERO_FLUX_INDEX) {
+    } else if (other_idx == SAME_VALUE_INDEX || other_idx == ZERO_FLUX_INDEX) {
       // No-op
     } else {
       Igor::Debug("cell = {}", curr_cell);
@@ -359,7 +324,9 @@ class Solver {
       UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
       const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid) const noexcept {
 
+#ifndef ZAP_SERIAL
 #pragma omp parallel for
+#endif  // ZAP_SERIAL
     for (size_t new_cut_idx : next_grid.cut_cell_idxs()) {
       auto& next_cell       = next_grid[new_cut_idx];
       const auto& curr_cell = curr_grid[new_cut_idx];
@@ -444,7 +411,7 @@ class Solver {
     auto& curr_grid = grid;
     auto next_grid  = grid;
 
-#ifndef ZAP_NO_PARALLEL
+#ifndef ZAP_SERIAL
     // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     auto divisor_pair = [](size_t number) {
       auto lower = static_cast<size_t>(std::floor(std::sqrt(number)));
@@ -460,9 +427,13 @@ class Solver {
 
     const size_t num_threads = [] {
       int n = -1;
-#pragma omp parallel
-#pragma omp single
-      { n = omp_get_num_threads(); }
+      // clang-format off
+      #pragma omp parallel
+      {
+        #pragma omp single
+        { n = omp_get_num_threads(); }
+      }
+      // clang-format on
       IGOR_ASSERT(n > 0, "Number of threads must be larger than zero but is {}", n);
       return static_cast<size_t>(n);
     }();
@@ -496,8 +467,17 @@ class Solver {
         };
       }
     }
+
+    // for (const auto& chunk : chunks) {
+    //   Igor::Info("chunk = {{ .xi_min = {}, .xi_max = {}, .yi_min = {}, .yi_max = {} }}",
+    //              chunk.xi_min,
+    //              chunk.xi_max,
+    //              chunk.yi_min,
+    //              chunk.yi_max);
+    // }
+    // Igor::Todo();
     // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#endif  // ZAP_NO_PARALLEL
+#endif  // ZAP_SERIAL
 
     if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(PassiveFloat{0})) {
       return std::nullopt;
@@ -517,13 +497,15 @@ class Solver {
 
       // = Pre-calculate internal interface waves ==================================================
       internal_waves.resize(curr_grid.cut_cell_idxs().size());
+#ifndef ZAP_SERIAL
 #pragma omp parallel for
+#endif  // ZAP_SERIAL
       for (size_t i = 0; i < curr_grid.cut_cell_idxs().size(); ++i) {
         const size_t cell_idx = curr_grid.cut_cell_idxs()[i];
         const auto& curr_cell = curr_grid[cell_idx];
         const auto internal_interface =
             get_internal_interface<ActiveFloat, PassiveFloat, PointType>(curr_cell);
-        auto wave = normal_wave<FREE>(
+        auto wave = calc_wave<FREE>(
             internal_interface, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
         IGOR_ASSERT(wave.has_value(),
                     "Internal wave must exist, i.e. internal interface must have length > EPS but "
@@ -536,6 +518,8 @@ class Solver {
 
 #ifndef ZAP_STATIC_CUT
       // = Move the wave front =====================================================================
+      // TODO: Consider purging cuts that are no longer at the shock front using the
+      //       RK-Jump-Condition
       if (!curr_grid.cut_cell_idxs().empty()) {
         next_grid.merge_cut_cells();
 
@@ -548,60 +532,52 @@ class Solver {
 
       recalculate_cut_cell_values(next_grid, curr_grid);
       // = Move the wave front =====================================================================
-
-      // TODO: Consider purging cuts that are no longer at the shock front using the
-      //       RK-Jump-Condition
 #endif  // ZAP_STATIC_CUT
-      assert(curr_grid.cut_cell_idxs().size() == internal_waves.size());
 
       // TODO: What happens when a subcell has area 0?
       //   -> cannot "uncut" the cell because that would loose shock position information
 
       // TODO: Do parallelization that handles tangential correction
 
-#ifdef ZAP_NO_PARALLEL
+#ifdef ZAP_SERIAL
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
-        const auto& curr_cell = curr_grid[cell_idx];
-        auto& next_cell       = next_grid[cell_idx];
-
-        handle_side_iterface<PointType, LEFT>(next_cell, curr_cell, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, RIGHT>(next_cell, curr_cell, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, BOTTOM>(next_cell, curr_cell, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, TOP>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, LEFT>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, RIGHT>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, BOTTOM>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, TOP>(cell_idx, next_grid, curr_grid, dt);
       }
       // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
 
       // = Handle internal interface ===============================================================
       assert(curr_grid.cut_cell_idxs().size() == internal_waves.size());
       for (size_t i = 0; i < internal_waves.size(); ++i) {
-        const auto cell_idx   = curr_grid.cut_cell_idxs()[i];
-        const auto& curr_cell = curr_grid[cell_idx];
-        assert(curr_cell.is_cut());
-        auto& next_cell = next_grid[cell_idx];
-        assert(next_cell.is_cartesian() || next_cell.is_cut());
+        const auto cell_idx = curr_grid.cut_cell_idxs()[i];
+        assert(curr_grid[cell_idx].is_cut());
 
         const auto& internal_wave  = internal_waves[i];
         const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
         // Neighbouring cells
         for (size_t neighbour_idx : cell_neighbours) {
-          update_cell_by_free_wave(next_grid[neighbour_idx], internal_wave, dt);
+          if (neighbour_idx != NULL_INDEX) {
+            update_cell_by_free_wave(neighbour_idx, next_grid, internal_wave, dt);
+          }
         }
         // This cell
-        update_cell_by_free_wave(next_cell, internal_wave, dt);
+        update_cell_by_free_wave(cell_idx, next_grid, internal_wave, dt);
       }
       // = Handle internal interface ===============================================================
 #else
       // ~ Parallelization of grid update ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
       auto do_update = [&](size_t xi, size_t yi) {
-        const size_t cell_idx = curr_grid.to_vec_idx(xi, yi);
-        const auto& curr_cell = curr_grid[cell_idx];
-        auto& next_cell       = next_grid[cell_idx];
+        const size_t cell_idx       = curr_grid.to_vec_idx(xi, yi);
+        const auto& curr_cell       = curr_grid[cell_idx];
+        const auto cell_on_boundary = curr_grid.on_boundary(cell_idx);
 
         // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP =================================
-        handle_side_iterface<PointType, LEFT>(next_cell, curr_cell, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, RIGHT>(next_cell, curr_cell, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, BOTTOM>(next_cell, curr_cell, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, TOP>(next_cell, curr_cell, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, LEFT>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, RIGHT>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, BOTTOM>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, TOP>(cell_idx, next_grid, curr_grid, dt);
         // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP =================================
 
         // = Handle internal interface =============================================================
@@ -618,13 +594,21 @@ class Solver {
               static_cast<size_t>(std::distance(curr_grid.cut_cell_idxs().cbegin(), it));
 
           const auto& internal_wave  = internal_waves[iw_idx];
-          const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
+          const auto cell_neighbours = curr_grid.get_neighbours(cell_idx);
           // Neighbouring cells
-          for (size_t neighbour_idx : cell_neighbours) {
-            update_cell_by_free_wave(next_grid[neighbour_idx], internal_wave, dt);
+          for (size_t i = 0; i < cell_neighbours.size(); ++i) {
+            const auto neighbour_idx  = cell_neighbours[i];
+            const auto neighbour_side = curr_grid.NEIGHBOUR_ORDER[i];
+            if (neighbour_idx != NULL_INDEX) {
+              update_cell_by_free_wave(next_grid,
+                                       neighbour_idx,
+                                       internal_wave,
+                                       dt,
+                                       static_cast<Side>(neighbour_side & cell_on_boundary));
+            }
           }
           // This cell
-          update_cell_by_free_wave(next_cell, internal_wave, dt);
+          update_cell_by_free_wave(next_grid, cell_idx, internal_wave, dt, static_cast<Side>(0));
         }
         // = Handle internal interface =============================================================
       };
@@ -648,18 +632,24 @@ class Solver {
         }
       };
 
-#pragma omp parallel
-#pragma omp single
-      for (const auto& chunk : chunks) {
-#pragma omp task
-        update_chunk(chunk);
+      // clang-format off
+      #pragma omp parallel
+      {
+        #pragma omp single
+        {
+          for (const auto& chunk : chunks) {
+            #pragma omp task
+            { update_chunk(chunk); }
+          }
+        }
       }
+      // clang-format on
 
       for (const auto& chunk : chunks) {
         stich_chunk(chunk);
       }
       // ~ Parallelization of grid update ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#endif  // ZAP_NO_PARALLEL
+#endif  // ZAP_SERIAL
 
       // Update time
       t += dt;

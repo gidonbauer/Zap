@@ -216,8 +216,8 @@ auto main() -> int {
       301UZ,
       351UZ,
       401UZ,
-      // 451UZ,
-      // 501UZ,
+      451UZ,
+      501UZ,
   };
 
   constexpr auto result_file = "clawpack_compare_res.txt";

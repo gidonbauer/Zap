@@ -151,12 +151,8 @@ struct Cell {
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cartesian_polygon() const noexcept
       -> Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
-    return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{{
-        {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
-        {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
-        {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-        {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
-    }};
+    return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{
+        get_cartesian_points<COORD_TYPE>()};
   }
 
   template <CoordType COORD_TYPE>
@@ -173,6 +169,18 @@ struct Cell {
     assert(is_cut());
     return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{
         get_right_points<COORD_TYPE>()};
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  template <CoordType COORD_TYPE>
+  [[nodiscard]] constexpr auto get_cartesian_points() const noexcept
+      -> SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
+    return SmallVector<CoordType2PointType<ActiveFloat, COORD_TYPE>>{{
+        {x_min<COORD_TYPE>(), y_min<COORD_TYPE>()},
+        {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>()},
+        {x_min<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+        {x_min<COORD_TYPE>() + dx<COORD_TYPE>(), y_min<COORD_TYPE>() + dy<COORD_TYPE>()},
+    }};
   }
 
   // -----------------------------------------------------------------------------------------------

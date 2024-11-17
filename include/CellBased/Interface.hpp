@@ -7,8 +7,7 @@
 
 namespace Zap::CellBased {
 
-// TODO: Fix interfaces
-
+// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, Point2D_c PointType>
 struct HalfInterface {
   ActiveFloat value;
@@ -16,6 +15,7 @@ struct HalfInterface {
   PointType end;
 };
 
+// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, Point2D_c PointType>
 struct FullInterface {
   ActiveFloat left_value;
@@ -24,6 +24,7 @@ struct FullInterface {
   PointType end;
 };
 
+// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, Point2D_c PointType>
 struct CellHalfInterfaces {
   SmallVector<HalfInterface<ActiveFloat, PointType>> left;
@@ -32,6 +33,7 @@ struct CellHalfInterfaces {
   SmallVector<HalfInterface<ActiveFloat, PointType>> top;
 };
 
+// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
 same_interface(const HalfInterface<ActiveFloat, PointType>& i1,
@@ -40,6 +42,7 @@ same_interface(const HalfInterface<ActiveFloat, PointType>& i1,
          (i1.end - i2.end).norm() <= EPS<ActiveFloat>;
 }
 
+// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
 get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat>& cell) noexcept
@@ -304,6 +307,7 @@ get_outer_cell_interfaces(const Cell<ActiveFloat, PassiveFloat>& cell) noexcept
   }
 }
 
+// -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
 get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat>& center_cell,
@@ -351,80 +355,82 @@ get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat>& center_cell,
       std::unreachable();
   }
 
+  // = Same amount of interfaces on left and right side ============================================
   if (left_side.size() == right_side.size()) {
     const auto n = left_side.size();
     SmallVector<FullInterface<ActiveFloat, PointType>> interfaces(n);
     for (size_t i = 0; i < n; ++i) {
-      // TODO: Is this necessary?
-      // assert(same_interface(left_side[i], right_side[i]));
+      // TODO: Do this check for periodic boundary conditions.
+      // IGOR_ASSERT(same_interface(left_side[i], right_side[i]),
+      //             "Incompatible interface: left = {} -> {} and right = {} -> {}",
+      //             left_side[i].begin,
+      //             left_side[i].end,
+      //             right_side[i].begin,
+      //             right_side[i].end);
       interfaces[i] = FullInterface<ActiveFloat, PointType>{
           .left_value  = left_side[i].value,
           .right_value = right_side[i].value,
-          // TODO: Is this necessary?
-          .begin = left_is_center ? left_side[i].begin : right_side[i].begin,
-          .end   = left_is_center ? left_side[i].end : right_side[i].end,
+          .begin       = left_is_center ? left_side[i].begin : right_side[i].begin,
+          .end         = left_is_center ? left_side[i].end : right_side[i].end,
       };
     }
     return interfaces;
-  } else {
+  }
+  // = Different amount of interfaces on left and right side =======================================
+  else {
+    // = Right side is resonsible for dividing the interface =======================================
     if (left_side.size() == 1) {
       SmallVector<FullInterface<ActiveFloat, PointType>> interfaces(right_side.size());
       for (size_t i = 0; i < right_side.size(); ++i) {
+        PointType begin = right_side[i].begin;
+        PointType end   = right_side[i].end;
+        if (left_is_center) {
+          if (side == LEFT || side == RIGHT) {
+            begin.x = left_side[0].begin.x;
+            end.x   = left_side[0].end.x;
+          } else if (side == BOTTOM || side == TOP) {
+            begin.y = left_side[0].begin.y;
+            end.y   = left_side[0].end.y;
+          }
+        }
+
         interfaces[i] = FullInterface<ActiveFloat, PointType>{
             .left_value  = left_side[0].value,
             .right_value = right_side[i].value,
-            .begin       = right_side[i].begin,
-            .end         = right_side[i].end,
+            .begin       = begin,
+            .end         = end,
         };
       }
       return interfaces;
-    } else if (right_side.size() == 1) {
+    }
+    // = Left side is resonsible for dividing the interface ========================================
+    else if (right_side.size() == 1) {
       SmallVector<FullInterface<ActiveFloat, PointType>> interfaces(left_side.size());
       for (size_t i = 0; i < left_side.size(); ++i) {
+        PointType begin = left_side[i].begin;
+        PointType end   = left_side[i].end;
+        if (!left_is_center) {
+          if (side == LEFT || side == RIGHT) {
+            begin.x = right_side[0].begin.x;
+            end.x   = right_side[0].end.x;
+          } else if (side == BOTTOM || side == TOP) {
+            begin.y = right_side[0].begin.y;
+            end.y   = right_side[0].end.y;
+          }
+        }
+
         interfaces[i] = FullInterface<ActiveFloat, PointType>{
             .left_value  = left_side[i].value,
             .right_value = right_side[0].value,
-            .begin       = left_side[i].begin,
-            .end         = left_side[i].end,
+            .begin       = begin,
+            .end         = end,
         };
       }
       return interfaces;
-    } else {
-      Igor::Panic("Only simple case when either left_side or right side have only one interface is "
-                  "implemented.");
-      std::unreachable();
     }
-
-    Igor::Debug("left_side:");
-    for (size_t i = 0; i < left_side.size(); ++i) {
-      Igor::Debug("[{}] = {{ .value = {}, .begin = {}, .end = {} }}",
-                  i,
-                  left_side[i].value,
-                  left_side[i].begin,
-                  left_side[i].end);
-    }
-
-    Igor::Debug("right_side:");
-    for (size_t i = 0; i < right_side.size(); ++i) {
-      Igor::Debug("[{}] = {{ .value = {}, .begin = {}, .end = {} }}",
-                  i,
-                  right_side[i].value,
-                  right_side[i].begin,
-                  right_side[i].end);
-    }
-
-    {
-      std::stringstream s;
-      s << center_cell;
-      Igor::Debug("center_cell = {}", s.str());
-    }
-    {
-      std::stringstream s;
-      s << other_cell;
-      Igor::Debug("other_cell = {}", s.str());
-    }
-
-    Igor::Todo("Handle incompatible interfaces.");
+    // = Multiple incompatible interfaces ==========================================================
+    Igor::Panic("Only simple case when either left_side or right side have only one interface is "
+                "implemented.");
     std::unreachable();
   }
 }
