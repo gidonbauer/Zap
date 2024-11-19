@@ -147,9 +147,9 @@ requires(orientation == X || orientation == Y || orientation == FREE)
     const ActiveFloat cos_angle = tangent_vector.y;
     const ActiveFloat sin_angle =
         -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y);
-    const ActiveFloat u_mid         = (interface.left_value + interface.right_value) / 2;
-    const ActiveFloat normal_speed  = u_mid * (cos_angle + sin_angle);
-    const ActiveFloat tangent_speed = u_mid * (-sin_angle + cos_angle);
+    const ActiveFloat u_mid        = (interface.left_value + interface.right_value) / 2;
+    const ActiveFloat normal_speed = u_mid * (cos_angle + sin_angle);
+    [[maybe_unused]] const ActiveFloat tangent_speed = u_mid * (-sin_angle + cos_angle);
 
     return std::make_optional(FreeWave<ActiveFloat, PointType>{
         .first_order_update =

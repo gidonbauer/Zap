@@ -2,7 +2,8 @@
 #include <iomanip>
 #include <optional>
 
-// #define USE_FLUX_FOR_CARTESIAN
+// #define ZAP_SERIAL
+#define ZAP_NO_TANGENTIAL_CORRECTION
 
 #include <AD/ad.hpp>
 
@@ -218,7 +219,7 @@ void print_solution_error(
 [[nodiscard]] auto run(size_t nx, size_t ny, PassiveFloat tend, std::ostream& out) noexcept
     -> bool {
   Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
-  grid.same_value_boundary();
+  grid.periodic_boundary();
 
   // if (!grid.cut_curve(init_shock)) { return false; }
   {
@@ -289,12 +290,11 @@ auto main(int argc, char** argv) -> int {
 
     bool all_success        = true;
     constexpr std::array ns = {
-        3UZ,   5UZ,   10UZ,  15UZ,  20UZ,  25UZ,  30UZ,  35UZ,  40UZ,  45UZ,
-        50UZ,  55UZ,  60UZ,  65UZ,  70UZ,  75UZ,  80UZ,  85UZ,  90UZ,  95UZ,
-        100UZ, 105UZ, 110UZ, 115UZ, 120UZ, 125UZ, 130UZ, 135UZ, 140UZ, 145UZ,
-        150UZ, 155UZ, 160UZ, 165UZ, 170UZ, 175UZ, 180UZ, 185UZ, 190UZ, 195UZ,
-        200UZ, 205UZ, 210UZ, 215UZ, 220UZ, 225UZ, 230UZ, 235UZ, 240UZ, /*245UZ,*/ 250UZ,
-        255UZ, 260UZ, 265UZ, 270UZ, 275UZ, 280UZ, 285UZ, 290UZ, 295UZ, 300UZ,
+        10UZ,  15UZ,  20UZ,  25UZ,  30UZ,  35UZ,  40UZ,  45UZ,  50UZ,  55UZ,  60UZ,  65UZ,
+        70UZ,  75UZ,  80UZ,  85UZ,  90UZ,  95UZ,  100UZ, 105UZ, 110UZ, 115UZ, 120UZ, 125UZ,
+        130UZ, 135UZ, 140UZ, 145UZ, 150UZ, 155UZ, 160UZ, 165UZ, 170UZ, 175UZ, 180UZ, 185UZ,
+        190UZ, 195UZ, 200UZ, 205UZ, 210UZ, 215UZ, 220UZ, 225UZ, 230UZ, 235UZ, 240UZ, 245UZ,
+        250UZ, 255UZ, 260UZ, 265UZ, 270UZ, 275UZ, 280UZ, 285UZ, 290UZ, 295UZ, 300UZ,
     };
     for (size_t n : ns) {
       const auto success = run(n, 3, args->tend, out);

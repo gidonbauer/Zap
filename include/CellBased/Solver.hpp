@@ -8,6 +8,7 @@
 #include <omp.h>
 #endif  // ZAP_SERIAL
 
+#include "CellBased/Chunk.hpp"
 #include "CellBased/Geometry.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Interface.hpp"
@@ -129,7 +130,8 @@ class Solver {
   void handle_side_iterface(size_t cell_idx,
                             UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
                             const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid,
-                            const ActiveFloat& dt) const noexcept {
+                            const ActiveFloat& dt,
+                            Side cell_on_boundary) const noexcept {
     const auto& curr_cell = curr_grid[cell_idx];
     auto& next_cell       = next_grid[cell_idx];
 
@@ -227,8 +229,6 @@ class Solver {
             tangent_cell.get_cartesian().value -=
                 (overlap_area / cell_area) * wave->first_order_update;
           } else {
-            const Side boundary = curr_grid.on_boundary(cell_idx);
-
             // TODO: Handle periodic boundary
             const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
                 *wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
@@ -238,14 +238,14 @@ class Solver {
             update_value_by_overlap<side>(tangent_cell.get_cut().left_value,
                                           Geometry::Polygon<PointType>(curr_grid.translate(
                                               tangent_cell.template get_left_points<coord_type>(),
-                                              static_cast<Side>(boundary & tangent_side))),
+                                              static_cast<Side>(cell_on_boundary & tangent_side))),
                                           wave_polygon,
                                           *wave);
             // Right subcell
             update_value_by_overlap<side>(tangent_cell.get_cut().right_value,
                                           Geometry::Polygon<PointType>(curr_grid.translate(
                                               tangent_cell.template get_right_points<coord_type>(),
-                                              static_cast<Side>(boundary & tangent_side))),
+                                              static_cast<Side>(cell_on_boundary & tangent_side))),
                                           wave_polygon,
                                           *wave);
           }
@@ -413,69 +413,16 @@ class Solver {
 
 #ifndef ZAP_SERIAL
     // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    auto divisor_pair = [](size_t number) {
-      auto lower = static_cast<size_t>(std::floor(std::sqrt(number)));
-      while (number % lower > 0) {
-        lower -= 1;
-      }
-      return std::make_pair(lower, number / lower);
-    };
+    const auto target_num_chunks = get_num_threads();
+    const auto [num_chunks_x, num_chunks_y] =
+        optimal_chunk_ratio(target_num_chunks, curr_grid.nx(), curr_grid.ny());
+    const auto chunks = generate_chunks(num_chunks_x, num_chunks_y, curr_grid.nx(), curr_grid.ny());
 
-    struct Chunk {
-      size_t xi_min, xi_max, yi_min, yi_max;
-    };
-
-    const size_t num_threads = [] {
-      int n = -1;
-      // clang-format off
-      #pragma omp parallel
-      {
-        #pragma omp single
-        { n = omp_get_num_threads(); }
-      }
-      // clang-format on
-      IGOR_ASSERT(n > 0, "Number of threads must be larger than zero but is {}", n);
-      return static_cast<size_t>(n);
-    }();
-
-    const size_t num_chunks                 = num_threads;
-    const auto [num_chunks_y, num_chunks_x] = divisor_pair(num_chunks);
-
-    Igor::Info("Number of chunks for parallel computation: {}", num_chunks);
+#ifndef ZAP_NO_CHUNK_INFO
+    Igor::Info("Number of chunks for parallel computation: {}", num_chunks_x * num_chunks_y);
     Igor::Info("Number of chunks in x-direction: {}", num_chunks_x);
     Igor::Info("Number of chunks in y-direction: {}", num_chunks_y);
-
-    IGOR_ASSERT(num_chunks == num_chunks_x * num_chunks_y,
-                "Number of chunks in x and y direction does not match number of overall chunks.");
-
-    const auto chunk_width     = curr_grid.nx() / num_chunks_x;
-    const auto chunk_height    = curr_grid.ny() / num_chunks_y;
-    const auto chunk_missing_x = curr_grid.nx() - chunk_width * num_chunks_x;
-    const auto chunk_missing_y = curr_grid.ny() - chunk_height * num_chunks_y;
-
-    std::vector<Chunk> chunks(num_chunks);
-    for (size_t chunk_yi = 0; chunk_yi < num_chunks_y; ++chunk_yi) {
-      for (size_t chunk_xi = 0; chunk_xi < num_chunks_x; ++chunk_xi) {
-        const auto i = chunk_xi + chunk_yi * num_chunks_x;
-        chunks[i]    = Chunk{
-               .xi_min = chunk_xi * chunk_width,
-               .xi_max =
-                (chunk_xi + 1) * chunk_width + chunk_missing_x * (chunk_xi + 1 == num_chunks_x),
-               .yi_min = chunk_yi * chunk_height,
-               .yi_max =
-                (chunk_yi + 1) * chunk_height + chunk_missing_y * (chunk_yi + 1 == num_chunks_y),
-        };
-      }
-    }
-
-    // for (const auto& chunk : chunks) {
-    //   Igor::Info("chunk = {{ .xi_min = {}, .xi_max = {}, .yi_min = {}, .yi_max = {} }}",
-    //              chunk.xi_min,
-    //              chunk.xi_max,
-    //              chunk.yi_min,
-    //              chunk.yi_max);
-    // }
-    // Igor::Todo();
+#endif  // ZAP_NO_CHUNK_INFO
     // ~ Chunks for parallelization ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #endif  // ZAP_SERIAL
 
@@ -541,10 +488,13 @@ class Solver {
 
 #ifdef ZAP_SERIAL
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {
-        handle_side_iterface<PointType, LEFT>(cell_idx, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, RIGHT>(cell_idx, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, BOTTOM>(cell_idx, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, TOP>(cell_idx, next_grid, curr_grid, dt);
+        const auto cell_on_boundary = curr_grid.on_boundary(cell_idx);
+        handle_side_iterface<PointType, LEFT>(cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
+        handle_side_iterface<PointType, RIGHT>(
+            cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
+        handle_side_iterface<PointType, BOTTOM>(
+            cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
+        handle_side_iterface<PointType, TOP>(cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
       }
       // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
 
@@ -554,16 +504,23 @@ class Solver {
         const auto cell_idx = curr_grid.cut_cell_idxs()[i];
         assert(curr_grid[cell_idx].is_cut());
 
-        const auto& internal_wave  = internal_waves[i];
-        const auto cell_neighbours = curr_grid.get_existing_neighbours(cell_idx);
+        const auto& internal_wave   = internal_waves[i];
+        const auto cell_neighbours  = curr_grid.get_neighbours(cell_idx);
+        const auto cell_on_boundary = curr_grid.on_boundary(cell_idx);
         // Neighbouring cells
-        for (size_t neighbour_idx : cell_neighbours) {
+        for (size_t j = 0; j < cell_neighbours.size(); ++j) {
+          const auto neighbour_idx  = cell_neighbours[j];
+          const auto neighbour_side = curr_grid.NEIGHBOUR_ORDER[j];
           if (neighbour_idx != NULL_INDEX) {
-            update_cell_by_free_wave(neighbour_idx, next_grid, internal_wave, dt);
+            update_cell_by_free_wave(next_grid,
+                                     neighbour_idx,
+                                     internal_wave,
+                                     dt,
+                                     static_cast<Side>(neighbour_side & cell_on_boundary));
           }
         }
         // This cell
-        update_cell_by_free_wave(cell_idx, next_grid, internal_wave, dt);
+        update_cell_by_free_wave(next_grid, cell_idx, internal_wave, dt, static_cast<Side>(0));
       }
       // = Handle internal interface ===============================================================
 #else
@@ -574,10 +531,12 @@ class Solver {
         const auto cell_on_boundary = curr_grid.on_boundary(cell_idx);
 
         // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP =================================
-        handle_side_iterface<PointType, LEFT>(cell_idx, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, RIGHT>(cell_idx, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, BOTTOM>(cell_idx, next_grid, curr_grid, dt);
-        handle_side_iterface<PointType, TOP>(cell_idx, next_grid, curr_grid, dt);
+        handle_side_iterface<PointType, LEFT>(cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
+        handle_side_iterface<PointType, RIGHT>(
+            cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
+        handle_side_iterface<PointType, BOTTOM>(
+            cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
+        handle_side_iterface<PointType, TOP>(cell_idx, next_grid, curr_grid, dt, cell_on_boundary);
         // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP =================================
 
         // = Handle internal interface =============================================================
@@ -613,25 +572,6 @@ class Solver {
         // = Handle internal interface =============================================================
       };
 
-      auto update_chunk = [&](const Chunk& chunk) {
-        for (size_t yi = chunk.yi_min + 1; yi < chunk.yi_max - 1; ++yi) {
-          for (size_t xi = chunk.xi_min + 1; xi < chunk.xi_max - 1; ++xi) {
-            do_update(xi, yi);
-          }
-        }
-      };
-
-      auto stich_chunk = [&](const Chunk& chunk) {
-        for (size_t xi = chunk.xi_min; xi < chunk.xi_max; ++xi) {
-          do_update(xi, chunk.yi_min);
-          do_update(xi, chunk.yi_max - 1);
-        }
-        for (size_t yi = chunk.yi_min + 1; yi < chunk.yi_max - 1; ++yi) {
-          do_update(chunk.xi_min, yi);
-          do_update(chunk.xi_max - 1, yi);
-        }
-      };
-
       // clang-format off
       #pragma omp parallel
       {
@@ -639,14 +579,14 @@ class Solver {
         {
           for (const auto& chunk : chunks) {
             #pragma omp task
-            { update_chunk(chunk); }
+            { update_chunk(chunk, do_update); }
           }
         }
       }
       // clang-format on
 
       for (const auto& chunk : chunks) {
-        stich_chunk(chunk);
+        stich_chunk(chunk, do_update);
       }
       // ~ Parallelization of grid update ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #endif  // ZAP_SERIAL
@@ -659,6 +599,10 @@ class Solver {
       if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
         return std::nullopt;
       }
+
+#ifdef ZAP_SINGLE_ITERATION
+      break;
+#endif  // ZAP_SINGLE_ITERATION
     }
 
     return curr_grid;

@@ -161,7 +161,7 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
       r * std::cos(std::numbers::pi_v<PassiveFloat> / 2 * t),
       r * std::sin(std::numbers::pi_v<PassiveFloat> / 2 * t),
   };
-};
+}
 
 // -------------------------------------------------------------------------------------------------
 auto run_cell_based(size_t nx,
