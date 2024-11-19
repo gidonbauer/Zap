@@ -347,7 +347,7 @@ class UniformGrid {
       return ClassifyError::BOTH_CUTS_ON_SAME_SIDE;
     }
 
-    if (!(count_sides(cut_entry_loc) == 1 && count_sides(cut_exit_loc) == 1)) {
+    if (count_sides(cut_entry_loc) != 1 || count_sides(cut_exit_loc) != 1) {
       Igor::Warn("Expected cut1 on cut2 to be on only one side after removing common sides, but "
                  "cut_entry_loc = {} and cut_exit_loc = {}.",
                  cut_entry_loc,
@@ -384,208 +384,20 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <Point2D_c PointType>
-  [[nodiscard]] constexpr auto find_next_cell_to_cut(const Cell<ActiveFloat, PassiveFloat>& cell,
-                                                     const PointType& exit_point) const noexcept
-      -> size_t {
-    IGOR_ASSERT(point_in_cell(exit_point, cell), "Point {} is not in cell {}", exit_point, cell);
-
-    constexpr CoordType coord_type = PointType2CoordType<PointType>;
-
-    const int on_x = approx_eq(cell.template x_min<coord_type>(), exit_point.x) * ON_MIN +
-                     approx_eq(cell.template x_min<coord_type>() + cell.template dx<coord_type>(),
-                               exit_point.x) *
-                         ON_MAX;
-    const int on_y = approx_eq(cell.template y_min<coord_type>(), exit_point.y) * ON_MIN +
-                     approx_eq(cell.template y_min<coord_type>() + cell.template dy<coord_type>(),
-                               exit_point.y) *
-                         ON_MAX;
-    assert(on_x != NOT_ON || on_y != NOT_ON);
-
-    if (on_x != NOT_ON && on_y != NOT_ON) {
-      // Bottom left corner
-      if (on_x == ON_MIN && on_y == ON_MIN) {
-        assert(is_cell(cell.bottom_idx));
-        assert(is_cell(m_cells[cell.bottom_idx].left_idx));
-
-        // TODO: Add check that this is actually the correct next cell
-        Igor::Todo("Exit on bottom left corner.");
-        return m_cells[cell.bottom_idx].left_idx;
-      }
-      // Top left corner
-      else if (on_x == ON_MIN && on_y == ON_MAX) {
-        assert(is_cell(cell.top_idx));
-        assert(is_cell(m_cells[cell.top_idx].left_idx));
-
-        // TODO: Add check that this is actually the correct next cell
-        Igor::Todo("Exit on top left corner.");
-        return m_cells[cell.top_idx].left_idx;
-      }
-      // Bottom right corner
-      else if (on_x == ON_MAX && on_y == ON_MIN) {
-        assert(is_cell(cell.bottom_idx));
-        assert(is_cell(m_cells[cell.bottom_idx].right_idx));
-
-        // TODO: Add check that this is actually the correct next cell
-        Igor::Todo("Exit on bottom right corner.");
-        return m_cells[cell.bottom_idx].right_idx;
-      }
-      // Top right corner
-      else {
-        assert(is_cell(cell.top_idx));
-        assert(is_cell(m_cells[cell.top_idx].right_idx));
-
-        // TODO: Add check that this is actually the correct next cell
-        Igor::Todo("Exit on top right corner.");
-        return m_cells[cell.top_idx].right_idx;
-
-        // return cell.top_idx;
-      }
-    } else {
-      // Left side
-      if (on_x == ON_MIN) {
-        assert(is_cell(cell.left_idx));
-        return cell.left_idx;
-      }
-      // Right side
-      else if (on_x == ON_MAX) {
-        assert(is_cell(cell.right_idx));
-        return cell.right_idx;
-      }
-      // Bottom side
-      else if (on_y == ON_MIN) {
-        assert(is_cell(cell.bottom_idx));
-        return cell.bottom_idx;
-      }
-      // Top side
-      else {
-        assert(is_cell(cell.top_idx));
-        return cell.top_idx;
-      }
-    }
-  }
-
-  // -----------------------------------------------------------------------------------------------
   template <typename ParamCurve>
-  [[nodiscard]] constexpr auto cut_curve(ParamCurve curve) noexcept -> bool {
-    enum { T_BELOW_EXIT = -1, T_IS_EXIT, T_ABOVE_EXIT };
+  [[nodiscard]] constexpr auto cut_curve(ParamCurve curve,
+                                         size_t num_discretization_points = 0UZ) noexcept -> bool {
+    if (num_discretization_points == 0UZ) { num_discretization_points = size() / 2UZ; }
 
-    using PointType = GridCoord<PassiveFloat>;
-
-    const auto t_location = [this, curve](PassiveFloat t,
-                                          const Cell<ActiveFloat, PassiveFloat>& cell,
-                                          PassiveFloat t_entry) -> int {
-      const auto pos = to_grid_coord(curve(t));
-      if (t <= t_entry || (point_in_cell(pos, cell) && !point_on_boundary(pos, cell))) {
-        return T_BELOW_EXIT;
-      } else if (point_on_boundary(pos, cell)) {
-        return T_IS_EXIT;
-      }
-      return T_ABOVE_EXIT;
-    };
-
-    PassiveFloat t      = 0;
-    const auto init_pos = to_grid_coord(curve(t));
-    auto cell_idx       = find_cell(init_pos);
-    if (cell_idx == NULL_INDEX) {
-      Igor::Warn("Point {} on parametrized curve is not in the grid.", curve(t));
-      return false;
-    }
-
-    if (!m_cut_cell_idxs.empty()) {
-      Igor::Warn("Grid is already cut, this method expects the grid to no be cut.");
-      return false;
-    }
-
-    m_cut_cell_idxs.push_back(cell_idx);
-    std::vector<PointType> entry_points{};
-    entry_points.push_back(init_pos);
-
-    while (t < 1) {
-      const auto& cell = m_cells[cell_idx];
-      auto t_lower     = t;
-      auto t_upper     = std::min(PassiveFloat{1}, t + PassiveFloat{0.5});
-
-      bool found_exit = false;
-      while (!found_exit) {
-        int t_lower_loc = t_location(t_lower, cell, t);
-        int t_upper_loc = t_location(t_upper, cell, t);
-        if (t_lower_loc == T_IS_EXIT && t_upper_loc == T_IS_EXIT) {
-          Igor::Warn("lower t ({}) and upper t ({}) are both exit points.", t_lower, t_upper);
-        }
-        assert(!(t_lower_loc == T_IS_EXIT && t_upper_loc == T_IS_EXIT));
-
-        if (!(t_lower_loc == T_BELOW_EXIT || t_lower_loc == T_IS_EXIT)) {
-          Igor::Warn("lower t ({}) is outside of cell.", t_lower);
-        }
-        assert(t_lower_loc == T_BELOW_EXIT || t_lower_loc == T_IS_EXIT);
-
-        if (!(t_upper_loc == T_ABOVE_EXIT || t_upper_loc == T_IS_EXIT)) {
-          IGOR_DEBUG_PRINT(t);
-          IGOR_DEBUG_PRINT(t_lower);
-          IGOR_DEBUG_PRINT(t_upper);
-          IGOR_DEBUG_PRINT(curve(t_upper));
-          IGOR_DEBUG_PRINT(to_grid_coord(curve(t_upper)));
-          IGOR_DEBUG_PRINT(point_on_boundary(to_grid_coord(curve(t_upper)), cell));
-          Igor::Warn("upper t ({}) is inside of cell.", t_upper);
-        }
-        assert(t_upper_loc == T_ABOVE_EXIT || t_upper_loc == T_IS_EXIT);
-
-        if (t_lower_loc == T_IS_EXIT) {
-          t          = t_lower;
-          found_exit = true;
-        } else if (t_upper_loc == T_IS_EXIT) {
-          t          = t_upper;
-          found_exit = true;
-        } else {
-          const auto t_mid = (t_upper + t_lower) / 2;
-          switch (t_location(t_mid, cell, t)) {
-            case T_BELOW_EXIT: t_lower = t_mid; break;
-            case T_ABOVE_EXIT: t_upper = t_mid; break;
-            case T_IS_EXIT:
-              t          = t_mid;
-              found_exit = true;
-              break;
-          }
-        }
-      }
-      const auto next_pos = to_grid_coord(curve(t));
-      entry_points.push_back(next_pos);
-
-      if (approx_eq(t, PassiveFloat{1})) { break; }
-
-      cell_idx = find_next_cell_to_cut(cell, next_pos);
-      m_cut_cell_idxs.push_back(cell_idx);
-    }
-
-    assert(m_cut_cell_idxs.size() + 1 == entry_points.size());
-    for (size_t i = 0; i < m_cut_cell_idxs.size(); ++i) {
-      auto& cell_to_cut    = m_cells[m_cut_cell_idxs[i]];
-      auto cut_entry_point = entry_points[i];
-      auto cut_exit_point  = entry_points[i + 1];
-
-      Side entry_loc;
-      Side exit_loc;
-      if (classify_cut(cell_to_cut, cut_entry_point, cut_exit_point, entry_loc, exit_loc) !=
-          ClassifyError::OK) {
-        Igor::Warn("Could not classify cut, cut is invalid.");
-        return false;
-      }
-
-      ActiveFloat old_value = 0.0;
-      if (cell_to_cut.is_cartesian()) { old_value = cell_to_cut.get_cartesian().value; }
-
-      cell_to_cut.cell_type = CutValue<ActiveFloat>{
-          .left_value    = old_value,
-          .right_value   = old_value,
-          .rel_cut_entry = {cut_entry_point.x, cut_entry_point.y},
-          .entry_loc     = entry_loc,
-          .rel_cut_exit  = {cut_exit_point.x, cut_exit_point.y},
-          .exit_loc      = exit_loc,
-      };
-    }
-
-    return true;
+    std::vector<GridCoord<ActiveFloat>> points(num_discretization_points);
+    std::generate(std::begin(points),
+                  std::end(points),
+                  [this, num_discretization_points, curve, i = 0UZ]() mutable {
+                    const auto t = static_cast<PassiveFloat>(i++) /
+                                   static_cast<PassiveFloat>(num_discretization_points - 1);
+                    return to_grid_coord(curve(t));
+                  });
+    return cut_piecewise_linear<ExtendType::MAX>(points);
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -1005,6 +817,7 @@ class UniformGrid {
 
   // -----------------------------------------------------------------------------------------------
   static constexpr std::array<Side, 8UZ> NEIGHBOUR_ORDER = {
+      BOTTOM,
       static_cast<Side>(BOTTOM | RIGHT),
       RIGHT,
       static_cast<Side>(TOP | RIGHT),
@@ -1136,6 +949,7 @@ class UniformGrid {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto nx() const noexcept -> size_t { return m_nx; }
   [[nodiscard]] constexpr auto ny() const noexcept -> size_t { return m_ny; }
+  [[nodiscard]] constexpr auto size() const noexcept -> size_t { return m_cells.size(); }
   [[nodiscard]] constexpr auto min_delta() const noexcept -> PassiveFloat {
     return std::min(m_dx, m_dy);
   }
@@ -1155,9 +969,6 @@ class UniformGrid {
   [[nodiscard]] constexpr auto cut_cell_idxs() const noexcept -> const std::vector<size_t>& {
     return m_cut_cell_idxs;
   }
-
-  // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto size() const noexcept -> size_t { return m_cells.size(); }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept
