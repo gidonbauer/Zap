@@ -3,8 +3,8 @@
 
 #include <variant>
 
-#include "CellBased/Cell.hpp"
 #include "CellBased/Definitions.hpp"
+#include "CellBased/Geometry.hpp"
 #include "CellBased/SmallVector.hpp"
 #include "IO/IncCellWriter.hpp"
 
@@ -481,6 +481,67 @@ class IncCellReader {
   [[nodiscard]] constexpr auto y_max() const noexcept -> Float { return m_y_max; }
   [[nodiscard]] constexpr auto nx() const noexcept -> size_t { return m_nx; }
   [[nodiscard]] constexpr auto ny() const noexcept -> size_t { return m_ny; }
+
+  // -----------------------------------------------------------------------------------------------
+  constexpr void calc_symmetry_error() noexcept {
+    IGOR_ASSERT(
+        nx() == ny(),
+        "This function assumes that the grid is square with nx == ny, but nx is {} and ny is {}.",
+        nx(),
+        ny());
+
+    for (size_t yi = 0; yi < ny(); ++yi) {
+      for (size_t xi = yi; xi < nx(); ++xi) {
+        const size_t idx1 = yi * nx() + xi;
+        const size_t idx2 = xi * nx() + yi;
+
+        auto& cell1 = m_cells[idx1];
+        auto& cell2 = m_cells[idx2];
+
+        if (cell1.is_cartesian() && cell2.is_cartesian()) {
+          const auto value1 = cell1.get_cartesian().value;
+          const auto value2 = cell2.get_cartesian().value;
+
+          cell1.get_cartesian().value = value1 - value2;
+          cell2.get_cartesian().value = value2 - value1;
+        } else if (cell1.is_cut() && cell2.is_cut()) {
+          cell1.get_cut().left_value  = Eigen::Vector<Float, DIM>::Zero();
+          cell1.get_cut().right_value = Eigen::Vector<Float, DIM>::Zero();
+          cell2.get_cut().left_value  = Eigen::Vector<Float, DIM>::Zero();
+          cell2.get_cut().right_value = Eigen::Vector<Float, DIM>::Zero();
+          Igor::Warn("Both cut is not implemented yet.");
+        } else if (cell1.is_cut() && cell2.is_cartesian()) {
+          const auto value1_left  = cell1.get_cut().left_value;
+          const auto value1_right = cell1.get_cut().right_value;
+
+          const auto area1_left  = CellBased::Geometry::Polygon(cell1.get_left_points()).area();
+          const auto area1_right = CellBased::Geometry::Polygon(cell1.get_right_points()).area();
+          const auto area1       = cell1.dx() * cell1.dy();
+
+          const auto value2 = cell2.get_cartesian().value;
+
+          cell1.get_cut().left_value  = value1_left - value2;
+          cell1.get_cut().right_value = value1_right - value2;
+          cell2.get_cartesian().value =
+              value2 - (value1_left * area1_left + value1_right * area1_right) / area1;
+        } else {
+          const auto value1 = cell1.get_cartesian().value;
+
+          const auto value2_left  = cell2.get_cut().left_value;
+          const auto value2_right = cell2.get_cut().right_value;
+
+          const auto area2_left  = CellBased::Geometry::Polygon(cell2.get_left_points()).area();
+          const auto area2_right = CellBased::Geometry::Polygon(cell2.get_right_points()).area();
+          const auto area2       = cell2.dx() * cell2.dy();
+
+          cell1.get_cartesian().value =
+              value1 - (value2_left * area2_left + value2_right * area2_right) / area2;
+          cell2.get_cut().left_value  = value2_left - value1;
+          cell2.get_cut().right_value = value2_right - value1;
+        }
+      }
+    }
+  }
 };
 
 }  // namespace Zap::IO

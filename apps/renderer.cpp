@@ -1,9 +1,8 @@
-#include <cmath>
 #include <optional>
 
-#include "CellBased/Cell.hpp"
 #include "IO/IncCellReader.hpp"
 #include "IO/IncMatrixReader.hpp"
+
 #include "Renderer/Canvas.hpp"
 #include "Renderer/FFmpeg.hpp"
 #include "Renderer/Modules.hpp"
@@ -34,6 +33,7 @@ struct Args {
   size_t fps                    = 60;
   bool two_dim                  = false;
   bool no_mass                  = false;
+  bool symmetry_error           = false;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -59,7 +59,9 @@ constexpr void usage(std::string_view prog) {
       << std::boolalpha << args.two_dim << '\n';
   std::cerr << "\t--no-mass         Do not display the mass ||u||, this flag saves some "
                "computation time, default is "
-            << args.no_mass << '\n';
+            << std::boolalpha << args.no_mass << '\n';
+  std::cerr << "\t--symmetry-error  Show the symmetry error with symmetry axis [1, 1], default is "
+            << std::boolalpha << args.symmetry_error << '\n';
   std::cerr << "\tu input file      Solution field for each iteration\n";
   std::cerr << "\tt input file      Time for each iteration\n";
   std::cerr << "\toutput file       File for the rendered video\n";
@@ -149,6 +151,8 @@ constexpr void usage(std::string_view prog) {
       args.two_dim = true;
     } else if (*argv == "--no-mass"sv) {
       args.no_mass = true;
+    } else if (*argv == "--symmetry-error"sv) {
+      args.symmetry_error = true;
     } else if (args.u_input_file.empty()) {
       args.u_input_file = *argv;
     } else if (args.t_input_file.empty()) {
@@ -376,6 +380,12 @@ template <typename Float, size_t DIM>
                             args.fps,
                             "100000k",
                             args.save_frame_images != Args::NO_SAVE);
+    Igor::on_death.emplace_back([child = ffmpeg.child()]() {
+      if (kill(child, SIGKILL) == -1) {
+        Igor::Warn("Could not kill FFmpeg: {}", std::strerror(errno));
+      }
+    });
+
     Eigen::Vector<Float, DIM> min{};
     Eigen::Vector<Float, DIM> max{};
     for (size_t iter = 0; true; ++iter) {
@@ -396,6 +406,10 @@ template <typename Float, size_t DIM>
       } else if (!got_next_t) {
         Igor::Warn("Got more u-entries than t-entries.");
         return false;
+      }
+
+      if (args.symmetry_error) {
+        std::visit([](auto& reader) { reader.calc_symmetry_error(); }, u_reader);
       }
 
       canvas.clear(BLACK);
@@ -553,6 +567,12 @@ template <typename Float, size_t DIM>
     Igor::ScopeTimer timer{"Rendering"};
 
     const Rd::FFmpeg ffmpeg(canvas.width(), canvas.height(), args.output_file, args.fps);
+    Igor::on_death.emplace_back([child = ffmpeg.child()]() {
+      if (kill(child, SIGKILL) == -1) {
+        Igor::Warn("Could not kill FFmpeg: {}", std::strerror(errno));
+      }
+    });
+
     Eigen::Vector<Float, DIM> min{};
     Eigen::Vector<Float, DIM> max{};
     for (size_t iter = 0; true; ++iter) {

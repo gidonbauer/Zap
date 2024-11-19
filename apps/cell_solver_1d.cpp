@@ -3,7 +3,7 @@
 
 #include <AD/ad.hpp>
 
-// #define ZAP_NO_PARALLEL
+// #define ZAP_SERIAL
 // #define ZAP_2ND_ORDER_CORRECTION
 // #define ZAP_NO_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
@@ -26,7 +26,7 @@ using namespace std::string_view_literals;
 
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
-using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
+using ActiveFloat            = double;  // ad::gt1s<PassiveFloat>::type;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 5.0;
 constexpr PassiveFloat Y_MIN = 0.0;
@@ -188,11 +188,12 @@ auto main(int argc, char** argv) -> int {
 
   Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(
       X_MIN, X_MAX, args->nx, Y_MIN, Y_MAX, args->ny);
-  // grid.same_value_boundary();
+  // grid.same_value_boundary(Zap::CellBased::TOP | Zap::CellBased::BOTTOM);
+  // grid.periodic_boundary(Zap::CellBased::LEFT | Zap::CellBased::RIGHT);
   grid.periodic_boundary();
 
-  ActiveFloat eps     = args->eps;
-  ad::derivative(eps) = 1;
+  ActiveFloat eps = args->eps;
+  // ad::derivative(eps) = 1;
 
 // #define RAMP_X
 #define QUARTER_CIRCLE

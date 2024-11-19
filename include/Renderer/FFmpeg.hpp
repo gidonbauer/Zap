@@ -117,6 +117,7 @@ class FFmpeg {
   }
 
   [[nodiscard]] constexpr auto stream() const noexcept -> pid_t { return m_stream; }
+  [[nodiscard]] constexpr auto child() const noexcept -> pid_t { return m_child; }
 };
 
 }  // namespace Zap::Renderer

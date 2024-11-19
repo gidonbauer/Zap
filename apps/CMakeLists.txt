@@ -15,6 +15,7 @@ set(executables
   example_inverse_ramp
 
   compare_clawpack
+  is_symmetric
 )
 
 foreach(exec ${executables})

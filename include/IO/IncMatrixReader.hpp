@@ -139,9 +139,7 @@ class IncMatrixReader {
       return false;
     }
 
-    if (!m_in.seekg(0, std::ios::end)) {
-      Igor::Warn("Could not move input position indicator.");
-    }
+    if (!m_in.seekg(0, std::ios::end)) { Igor::Warn("Could not move input position indicator."); }
 
     const auto end = m_in.tellg();
     if (end == -1) {
@@ -149,9 +147,7 @@ class IncMatrixReader {
       return false;
     }
 
-    if (!m_in.seekg(begin)) {
-      Igor::Warn("Could not move input position indicator.");
-    }
+    if (!m_in.seekg(begin)) { Igor::Warn("Could not move input position indicator."); }
 
     if ((end - begin) % matrix_size_bytes() != 0) {
       Igor::Warn("Data size ({} bytes) is not a multiple of the matrix size ({} bytes)",
@@ -170,9 +166,7 @@ class IncMatrixReader {
   [[nodiscard]] auto read_next() -> bool {
     m_elem_idx += 1;
     if (m_elem_idx >= m_num_elem) {
-      if constexpr (WARN_END) {
-        Igor::Warn("Reached end of file.");
-      }
+      if constexpr (WARN_END) { Igor::Warn("Reached end of file."); }
       return false;
     }
 
@@ -193,9 +187,7 @@ class IncMatrixReader {
       Igor::Panic("Need to call `read_next` at least once before indexing into the matrix.");
     }
 
-    if (m_is_row_major != 0) {
-      return m_element[static_cast<size_t>(row * m_cols + col)];
-    }
+    if (m_is_row_major != 0) { return m_element[static_cast<size_t>(row * m_cols + col)]; }
     return m_element[static_cast<size_t>(col * m_rows + row)];
   }
 
@@ -206,9 +198,7 @@ class IncMatrixReader {
       Igor::Panic("Need to call `read_next` at least once before indexing into the matrix.");
     }
 
-    if (m_is_row_major != 0) {
-      return m_element[static_cast<size_t>(row * m_cols + col)];
-    }
+    if (m_is_row_major != 0) { return m_element[static_cast<size_t>(row * m_cols + col)]; }
     return m_element[static_cast<size_t>(col * m_rows + row)];
   }
 
@@ -229,6 +219,9 @@ class IncMatrixReader {
     }
     return m_element;
   }
+
+  // -----------------------------------------------------------------------------------------------
+  constexpr void calc_symmetry_error() noexcept { Igor::Todo(); }
 };
 
 }  // namespace Zap::IO
