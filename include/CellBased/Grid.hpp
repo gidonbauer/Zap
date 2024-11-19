@@ -1010,42 +1010,25 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  [[nodiscard]] constexpr auto translate(SmallVector<GridCoord<ActiveFloat>> points,
+  [[nodiscard]] constexpr auto translate(Geometry::Polygon<GridCoord<ActiveFloat>> polygon,
                                          Side side) const noexcept
-      -> SmallVector<GridCoord<ActiveFloat>> {
+      -> Geometry::Polygon<GridCoord<ActiveFloat>> {
     IGOR_ASSERT(m_nx > 1 && m_ny > 1,
                 "This function assumes that both nx and ny are greater than one, but they are {} "
                 "and {} respectively",
                 m_nx,
                 m_ny);
 
-    if (side == 0) { return points; }
+    if (side == 0) { return polygon; }
 
-    if ((side & LEFT) > 0) {
-      for (auto& p : points) {
-        p.x -= static_cast<PassiveFloat>(m_nx);
-      }
-    }
+    PassiveFloat dx = 0;
+    PassiveFloat dy = 0;
+    if ((side & LEFT) > 0) { dx -= static_cast<PassiveFloat>(m_nx); }
+    if ((side & RIGHT) > 0) { dx += static_cast<PassiveFloat>(m_nx); }
+    if ((side & BOTTOM) > 0) { dy -= static_cast<PassiveFloat>(m_ny); }
+    if ((side & TOP) > 0) { dy += static_cast<PassiveFloat>(m_ny); }
 
-    if ((side & RIGHT) > 0) {
-      for (auto& p : points) {
-        p.x += static_cast<PassiveFloat>(m_nx);
-      }
-    }
-
-    if ((side & BOTTOM) > 0) {
-      for (auto& p : points) {
-        p.y -= static_cast<PassiveFloat>(m_ny);
-      }
-    }
-
-    if ((side & TOP) > 0) {
-      for (auto& p : points) {
-        p.y += static_cast<PassiveFloat>(m_ny);
-      }
-    }
-
-    return points;
+    return Geometry::translate(std::move(polygon), dx, dy);
   }
 
   // -----------------------------------------------------------------------------------------------

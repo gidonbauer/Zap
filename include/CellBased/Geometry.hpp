@@ -171,6 +171,28 @@ template <Point2D_c PointType>
   return intersect;
 }
 
+// -------------------------------------------------------------------------------------------------
+template <Point2D_c PointType, typename PassiveFloat>
+[[nodiscard]] constexpr auto translate(Polygon<PointType> polygon,
+                                       PassiveFloat dx,
+                                       PassiveFloat dy) noexcept -> Polygon<PointType> {
+  static_assert(
+      std::is_same_v<decltype(std::declval<PointType>().x), decltype(std::declval<PointType>().y)>,
+      "Expect x- and y-component of PointType to have the same type.");
+  using PT_ActiveFloat  = decltype(std::declval<PointType>().x);
+  using PT_PassiveFloat = std::conditional_t<ad::mode<PT_ActiveFloat>::is_ad_type,
+                                             typename ad::mode<PT_ActiveFloat>::passive_t,
+                                             PT_ActiveFloat>;
+  static_assert(std::is_same_v<PassiveFloat, PT_PassiveFloat>,
+                "Expect PassiveFloat and PT_PassiveFloat (from PointType) to be the same type.");
+
+  for (auto& p : polygon.points()) {
+    p.x += dx;
+    p.y += dy;
+  }
+  return polygon;
+}
+
 }  // namespace Zap::CellBased::Geometry
 
 #endif  // ZAP_CELL_BASED_GEOMETRY_HPP_

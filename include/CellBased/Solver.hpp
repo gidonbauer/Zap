@@ -102,23 +102,20 @@ class Solver {
     if (cell.is_cartesian()) {
       update_value_by_overlap<static_cast<Side>(0)>(
           cell.get_cartesian().value,
-          Geometry::Polygon<PointType>{
-              next_grid.translate(cell.template get_cartesian_points<coord_type>(), translate)},
+          next_grid.translate(cell.template get_cartesian_polygon<coord_type>(), translate),
           wave_polygon,
           wave);
     } else {
       // Left subcell
       update_value_by_overlap<static_cast<Side>(0)>(
           cell.get_cut().left_value,
-          Geometry::Polygon<PointType>{
-              next_grid.translate(cell.template get_left_points<coord_type>(), translate)},
+          next_grid.translate(cell.template get_cut_left_polygon<coord_type>(), translate),
           wave_polygon,
           wave);
       // Right subcell
       update_value_by_overlap<static_cast<Side>(0)>(
           cell.get_cut().right_value,
-          Geometry::Polygon<PointType>{
-              next_grid.translate(cell.template get_right_points<coord_type>(), translate)},
+          next_grid.translate(cell.template get_cut_right_polygon<coord_type>(), translate),
           wave_polygon,
           wave);
     }
@@ -235,19 +232,19 @@ class Solver {
 
             constexpr CoordType coord_type = PointType2CoordType<PointType>;
             // Left subcell
-            update_value_by_overlap<side>(tangent_cell.get_cut().left_value,
-                                          Geometry::Polygon<PointType>(curr_grid.translate(
-                                              tangent_cell.template get_left_points<coord_type>(),
-                                              static_cast<Side>(cell_on_boundary & tangent_side))),
-                                          wave_polygon,
-                                          *wave);
+            update_value_by_overlap<side>(
+                tangent_cell.get_cut().left_value,
+                curr_grid.translate(tangent_cell.template get_cut_left_polygon<coord_type>(),
+                                    static_cast<Side>(cell_on_boundary & tangent_side)),
+                wave_polygon,
+                *wave);
             // Right subcell
-            update_value_by_overlap<side>(tangent_cell.get_cut().right_value,
-                                          Geometry::Polygon<PointType>(curr_grid.translate(
-                                              tangent_cell.template get_right_points<coord_type>(),
-                                              static_cast<Side>(cell_on_boundary & tangent_side))),
-                                          wave_polygon,
-                                          *wave);
+            update_value_by_overlap<side>(
+                tangent_cell.get_cut().right_value,
+                curr_grid.translate(tangent_cell.template get_cut_right_polygon<coord_type>(),
+                                    static_cast<Side>(cell_on_boundary & tangent_side)),
+                wave_polygon,
+                *wave);
           }
         }
         // = Update tangentally affected cell ==============
