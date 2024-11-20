@@ -80,7 +80,7 @@ struct SymmetryResults {
                                   size_t N         = 2000,
                                   PassiveFloat tol = EPS<PassiveFloat>()) noexcept
     -> SymmetryResults {
-  Igor::ScopeTimer timer("Symmetry check");
+  // Igor::ScopeTimer timer("Symmetry check");
 
   size_t num_non_symmetric         = 0;
   size_t num_points_checked        = 0;
@@ -136,7 +136,7 @@ struct SymmetryResults {
   NoopWriter grid_writer;
   NoopWriter time_writer;
 
-  Igor::ScopeTimer timer("Solver");
+  // Igor::ScopeTimer timer("Solver");
   return solver.solve(grid, tend, grid_writer, time_writer, cfl);
 }
 
@@ -153,8 +153,7 @@ auto main() -> int {
   //            "------------------------");
   Igor::Info("Gridsize,#non-symmetric,%non-symmetric,%cut,abs. non-symmetric error,"
              "rel. non-symmetric error");
-  // for (size_t n = 11; n <= 401; n += n > 150 ? 50 : 10) {
-  if (size_t n = 141; true) {
+  for (size_t n = 11; n <= 401; n += n > 150 ? 50 : 10) {
     const PassiveFloat cfl = n <= 101 ? 0.5 : 0.2;
     const auto res         = run(n, n, tend, cfl);
     if (!res.has_value()) {
