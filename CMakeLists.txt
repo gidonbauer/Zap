@@ -18,6 +18,9 @@ add_compile_options(-Wall -Wextra -pedantic -Wconversion -Wshadow)
 # - AD compile definitions ------------------------------------------------------------------------- 
 add_compile_definitions(AD_STD_COMPATIBILITY AD_INTEROP_EIGEN AD_AUTO_SUPPORT AD_FORMATTING)
 
+# - Boost Multiprecision definitions ---------------------------------------------------------------
+add_compile_definitions(BOOST_MP_STANDALONE)
+
 # - Build type options -----------------------------------------------------------------------------
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
