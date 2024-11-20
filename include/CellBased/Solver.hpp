@@ -62,14 +62,14 @@ class Solver {
     // clang-format on
 
     const auto cell_area = cell_polygon.area();
-    assert(cell_area > 0 || std::abs(cell_area) <= EPS<ActiveFloat>);
-    if (std::abs(cell_area) <= EPS<ActiveFloat>) { return; }
+    assert(cell_area > 0 || std::abs(cell_area) <= EPS<ActiveFloat>());
+    if (std::abs(cell_area) <= EPS<ActiveFloat>()) { return; }
 
     const auto intersect_area = (cell_polygon & wave_polygon).area();
-    IGOR_ASSERT(intersect_area >= 0 || std::abs(intersect_area) < EPS<ActiveFloat>,
+    IGOR_ASSERT(intersect_area >= 0 || std::abs(intersect_area) < EPS<ActiveFloat>(),
                 "Expect the intersection area to be greater or equal to zero but is {}",
                 intersect_area);
-    IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<ActiveFloat>,
+    IGOR_ASSERT(intersect_area - cell_area <= 50 * EPS<ActiveFloat>(),
                 "Expected area of intersection to be smaller or equal to the area of the cell, "
                 "but intersection area is {} and cell area is {}, intersection area is {} "
                 "larger than cell area.",
@@ -78,12 +78,6 @@ class Solver {
                 static_cast<ActiveFloat>(intersect_area - cell_area));
 
     value -= (intersect_area / cell_area) * wave.first_order_update;
-    // TODO: Maybe dont do that.
-    // if constexpr ((side == LEFT || side == BOTTOM)) {
-    //   value -= (intersect_area / cell_area) * wave.second_order_update;
-    // } else if constexpr ((side == RIGHT) || (side == TOP)) {
-    //   value -= (intersect_area / cell_area) * (-wave.second_order_update);
-    // }
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -167,16 +161,15 @@ class Solver {
 
         // = Update this cell =========================================
         if (next_cell.is_cartesian()) {
-          const auto ds =
+          const auto dnormal =
               orientation == X ? curr_cell.template dy<SIM_C>() : curr_cell.template dx<SIM_C>();
-          const ActiveFloat overlap_area =
-              std::abs(wave->normal_speed) * dt * (ds - 0.5 * std::abs(wave->tangent_speed) * dt);
+          const ActiveFloat overlap_area = std::abs(wave->normal_speed) * dt *
+                                           (dnormal - 0.5 * std::abs(wave->tangent_speed) * dt);
           const ActiveFloat cell_area =
               curr_cell.template dx<SIM_C>() * curr_cell.template dy<SIM_C>();
 
           next_cell.get_cartesian().value -= (overlap_area / cell_area) * wave->first_order_update;
         } else {
-          // TODO: Handle periodic boundary
           const Geometry::Polygon<PointType> wave_polygon = calc_wave_polygon(
               *wave, curr_cell.template dx<SIM_C>(), curr_cell.template dy<SIM_C>(), dt);
 
@@ -338,8 +331,8 @@ class Solver {
         {
           const auto next_subcell_polygon = next_cell.template get_cut_left_polygon<GRID_C>();
           assert(next_subcell_polygon.area() > 0 ||
-                 std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>);
-          if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>) {
+                 std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>());
+          if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>()) {
             const auto left_intersect_area = (next_subcell_polygon & curr_cell_left_polygon).area();
             const auto right_intersect_area =
                 (next_subcell_polygon & curr_cell_right_polygon).area();
@@ -364,8 +357,8 @@ class Solver {
         {
           const auto next_subcell_polygon = next_cell.template get_cut_right_polygon<GRID_C>();
           assert(next_subcell_polygon.area() > 0 ||
-                 std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>);
-          if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>) {
+                 std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>());
+          if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>()) {
             const auto left_intersect_area = (next_subcell_polygon & curr_cell_left_polygon).area();
             const auto right_intersect_area =
                 (next_subcell_polygon & curr_cell_right_polygon).area();
@@ -435,7 +428,7 @@ class Solver {
         return std::nullopt;
       }
       const ActiveFloat dt =
-          std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
+          std::min<ActiveFloat>(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
 
       next_grid = curr_grid;
 

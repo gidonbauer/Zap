@@ -31,8 +31,8 @@ TEST(Wave, XDirection) {
                                AxisAlignedWave<double, GridCoord<double>, X>>,
                 "Expected an axis-aligned wave in x-direction.");
 
-  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>);
-  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>);
+  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>());
+  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>());
 
   EXPECT_GE(wave->normal_speed, 0.0) << "Expected wave to move to the right but is not.";
   EXPECT_DOUBLE_EQ(wave->normal_speed,
@@ -67,8 +67,8 @@ TEST(Wave, YDirection) {
                                AxisAlignedWave<double, GridCoord<double>, Y>>,
                 "Expected an axis-aligned wave in x-direction.");
 
-  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>);
-  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>);
+  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>());
+  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>());
 
   EXPECT_GE(wave->normal_speed, 0.0) << "Expected wave to move to the right but is not.";
   EXPECT_DOUBLE_EQ(wave->normal_speed,
@@ -103,12 +103,12 @@ TEST(Wave, FourtyFiveDegree) {
       std::is_same_v<std::remove_cvref_t<decltype(*wave)>, FreeWave<double, GridCoord<double>>>,
       "Expected an axis-aligned wave in x-direction.");
 
-  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>);
-  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>);
+  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>());
+  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>());
   EXPECT_LE((wave->normal -
              GridCoord<double>{std::numbers::sqrt2 / (2 * dx), std::numbers::sqrt2 / (2 * dy)})
                 .norm(),
-            EPS<double>);
+            EPS<double>());
 
   EXPECT_GE(wave->normal_speed, 0.0) << "Expected wave to move to the right but is not.";
   constexpr auto angle = std::numbers::pi / 4.0;
@@ -121,7 +121,7 @@ TEST(Wave, FourtyFiveDegree) {
               (-std::sin(angle) + std::cos(angle)) *
                   (f(interface.right_value) - f(interface.left_value)) /
                   (interface.right_value - interface.left_value),
-              EPS<double>)
+              EPS<double>())
       << "Tangential wave speed does not match with Rankine-Hugoniot condition";
 
   // Igor::Info("wave->first_order_update  = {}", wave->first_order_update);
@@ -147,12 +147,12 @@ TEST(Wave, TwohundredTwentyFiveDegree) {
       std::is_same_v<std::remove_cvref_t<decltype(*wave)>, FreeWave<double, GridCoord<double>>>,
       "Expected an axis-aligned wave in x-direction.");
 
-  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>);
-  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>);
+  EXPECT_LE((wave->begin - interface.begin).norm(), EPS<double>());
+  EXPECT_LE((wave->end - interface.end).norm(), EPS<double>());
   EXPECT_LE((wave->normal -
              GridCoord<double>{-std::numbers::sqrt2 / (2 * dx), -std::numbers::sqrt2 / (2 * dy)})
                 .norm(),
-            EPS<double>);
+            EPS<double>());
 
   EXPECT_LT(wave->normal_speed, 0.0) << "Expected wave to move to the left but is not.";
   const auto angle = 5.0 * std::numbers::pi / 4.0;
@@ -165,7 +165,7 @@ TEST(Wave, TwohundredTwentyFiveDegree) {
               (-std::sin(angle) + std::cos(angle)) *
                   (f(interface.right_value) - f(interface.left_value)) /
                   (interface.right_value - interface.left_value),
-              EPS<double>)
+              EPS<double>())
       << "Tangential wave speed does not match with Rankine-Hugoniot condition";
 
   // Igor::Info("wave->first_order_update  = {}", wave->first_order_update);

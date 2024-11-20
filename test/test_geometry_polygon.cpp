@@ -348,15 +348,15 @@ TEST(GeometryPolygon, ScalingAndRelativeSizes) {
 
   EXPECT_NEAR(scaled_intersect_AB.area(),
               scale_x * scale_y * intersect_AB.area(),
-              Zap::CellBased::EPS<double>);
+              Zap::CellBased::EPS<double>());
 
   EXPECT_NEAR(intersect_AB.area() / polygon_A.area(),
               scaled_intersect_AB.area() / scaled_polygon_A.area(),
-              Zap::CellBased::EPS<double>);
+              Zap::CellBased::EPS<double>());
 
   EXPECT_NEAR(intersect_AB.area() / polygon_B.area(),
               scaled_intersect_AB.area() / scaled_polygon_B.area(),
-              Zap::CellBased::EPS<double>);
+              Zap::CellBased::EPS<double>());
 }
 
 TEST(GeometryPolygon, NonIntersectingParallel) {

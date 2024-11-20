@@ -40,7 +40,9 @@ struct Chunk {
   std::pair<size_t, size_t> opt_pair = {1, nt_target};
   auto opt_val                       = calc_val(opt_pair);
 
-  for (size_t lower = 2; lower <= static_cast<size_t>(std::floor(std::sqrt(nt_target))); ++lower) {
+  const auto upper_bound =
+      static_cast<size_t>(std::floor(std::sqrt(static_cast<double>(nt_target))));
+  for (size_t lower = 2; lower <= upper_bound; ++lower) {
     if (nt_target % lower == 0) {
       const std::pair<size_t, size_t> p = {lower, nt_target / lower};
       const auto val                    = calc_val(p);

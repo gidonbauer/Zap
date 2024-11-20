@@ -7,7 +7,8 @@
 namespace Zap::CellBased {
 
 template <typename Float>
-[[nodiscard]] constexpr auto approx_eq(Float a, Float b, Float tol = EPS<Float>) noexcept -> bool {
+[[nodiscard]] constexpr auto approx_eq(Float a, Float b, Float tol = EPS<Float>()) noexcept
+    -> bool {
   return std::abs(a - b) <= tol;
 };
 
@@ -19,14 +20,14 @@ template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 
   return ((approx_eq(p.x, cell.template x_min<coord_type>()) ||
            approx_eq(p.x, cell.template x_min<coord_type>() + cell.template dx<coord_type>())) &&
-          (p.y - cell.template y_min<coord_type>() >= -EPS<PassiveFloat> &&
+          (p.y - cell.template y_min<coord_type>() >= -EPS<PassiveFloat>() &&
            p.y - (cell.template y_min<coord_type>() + cell.template dy<coord_type>()) <=
-               EPS<PassiveFloat>)) ||
+               EPS<PassiveFloat>())) ||
          ((approx_eq(p.y, cell.template y_min<coord_type>()) ||
            approx_eq(p.y, cell.template y_min<coord_type>() + cell.template dy<coord_type>())) &&
-          (p.x - cell.template x_min<coord_type>() >= -EPS<PassiveFloat> &&
+          (p.x - cell.template x_min<coord_type>() >= -EPS<PassiveFloat>() &&
            p.x - (cell.template x_min<coord_type>() + cell.template dx<coord_type>()) <=
-               EPS<PassiveFloat>));
+               EPS<PassiveFloat>()));
 };
 
 template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
@@ -34,12 +35,12 @@ template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
                                            const Cell<ActiveFloat, PassiveFloat>& cell) {
   constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
-  return p.x - cell.template x_min<coord_type>() >= -EPS<PassiveFloat> &&
+  return p.x - cell.template x_min<coord_type>() >= -EPS<PassiveFloat>() &&
          p.x - (cell.template x_min<coord_type>() + cell.template dx<coord_type>()) <=
-             EPS<PassiveFloat> &&
-         p.y - cell.template y_min<coord_type>() >= -EPS<PassiveFloat> &&
+             EPS<PassiveFloat>() &&
+         p.y - cell.template y_min<coord_type>() >= -EPS<PassiveFloat>() &&
          p.y - (cell.template y_min<coord_type>() + cell.template dy<coord_type>()) <=
-             EPS<PassiveFloat>;
+             EPS<PassiveFloat>();
 };
 
 }  // namespace Zap::CellBased

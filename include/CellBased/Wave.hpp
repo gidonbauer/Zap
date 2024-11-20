@@ -32,7 +32,6 @@ struct AxisAlignedWave {
   static_assert(orientation == X || orientation == Y, "Orientation must be `X` or `Y`.");
 
   ActiveFloat first_order_update;
-  ActiveFloat second_order_update;
 
   ActiveFloat normal_speed;
 
@@ -46,7 +45,6 @@ struct AxisAlignedWave {
 template <typename ActiveFloat, Point2D_c PointType>
 struct FreeWave {
   ActiveFloat first_order_update;
-  ActiveFloat second_order_update;
 
   ActiveFloat normal_speed;
   PointType normal;
@@ -71,7 +69,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
     -> std::optional<std::conditional_t<orientation == FREE,
                                         FreeWave<ActiveFloat, PointType>,
                                         AxisAlignedWave<ActiveFloat, PointType, orientation>>> {
-  if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>) { return std::nullopt; }
+  if ((interface.end - interface.begin).norm() < EPS<PassiveFloat>()) { return std::nullopt; }
 
   const ActiveFloat wave = interface.right_value - interface.left_value;  // As in LeVeque Book
 
@@ -79,8 +77,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
   if constexpr (orientation == X || orientation == Y) {
     const ActiveFloat wave_speed = (interface.left_value + interface.right_value) / 2;
 
-    // TODO: wave in second_order_update can be replaced by limited version
-    // TODO: how is the second_order_update distributed when multiple cells are swept over?
+    // TODO: What about the second order correction?
     // TODO: maybe add entropy fix for transsonic
     if constexpr (orientation == X) {
       IGOR_ASSERT(approx_eq(interface.begin.x, interface.end.x),
@@ -90,12 +87,6 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 
       return std::make_optional(AxisAlignedWave<ActiveFloat, PointType, X>{
           .first_order_update = sign(wave_speed) * wave,
-#ifdef ZAP_2ND_ORDER_CORRECTION
-          .second_order_update =
-              0.5 * std::abs(wave_speed) * (1 - dt / dx * std::abs(wave_speed)) * wave,
-#else
-          .second_order_update = 0,
-#endif  //  ZAP_2ND_ORDER_CORRECTION
 
           .normal_speed = wave_speed,
 
@@ -116,12 +107,6 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 
       return std::make_optional(AxisAlignedWave<ActiveFloat, PointType, Y>{
           .first_order_update = sign(wave_speed) * wave,
-#ifdef ZAP_2ND_ORDER_CORRECTION
-          .second_order_update =
-              0.5 * std::abs(wave_speed) * (1 - dt / dy * std::abs(wave_speed)) * wave,
-#else
-          .second_order_update = 0,
-#endif  //  ZAP_2ND_ORDER_CORRECTION
 
           .normal_speed = wave_speed,
 
@@ -142,8 +127,6 @@ requires(orientation == X || orientation == Y || orientation == FREE)
     const PointType normal_vector  = {tangent_vector.y, -tangent_vector.x};
 
     // Rotate PDE if interface does not align with an axis:
-    //  tangent.y                                     = cos(interface_angle)
-    //  -sign(tangent.x) * std::sqrt(1 - tangent.y^2) = sin(interface_angle)
     const ActiveFloat cos_angle = tangent_vector.y;
     const ActiveFloat sin_angle =
         -sign(tangent_vector.x) * std::sqrt(1 - tangent_vector.y * tangent_vector.y);
@@ -154,7 +137,6 @@ requires(orientation == X || orientation == Y || orientation == FREE)
     return std::make_optional(FreeWave<ActiveFloat, PointType>{
         .first_order_update =
             sign(normal_speed) * wave,  // TODO: Double check if sign(normal_speed) is correct
-        .second_order_update = 0,       // TODO: How does the second_order_update work here?
 
         .normal_speed = normal_speed,
         .normal       = scale_if_grid_coord(normal_vector, dx, dy),
@@ -230,7 +212,6 @@ struct fmt::formatter<Zap::CellBased::AxisAlignedWave<ActiveFloat, PointType, or
     return fmt::format_to(ctx.out(),
                           "{{\n"
                           "  .first_order_update = {}\n"
-                          "  .second_order_update = {}\n"
                           "  .normal_speed = {}\n"
                           "  .tangent_speed = {}\n"
                           "  .begin = {}\n"
@@ -238,7 +219,6 @@ struct fmt::formatter<Zap::CellBased::AxisAlignedWave<ActiveFloat, PointType, or
                           "  .orientation = {}\n"
                           "}}",
                           wave.first_order_update,
-                          wave.second_order_update,
                           wave.normal_speed,
                           wave.tangent_speed,
                           wave.begin,
@@ -260,7 +240,6 @@ struct fmt::formatter<Zap::CellBased::FreeWave<ActiveFloat, PointType>> {
     return fmt::format_to(ctx.out(),
                           "{{\n"
                           "  .first_order_update = {}\n"
-                          "  .second_order_update = {}\n"
                           "  .normal_speed = {}\n"
                           "  .normal = {}\n"
                           "  .tangent_speed = {}\n"
@@ -269,7 +248,6 @@ struct fmt::formatter<Zap::CellBased::FreeWave<ActiveFloat, PointType>> {
                           "  .end = {}\n"
                           "}}",
                           wave.first_order_update,
-                          wave.second_order_update,
                           wave.normal_speed,
                           wave.normal,
                           wave.tangent_speed,

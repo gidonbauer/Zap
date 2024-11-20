@@ -365,18 +365,20 @@ class UniformGrid {
     cut_exit_point.y =
         (cut_exit_point.y - cell.template y_min<coord_type>()) / cell.template dy<coord_type>();
 
-    IGOR_ASSERT(cut_entry_point.x >= -EPS<PassiveFloat> &&
-                    cut_entry_point.x - 1 <= EPS<PassiveFloat>,
+    IGOR_ASSERT(cut_entry_point.x >= -EPS<PassiveFloat>() &&
+                    cut_entry_point.x - 1 <= EPS<PassiveFloat>(),
                 "Cut-entry-x {} is not in [0, 1].",
                 cut_entry_point.x);
-    IGOR_ASSERT(cut_entry_point.y >= -EPS<PassiveFloat> &&
-                    cut_entry_point.y - 1 <= EPS<PassiveFloat>,
+    IGOR_ASSERT(cut_entry_point.y >= -EPS<PassiveFloat>() &&
+                    cut_entry_point.y - 1 <= EPS<PassiveFloat>(),
                 "Cut-entry-y {} is not in [0, 1].",
                 cut_entry_point.y);
-    IGOR_ASSERT(cut_exit_point.x >= -EPS<PassiveFloat> && cut_exit_point.x - 1 <= EPS<PassiveFloat>,
+    IGOR_ASSERT(cut_exit_point.x >= -EPS<PassiveFloat>() &&
+                    cut_exit_point.x - 1 <= EPS<PassiveFloat>(),
                 "Cut-exit-x {} is not in [0, 1].",
                 cut_exit_point.x);
-    IGOR_ASSERT(cut_exit_point.y >= -EPS<PassiveFloat> && cut_exit_point.y - 1 <= EPS<PassiveFloat>,
+    IGOR_ASSERT(cut_exit_point.y >= -EPS<PassiveFloat>() &&
+                    cut_exit_point.y - 1 <= EPS<PassiveFloat>(),
                 "Cut-exit-y {} is not in [0, 1].",
                 cut_exit_point.y);
 
@@ -450,7 +452,7 @@ class UniformGrid {
         T r_entry = -std::numeric_limits<T>::max();
         for (auto r : rs) {
           if constexpr (extend_type == ExtendType::MAX) {
-            if (r < EPS<T> && r > r_entry) { r_entry = r; }
+            if (r < EPS<T>() && r > r_entry) { r_entry = r; }
           } else {
             if (std::abs(r) < std::abs(r_entry)) { r_entry = r; }
           }
@@ -480,7 +482,7 @@ class UniformGrid {
         T r_exit = std::numeric_limits<T>::max();
         for (auto r : rs) {
           if constexpr (extend_type == ExtendType::MAX) {
-            if (r > -EPS<T> && r < r_exit) { r_exit = r; }
+            if (r > -EPS<T>() && r < r_exit) { r_exit = r; }
           } else {
             if (std::abs(r) < std::abs(r_exit)) { r_exit = r; }
           }
@@ -528,7 +530,9 @@ class UniformGrid {
           const T x = p0.x + r * slope.x;
 
           // If x is a whole number, the point was already added in the previous loop, can ignore it
-          if (search_whole_x && approx_eq(ad::value(x), std::round(ad::value(x)))) { continue; }
+          if (search_whole_x && approx_eq<PassiveFloat>(ad::value(x), std::round(ad::value(x)))) {
+            continue;
+          }
 
           intersect_points.emplace_back(x, static_cast<T>(y));
         }
@@ -549,7 +553,7 @@ class UniformGrid {
     intersect_points.erase(std::unique(intersect_points.begin(),
                                        intersect_points.end(),
                                        [](const GridCoord<T>& lhs, const GridCoord<T>& rhs) {
-                                         return (lhs - rhs).norm() < EPS<T>;
+                                         return (lhs - rhs).norm() < EPS<T>();
                                        }),
                            intersect_points.end());
 
@@ -693,14 +697,14 @@ class UniformGrid {
   template <typename PointType>
   [[nodiscard]] constexpr auto point_in_grid(const PointType& point) const noexcept -> bool {
     if constexpr (is_SimCoord_v<PointType>) {
-      return point.x - m_x_min >= -EPS<PassiveFloat> &&
-             m_x_max - point.x >= -EPS<PassiveFloat> &&  //
-             point.y - m_y_min >= -EPS<PassiveFloat> && m_y_max - point.y >= -EPS<PassiveFloat>;
+      return point.x - m_x_min >= -EPS<PassiveFloat>() &&
+             m_x_max - point.x >= -EPS<PassiveFloat>() &&  //
+             point.y - m_y_min >= -EPS<PassiveFloat>() && m_y_max - point.y >= -EPS<PassiveFloat>();
     } else {
-      return point.x >= -EPS<PassiveFloat> &&
-             static_cast<PassiveFloat>(m_nx) - point.x >= -EPS<PassiveFloat> &&  //
-             point.y >= -EPS<PassiveFloat> &&
-             static_cast<PassiveFloat>(m_ny) - point.y >= -EPS<PassiveFloat>;
+      return point.x >= -EPS<PassiveFloat>() &&
+             static_cast<PassiveFloat>(m_nx) - point.x >= -EPS<PassiveFloat>() &&  //
+             point.y >= -EPS<PassiveFloat>() &&
+             static_cast<PassiveFloat>(m_ny) - point.y >= -EPS<PassiveFloat>();
     }
   }
 
@@ -716,14 +720,14 @@ class UniformGrid {
       }
     }();
 
-    if (gpos.x < -EPS<PassiveFloat> ||
-        gpos.x > static_cast<PassiveFloat>(m_nx) + EPS<PassiveFloat>) {
+    if (gpos.x < -EPS<PassiveFloat>() ||
+        gpos.x > static_cast<PassiveFloat>(m_nx) + EPS<PassiveFloat>()) {
       Igor::Warn(
           "x-component of position Sim({}) ^= Grid({}) is not in grid with nx={}", pos, gpos, m_nx);
       return NULL_INDEX;
     }
-    if (gpos.y < -EPS<PassiveFloat> ||
-        gpos.y > static_cast<PassiveFloat>(m_ny) + EPS<PassiveFloat>) {
+    if (gpos.y < -EPS<PassiveFloat>() ||
+        gpos.y > static_cast<PassiveFloat>(m_ny) + EPS<PassiveFloat>()) {
       Igor::Warn(
           "y-component of position Sim({}) ^= Grid({}) is not in grid with ny={}", pos, gpos, m_ny);
       return NULL_INDEX;
@@ -746,12 +750,12 @@ class UniformGrid {
     }();
 
     IGOR_ASSERT(xi < m_nx,
-                "gpos.x={:.16f} translates to xi={} which is out of bounds for nx={}.",
+                "gpos.x={} translates to xi={} which is out of bounds for nx={}.",
                 gpos.x,
                 xi,
                 m_nx);
     IGOR_ASSERT(yi < m_ny,
-                "gpos.y={:.16f} translates to yi={} which is out of bounds for ny={}.",
+                "gpos.y={} translates to yi={} which is out of bounds for ny={}.",
                 gpos.y,
                 yi,
                 m_ny);
@@ -779,7 +783,7 @@ class UniformGrid {
 
       const auto cut_prev = cell_prev.template cut_exit<SIM_C>();
       const auto cut_next = cell_next.template cut_entry<SIM_C>();
-      IGOR_ASSERT((cut_prev - cut_next).norm() < EPS<PassiveFloat>,
+      IGOR_ASSERT((cut_prev - cut_next).norm() < EPS<PassiveFloat>(),
                   "Expected cut_a and cut_b to be the same point but cut_a = {} and cut_b = "
                   "{}.\ncell_a = {}\ncell_b = {}",
                   cut_prev,
@@ -892,8 +896,14 @@ class UniformGrid {
   }
 
   // -----------------------------------------------------------------------------------------------
-  template <Point2D_c PointType>
-  [[nodiscard]] constexpr auto eval(const PointType& point) const noexcept -> ActiveFloat {
+  [[nodiscard]] constexpr auto eval(const SimCoord<PassiveFloat>& point) const noexcept
+      -> ActiveFloat {
+    return eval(to_grid_coord(point));
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  [[nodiscard]] constexpr auto eval(const GridCoord<PassiveFloat>& point) const noexcept
+      -> ActiveFloat {
     const auto cell_idx = find_cell(point);
     if (cell_idx == NULL_INDEX) {
       Igor::Panic(
@@ -904,10 +914,8 @@ class UniformGrid {
     if (cell.is_cartesian()) {
       return cell.get_cartesian().value;
     } else if (cell.is_cut()) {
-      constexpr CoordType coord_type = PointType2CoordType<PointType>;
-
-      const auto point_in_left  = cell.template get_cut_left_polygon<coord_type>().contains(point);
-      const auto point_in_right = cell.template get_cut_right_polygon<coord_type>().contains(point);
+      const auto point_in_left  = cell.template get_cut_left_polygon<GRID_C>().contains(point);
+      const auto point_in_right = cell.template get_cut_right_polygon<GRID_C>().contains(point);
 
       if (point_in_left) {
         return cell.get_cut().left_value;

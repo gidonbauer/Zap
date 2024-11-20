@@ -27,8 +27,8 @@ TEST(PeriodicBoundary, CartesianBottom) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 2.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 0.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 0.0}).norm(), EPS<Float>());
   }
 
   // - 1 to 3 => bottom periodic boundary ----------------------------------------------------------
@@ -41,8 +41,8 @@ TEST(PeriodicBoundary, CartesianBottom) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 3.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>());
   }
 }
 
@@ -65,8 +65,8 @@ TEST(PeriodicBoundary, CartesianTop) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 2.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 2.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 2.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 2.0}).norm(), EPS<Float>());
   }
 
   // - 3 to 1 => top periodic boundary -------------------------------------------------------------
@@ -79,8 +79,8 @@ TEST(PeriodicBoundary, CartesianTop) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 3.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 2.0}).norm(), EPS<Float>());
   }
 }
 
@@ -103,8 +103,8 @@ TEST(PeriodicBoundary, CartesianLeft) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 1.0}).norm(), EPS<Float>());
   }
 
   // - 2 to 3 => left periodic boundary ------------------------------------------------------------
@@ -117,8 +117,8 @@ TEST(PeriodicBoundary, CartesianLeft) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 3.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 2.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 1.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 1.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 2.0}).norm(), EPS<Float>());
   }
 }
 
@@ -141,8 +141,8 @@ TEST(PeriodicBoundary, CartesianRight) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>());
   }
 
   // - 3 to 2 => right periodic boundary -----------------------------------------------------------
@@ -155,8 +155,8 @@ TEST(PeriodicBoundary, CartesianRight) {
 
     EXPECT_DOUBLE_EQ(interface.left_value, 3.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 2.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>());
   }
 }
 
@@ -187,14 +187,14 @@ TEST(PeriodicBoundary, CutLeft) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.25);
-    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 0.5}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 0.5}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.75);
-    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 0.5}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{0.0, 0.5}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{0.0, 1.0}).norm(), EPS<Float>());
   }
 
   // - 1 to 0 => right periodic boundary -----------------------------------------------------------
@@ -207,14 +207,14 @@ TEST(PeriodicBoundary, CutLeft) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.25);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 0.5}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 0.5}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 0.75);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.5}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.5}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>());
   }
 
   // - 0 to 1 => right regular boundary ------------------------------------------------------------
@@ -227,14 +227,14 @@ TEST(PeriodicBoundary, CutLeft) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 0.25);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 0.5}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 0.5}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 0.75);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 0.5}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.0, 0.5}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 1.0}).norm(), EPS<Float>());
   }
 }
 
@@ -265,14 +265,14 @@ TEST(PeriodicBoundary, CutTop) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 3.25);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.5, 2.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.5, 2.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 2.0}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 3.75);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.5, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.5, 2.0}).norm(), EPS<Float>());
   }
 
   // - 1 to 3 => bottom periodic boundary ----------------------------------------------------------
@@ -285,14 +285,14 @@ TEST(PeriodicBoundary, CutTop) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 3.25);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.5, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.5, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 0.0}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 3.75);
     EXPECT_DOUBLE_EQ(interface.right_value, 1.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.5, 0.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 0.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.5, 0.0}).norm(), EPS<Float>());
   }
 
   // - 1 to 3 => top regular boundary --------------------------------------------------------------
@@ -305,14 +305,14 @@ TEST(PeriodicBoundary, CutTop) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 3.25);
-    EXPECT_LE((interface.begin - GridCoord<Float>{1.5, 1.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{1.5, 1.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.0, 1.0}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 1.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 3.75);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{1.5, 1.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{1.5, 1.0}).norm(), EPS<Float>());
   }
 }
 
@@ -348,14 +348,14 @@ TEST(PeriodicBoundary, Wave) {
     auto interface = interfaces[0];
     EXPECT_DOUBLE_EQ(interface.left_value, 2.5);
     EXPECT_DOUBLE_EQ(interface.right_value, 2.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 1.25}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.0}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 1.25}).norm(), EPS<Float>());
 
     interface = interfaces[1];
     EXPECT_DOUBLE_EQ(interface.left_value, 0.0);
     EXPECT_DOUBLE_EQ(interface.right_value, 2.0);
-    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.25}).norm(), EPS<Float>);
-    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>);
+    EXPECT_LE((interface.begin - GridCoord<Float>{2.0, 1.25}).norm(), EPS<Float>());
+    EXPECT_LE((interface.end - GridCoord<Float>{2.0, 2.0}).norm(), EPS<Float>());
   }
 
   SmallVector<AxisAlignedWave<Float, GridCoord<Float>, X>> waves(interfaces.size());

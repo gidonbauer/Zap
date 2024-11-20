@@ -467,7 +467,7 @@ TEST(CutGrid, HandleCutOnSingleSide) {
     UniformGrid<double, double> grid(0.0, 1.0, 2, 0.0, 1.0, 2);
     std::vector<SimCoord<double>> points = {
         {0.125, 0.0},
-        {0.5 + 50 * EPS<double>, 0.5 + 1e-2},
+        {0.5 + 50 * EPS<double>(), 0.5 + 1e-2},
         {0.375, 1.0},
     };
 

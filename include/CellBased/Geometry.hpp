@@ -57,7 +57,7 @@ class Polygon {
     m_points.erase(std::unique(std::begin(m_points),
                                std::end(m_points),
                                [](const PointType& p1, const PointType& p2) {
-                                 return (p1 - p2).norm() < 50 * EPS<PassiveFloat>;
+                                 return (p1 - p2).norm() < 50 * EPS<PassiveFloat>();
                                }),
                    std::end(m_points));
   }
@@ -76,7 +76,7 @@ class Polygon {
   // -----------------------------------------------------------------------------------------------
   constexpr void add_point(PointType p) noexcept {
     if (std::find_if(std::cbegin(m_points), std::cend(m_points), [&p](const PointType& e) {
-          return (p - e).norm() <= EPS<PassiveFloat>;
+          return (p - e).norm() <= EPS<PassiveFloat>();
         }) == std::cend(m_points)) {
       m_points.push_back(std::move(p));
       sort_points_counter_clockwise();
@@ -126,13 +126,13 @@ line_intersect(const PointType& A, const PointType& B, const PointType& C, const
   using Float = decltype(std::declval<PointType>().x);
 
   const Float det = (B.x - A.x) * (C.y - D.y) - (B.y - A.y) * (C.x - D.x);
-  if (std::abs(det) < EPS<Float>) { return std::nullopt; }
+  if (std::abs(det) < EPS<Float>()) { return std::nullopt; }
 
   const Float r = ((C.y - D.y) * (C.x - A.x) + (D.x - C.x) * (C.y - A.y)) / det;
   const Float s = ((A.y - B.y) * (C.x - A.x) + (B.x - A.x) * (C.y - A.y)) / det;
 
-  if (!(0 - EPS<Float> <= r && r <= 1 + EPS<Float>) ||
-      !(0 - EPS<Float> <= s && s <= 1 + EPS<Float>)) {
+  if (!(0 - EPS<Float>() <= r && r <= 1 + EPS<Float>()) ||
+      !(0 - EPS<Float>() <= s && s <= 1 + EPS<Float>())) {
     return std::nullopt;
   }
 

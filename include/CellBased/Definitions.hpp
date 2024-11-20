@@ -6,34 +6,82 @@
 
 #include <AD/ad.hpp>
 
+#include <boost/multiprecision/cpp_bin_float.hpp>
+#include <boost/multiprecision/fwd.hpp>
+namespace mp = boost::multiprecision;
+
 #include "Igor/Logging.hpp"
 
 namespace Zap::CellBased {
+
+// - Type traits for passive and active types ------------------------------------------------------
+template <typename T>
+inline constexpr bool is_passive_real = std::is_floating_point_v<T> || mp::is_number<T>::value;
+
+template <typename T>
+inline constexpr bool is_active_real =
+    ad::mode<T>::is_ad_type && is_passive_real<typename ad::mode<T>::passive_t>;
+
+template <typename T>
+inline constexpr bool is_real = is_passive_real<T> || is_active_real<T>;
 
 enum class Orientation : uint8_t { X, Y, FREE };
 using enum Orientation;
 
 // - Tolerances for given floating point accuracy --------------------------------------------------
 template <typename Float>
-requires(std::is_floating_point_v<Float> || ad::mode<Float>::is_ad_type)
-inline constexpr Float EPS;
-template <>
-inline constexpr float EPS<float> = 1e-6f;
-template <>
-inline constexpr double EPS<double> = 1e-8;
+requires(is_real<Float> && !mp::is_number<Float>::value)
+[[nodiscard]] constexpr auto EPS() noexcept;
 
-// template <std::floating_point Float>
-// inline constexpr Float EPS<ad::internal::active_type<Float, ad::internal::ts_data<Float>>> =
-//     EPS<Float>;
 template <>
-inline constexpr float EPS<typename ad::gt1s<float>::type> = EPS<float>;
+[[nodiscard]] constexpr auto EPS<float>() noexcept {
+  return 1e-6F;
+}
 template <>
-inline constexpr double EPS<typename ad::gt1s<double>::type> = EPS<double>;
+[[nodiscard]] constexpr auto EPS<double>() noexcept {
+  return 1e-8;
+}
+
+template <>
+[[nodiscard]] constexpr auto EPS<typename ad::gt1s<float>::type>() noexcept {
+  return EPS<float>();
+}
+template <>
+[[nodiscard]] constexpr auto EPS<typename ad::gt1s<double>::type>() noexcept {
+  return EPS<double>();
+}
+
+template <typename Float>
+requires mp::is_number<Float>::value
+[[nodiscard]] constexpr auto EPS() noexcept {
+  return mp::sqrt(std::numeric_limits<Float>::epsilon());
+}
+
+// {
+//   if constexpr (std::is_same_v<Float, float>) {
+//     return 1e-6F;
+//   } else if constexpr (std::is_same_v<Float, double>) {
+//     return 1e-8;
+//   } else if
+// }
+
+// template <typename Float>
+// requires is_real<Float>
+// inline constexpr Float EPS;
+// template <>
+// inline constexpr float EPS<float> = 1e-6F;
+// template <>
+// inline constexpr double EPS<double> = 1e-8;
+//
+// template <>
+// inline constexpr float EPS<typename ad::gt1s<float>::type> = EPS<float>;
+// template <>
+// inline constexpr double EPS<typename ad::gt1s<double>::type> = EPS<double>;
 
 // - Sign function ---------------------------------------------------------------------------------
 template <typename T>
 [[nodiscard]] constexpr auto sign(const T& x) noexcept -> T {
-  return static_cast<T>(x > EPS<T>) - static_cast<T>(x < -EPS<T>);
+  return static_cast<T>(x > EPS<T>()) - static_cast<T>(x < -EPS<T>());
 }
 
 // - Points in grid and simulation coordinates -----------------------------------------------------
@@ -94,7 +142,7 @@ concept Point2D_c = requires(PointType t) {
                                                                                                    \
     [[nodiscard]] constexpr auto normalized() const noexcept -> name {                             \
       const auto n = norm();                                                                       \
-      IGOR_ASSERT(std::abs(n) >= EPS<Scalar>, "Cannot normalize null vector.");                    \
+      IGOR_ASSERT(std::abs(n) >= EPS<Scalar>(), "Cannot normalize null vector.");                  \
       return *this / norm();                                                                       \
     }                                                                                              \
                                                                                                    \
