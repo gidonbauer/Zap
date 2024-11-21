@@ -293,16 +293,16 @@ class IncCellWriter {
           right_value = cell_value.left_value;
         }
 
-        CellBased::SimCoord<PassiveFloat> passive_cut = {accessor(cut1.x), accessor(cut1.y)};
+        // TODO: Save derivative of cut1 and cut2
+        CellBased::SimCoord<PassiveFloat> passive_cut = {ad::value(cut1.x), ad::value(cut1.y)};
         out.write(reinterpret_cast<const char*>(&passive_cut.x), sizeof(passive_cut.x));
         out.write(reinterpret_cast<const char*>(&passive_cut.y), sizeof(passive_cut.y));
 
-        passive_cut = {accessor(cut2.x), accessor(cut2.y)};
+        passive_cut = {ad::value(cut2.x), ad::value(cut2.y)};
         out.write(reinterpret_cast<const char*>(&passive_cut.x), sizeof(passive_cut.x));
         out.write(reinterpret_cast<const char*>(&passive_cut.y), sizeof(passive_cut.y));
 
         // Value
-        // TODO: Should we save the derivative values as well?
         PassiveFloat passive_value;
 
         passive_value = accessor(left_value);
@@ -328,11 +328,13 @@ class IncCellWriter {
   [[nodiscard]] auto
   write_data(const CellBased::UniformGrid<ActiveFloat, PassiveFloat>& grid) noexcept -> bool {
     const auto success_primal = write_data_impl(
-        m_primal_out, m_primal_filename, grid, [](const ActiveFloat& v) { return ad::value(v); });
+        m_primal_out, m_primal_filename, grid, [](const ActiveFloat& v) -> PassiveFloat {
+          return ad::value(v);
+        });
 
     if (m_tangent_out.has_value() && m_tangent_filename.has_value()) {
-      const auto success_tangent =
-          write_data_impl(*m_tangent_out, *m_tangent_filename, grid, [](const ActiveFloat& v) {
+      const auto success_tangent = write_data_impl(
+          *m_tangent_out, *m_tangent_filename, grid, [](const ActiveFloat& v) -> PassiveFloat {
             return ad::derivative(v);
           });
 

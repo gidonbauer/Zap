@@ -65,7 +65,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 [[nodiscard]] constexpr auto calc_wave(const FullInterface<ActiveFloat, PointType>& interface,
                                        PassiveFloat dx,
                                        PassiveFloat dy,
-                                       [[maybe_unused]] ActiveFloat dt) noexcept
+                                       [[maybe_unused]] const ActiveFloat& dt) noexcept
     -> std::optional<std::conditional_t<orientation == FREE,
                                         FreeWave<ActiveFloat, PointType>,
                                         AxisAlignedWave<ActiveFloat, PointType, orientation>>> {

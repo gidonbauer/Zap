@@ -4,7 +4,6 @@
 #include <AD/ad.hpp>
 
 // #define ZAP_SERIAL
-// #define ZAP_2ND_ORDER_CORRECTION
 // #define ZAP_NO_TANGENTIAL_CORRECTION
 // #define ZAP_STATIC_CUT
 
@@ -12,7 +11,6 @@
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
-#include "IO/VTKWriter.hpp"
 
 #include "Igor/Logging.hpp"
 #include "Igor/Macros.hpp"
@@ -22,11 +20,13 @@
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "cell_based/"
 
+using namespace Zap::CellBased;
+using namespace Zap::IO;
 using namespace std::string_view_literals;
 
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
-using ActiveFloat            = double;  // ad::gt1s<PassiveFloat>::type;
+using ActiveFloat            = ad::gt1s<PassiveFloat>::type;
 constexpr PassiveFloat X_MIN = 0.0;
 constexpr PassiveFloat X_MAX = 5.0;
 constexpr PassiveFloat Y_MIN = 0.0;
@@ -186,14 +186,13 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("eps  = {}", args->eps);
   Igor::Info("CFL  = {}", args->CFL_safety_factor);
 
-  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(
-      X_MIN, X_MAX, args->nx, Y_MIN, Y_MAX, args->ny);
-  // grid.same_value_boundary(Zap::CellBased::TOP | Zap::CellBased::BOTTOM);
-  // grid.periodic_boundary(Zap::CellBased::LEFT | Zap::CellBased::RIGHT);
+  UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, args->nx, Y_MIN, Y_MAX, args->ny);
+  // grid.same_value_boundary(TOP | BOTTOM);
+  // grid.periodic_boundary(LEFT | RIGHT);
   grid.periodic_boundary();
 
-  ActiveFloat eps = args->eps;
-  // ad::derivative(eps) = 1;
+  ActiveFloat eps     = args->eps;
+  ad::derivative(eps) = 1;
 
 // #define RAMP_X
 #define QUARTER_CIRCLE
@@ -206,7 +205,7 @@ auto main(int argc, char** argv) -> int {
                                     std::pow(r, 2));
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> SimCoord<T> {
     // assert(t >= 0 && t <= 1);
     return {
         r * std::cos(std::numbers::pi_v<PassiveFloat> / 2 * t),
@@ -221,7 +220,7 @@ auto main(int argc, char** argv) -> int {
     // return (X_MAX - x) * (1.0 - static_cast<ActiveFloat>((x - X_MIN) < (X_MAX - X_MIN) / 2));
   };
 
-  [[maybe_unused]] auto init_shock = [=](PassiveFloat t) -> Zap::CellBased::SimCoord<PassiveFloat> {
+  [[maybe_unused]] auto init_shock = [=](PassiveFloat t) -> SimCoord<PassiveFloat> {
     assert(t >= 0 && t <= 1);
     return {
         (X_MAX - X_MIN) / 2,
@@ -239,9 +238,9 @@ auto main(int argc, char** argv) -> int {
     }
   };
 
-  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> Zap::CellBased::SimCoord<T> {
+  [[maybe_unused]] auto init_shock = [=]<typename T>(T t) -> SimCoord<T> {
     static_assert(false, "Not implemented yet.");
-    return Zap::CellBased::SimCoord<T>::Zero();
+    return SimCoord<T>::Zero();
   };
 #else
   static_assert(false, "No initial condition defined.");
@@ -252,11 +251,12 @@ auto main(int argc, char** argv) -> int {
   }
   grid.fill_four_point(u0);
 
-  constexpr auto u_file = OUTPUT_DIR "u_1d.grid";
-  Zap::IO::IncCellWriter<ActiveFloat, PassiveFloat> grid_writer{u_file, grid};
+  constexpr auto u_file = OUTPUT_DIR "u.grid";
+  constexpr auto v_file = OUTPUT_DIR "v.grid";
+  IncCellWriter<ActiveFloat, PassiveFloat> grid_writer{u_file, v_file, grid};
 
-  constexpr auto t_file = OUTPUT_DIR "t_1d.mat";
-  Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
+  constexpr auto t_file = OUTPUT_DIR "t.mat";
+  IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
 // #define SAVE_ONLY_INITIAL_STATE
 #ifdef SAVE_ONLY_INITIAL_STATE
@@ -264,12 +264,15 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(PassiveFloat{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
+    Solver<ExtendType::NEAREST> solver;
     const auto res = solver.solve(grid, args->tend, grid_writer, t_writer, args->CFL_safety_factor);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;
     }
+
+    Igor::Info("u(2.5, 2.5)  = {}", ad::value(res->eval(SimCoord{0.0, 0.0})));
+    Igor::Info("u'(2.5, 2.5) = {}", ad::derivative(res->eval(SimCoord{0.0, 0.0})));
 
     if (!args->print_shock_curve.empty()) {
       Igor::Info("ns = {}", args->ns);
@@ -283,13 +286,13 @@ auto main(int argc, char** argv) -> int {
           return static_cast<PassiveFloat>(i++) / static_cast<PassiveFloat>(args->ns - 1);
         });
         if (args->print_shock_curve == "LINEAR"sv) {
-          return Zap::CellBased::piecewise_linear(ts, res->get_shock_curve());
+          return piecewise_linear(ts, res->get_shock_curve());
         }
         if (args->print_shock_curve == "CUBIC"sv) {
-          return Zap::CellBased::natural_cubic_spline(ts, res->get_shock_curve());
+          return natural_cubic_spline(ts, res->get_shock_curve());
         }
         if (args->print_shock_curve == "SMOOTHSTEP"sv) {
-          return Zap::CellBased::smoothstep(ts, res->get_shock_curve());
+          return smoothstep(ts, res->get_shock_curve());
         }
 
         usage<Igor::detail::Level::PANIC>(prog, std::cerr);
@@ -297,22 +300,20 @@ auto main(int argc, char** argv) -> int {
         std::unreachable();
       }();
 
-      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> x_shock(final_shock.size());
+      std::vector<SimCoord<PassiveFloat>> x_shock(final_shock.size());
       std::transform(std::cbegin(final_shock),
                      std::cend(final_shock),
                      std::begin(x_shock),
-                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
-                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::value(p.x),
-                                                                     ad::value(p.y)};
+                     [](const SimCoord<ActiveFloat>& p) {
+                       return SimCoord<PassiveFloat>{ad::value(p.x), ad::value(p.y)};
                      });
 
-      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> xi_shock(final_shock.size());
+      std::vector<SimCoord<PassiveFloat>> xi_shock(final_shock.size());
       std::transform(std::cbegin(final_shock),
                      std::cend(final_shock),
                      std::begin(xi_shock),
-                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
-                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::derivative(p.x),
-                                                                     ad::derivative(p.y)};
+                     [](const SimCoord<ActiveFloat>& p) {
+                       return SimCoord<PassiveFloat>{ad::derivative(p.x), ad::derivative(p.y)};
                      });
 
       std::cout << "==============================================================================="
@@ -328,22 +329,20 @@ auto main(int argc, char** argv) -> int {
     if (args->print_cuts) {
       const auto final_cuts = res->get_cuts();
 
-      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> cuts(final_cuts.size());
+      std::vector<SimCoord<PassiveFloat>> cuts(final_cuts.size());
       std::transform(std::cbegin(final_cuts),
                      std::cend(final_cuts),
                      std::begin(cuts),
-                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
-                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::value(p.x),
-                                                                     ad::value(p.y)};
+                     [](const SimCoord<ActiveFloat>& p) {
+                       return SimCoord<PassiveFloat>{ad::value(p.x), ad::value(p.y)};
                      });
 
-      std::vector<Zap::CellBased::SimCoord<PassiveFloat>> dcuts(final_cuts.size());
+      std::vector<SimCoord<PassiveFloat>> dcuts(final_cuts.size());
       std::transform(std::cbegin(final_cuts),
                      std::cend(final_cuts),
                      std::begin(dcuts),
-                     [](const Zap::CellBased::SimCoord<ActiveFloat>& p) {
-                       return Zap::CellBased::SimCoord<PassiveFloat>{ad::derivative(p.x),
-                                                                     ad::derivative(p.y)};
+                     [](const SimCoord<ActiveFloat>& p) {
+                       return SimCoord<PassiveFloat>{ad::derivative(p.x), ad::derivative(p.y)};
                      });
 
       std::cout << "==============================================================================="
@@ -359,5 +358,6 @@ auto main(int argc, char** argv) -> int {
   Igor::Info("Solver finished successfully.");
 #endif
   Igor::Info("Saved grid to {}.", u_file);
+  Igor::Info("Saved derivative to {}.", v_file);
   Igor::Info("Saved time steps to {}.", t_file);
 }

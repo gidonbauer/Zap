@@ -28,20 +28,20 @@ class Solver {
   template <typename ActiveFloat, typename PassiveFloat>
   [[nodiscard]] constexpr auto
   cfl_factor(const UniformGrid<ActiveFloat, PassiveFloat>& grid) const noexcept -> ActiveFloat {
+    auto max = [](const auto& a, const auto& b) { return std::max(a, b); };
+
+    auto max_abs_cell_u = [](const Cell<ActiveFloat, PassiveFloat>& cell) -> ActiveFloat {
+      assert(cell.is_cartesian() || cell.is_cut());
+      if (cell.is_cartesian()) {
+        return std::abs(cell.get_cartesian().value);
+      } else {
+        return std::max<PassiveFloat>(std::abs(cell.get_cut().left_value),
+                                      std::abs(cell.get_cut().right_value));
+      }
+    };
+
     return std::transform_reduce(
-        std::cbegin(grid.cells()),
-        std::cend(grid.cells()),
-        ActiveFloat{0},
-        [](const auto& a, const auto& b) { return std::max(a, b); },
-        [](const Cell<ActiveFloat, PassiveFloat>& cell) -> ActiveFloat {
-          assert(cell.is_cartesian() || cell.is_cut());
-          if (cell.is_cartesian()) {
-            return std::abs(cell.get_cartesian().value);
-          } else {
-            return std::max<ActiveFloat>(std::abs(cell.get_cut().left_value),
-                                         std::abs(cell.get_cut().right_value));
-          }
-        });
+        std::cbegin(grid.cells()), std::cend(grid.cells()), ActiveFloat{0}, max, max_abs_cell_u);
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -273,7 +273,7 @@ class Solver {
   constexpr void
   move_wave_front(std::vector<PointType>& avg_new_shock_points,
                   const std::vector<FreeWave<ActiveFloat, PointType>>& internal_waves,
-                  ActiveFloat dt) const noexcept {
+                  const ActiveFloat& dt) const noexcept {
     avg_new_shock_points.clear();
     if (internal_waves.empty()) { return; }
 
@@ -422,13 +422,18 @@ class Solver {
 
     for (ActiveFloat t = 0.0; t < tend;) {
       const ActiveFloat CFL_factor = cfl_factor(curr_grid);
-
       if (std::isnan(CFL_factor) || std::isinf(CFL_factor)) {
         Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
         return std::nullopt;
       }
-      const ActiveFloat dt =
-          std::min<ActiveFloat>(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
+
+      const ActiveFloat dt = [&] {
+        ActiveFloat local_dt         = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
+        const ActiveFloat missing_dt = tend - t;
+        // TODO: Is this the right way to handle the final timestep?
+        if (dt > missing_dt) { ad::value(local_dt) = ad::value(missing_dt); }
+        return local_dt;
+      }();
 
       next_grid = curr_grid;
 
