@@ -420,7 +420,7 @@ class Solver {
       return std::nullopt;
     }
 
-    for (ActiveFloat t = 0.0; t < tend;) {
+    for (PassiveFloat t = 0.0; t < tend;) {
       const ActiveFloat CFL_factor = cfl_factor(curr_grid);
       if (std::isnan(CFL_factor) || std::isinf(CFL_factor)) {
         Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
@@ -428,10 +428,15 @@ class Solver {
       }
 
       const ActiveFloat dt = [&] {
-        ActiveFloat local_dt         = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
-        const ActiveFloat missing_dt = tend - t;
+        ActiveFloat local_dt          = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
+        const PassiveFloat missing_dt = tend - t;
         // TODO: Is this the right way to handle the final timestep?
-        if (dt > missing_dt) { ad::value(local_dt) = ad::value(missing_dt); }
+        if (local_dt > missing_dt) {
+          ad::value(local_dt) = missing_dt;
+          if constexpr (ad::mode<ActiveFloat>::is_ad_type) {
+            ad::derivative(local_dt) = -missing_dt;
+          }
+        }
         return local_dt;
       }();
 
@@ -587,13 +592,11 @@ class Solver {
 #endif  // ZAP_SERIAL
 
       // Update time
-      t += dt;
+      t += ad::value(dt);
 
       curr_grid = next_grid;
 
-      if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
-        return std::nullopt;
-      }
+      if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(t)) { return std::nullopt; }
 
 #ifdef ZAP_SINGLE_ITERATION
       break;
