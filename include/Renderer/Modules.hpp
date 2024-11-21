@@ -37,24 +37,14 @@ template <typename Float, int DIM>
                                               Eigen::Index solution_idx,
                                               const Eigen::Vector<Float, DIM>& min,
                                               const Eigen::Vector<Float, DIM>& max,
-                                              bool same_range,
                                               size_t num_colorbar_blocks = 10) noexcept -> bool {
   bool success = true;
 
   if (!canvas.set_font_size(6)) { success = false; }
   for (size_t i = 0; i < num_colorbar_blocks; ++i) {
     const Float frac = static_cast<Float>(i) / static_cast<Float>(num_colorbar_blocks - 1);
-    RGB c{};
-    Float value{};
-    if (same_range) {
-      const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-      const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-      value                = std::lerp(*total_min, *total_max, frac);
-      c                    = float_to_rgb(value, *total_min, *total_max);
-    } else {
-      value = std::lerp(min(solution_idx), max(solution_idx), frac);
-      c     = float_to_rgb(value, min(solution_idx), max(solution_idx));
-    }
+    Float value      = std::lerp(min(solution_idx), max(solution_idx), frac);
+    RGB c            = float_to_rgb(value, min(solution_idx), max(solution_idx));
 
     const Box block = {
         .col    = 0,
@@ -87,8 +77,7 @@ template <typename Float, size_t DIM>
                                 const Eigen::Vector<Float, DIM>& min,
                                 const Eigen::Vector<Float, DIM>& max,
                                 const Box& graph_box,
-                                size_t scale,
-                                bool same_range) noexcept -> bool {
+                                size_t scale) noexcept -> bool {
   assert(scale > 0);
   const auto& cells = u_reader.cells();
 
@@ -108,15 +97,8 @@ template <typename Float, size_t DIM>
           .height = to_pixel_coord(
               norm_length(cell.dy(), u_reader.y_min(), u_reader.y_max()), u_reader.ny(), scale),
       };
-      RGB c{};
-      if (same_range) {
-        const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-        const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-        c = float_to_rgb(cell.get_cartesian().value(solution_idx), *total_min, *total_max);
-      } else {
-        c = float_to_rgb(
-            cell.get_cartesian().value(solution_idx), min(solution_idx), max(solution_idx));
-      }
+      RGB c = float_to_rgb(
+          cell.get_cartesian().value(solution_idx), min(solution_idx), max(solution_idx));
 
       if (!canvas.draw_rect(rect, graph_box, c, true)) {
         Igor::Warn("Could not draw cell");
@@ -140,15 +122,8 @@ template <typename Float, size_t DIM>
           };
         }
 
-        RGB c{};
-        if (same_range) {
-          const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-          const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-          c = float_to_rgb(cell.get_cut().left_value(solution_idx), *total_min, *total_max);
-        } else {
-          c = float_to_rgb(
-              cell.get_cut().left_value(solution_idx), min(solution_idx), max(solution_idx));
-        }
+        RGB c = float_to_rgb(
+            cell.get_cut().left_value(solution_idx), min(solution_idx), max(solution_idx));
 
         if (!canvas.draw_polygon(canvas_points, graph_box, c, true)) {
           Igor::Warn("Could not draw left polygon.");
@@ -171,15 +146,8 @@ template <typename Float, size_t DIM>
           };
         }
 
-        RGB c{};
-        if (same_range) {
-          const auto total_min = std::min_element(std::cbegin(min), std::cend(min));
-          const auto total_max = std::max_element(std::cbegin(max), std::cend(max));
-          c = float_to_rgb(cell.get_cut().right_value(solution_idx), *total_min, *total_max);
-        } else {
-          c = float_to_rgb(
-              cell.get_cut().right_value(solution_idx), min(solution_idx), max(solution_idx));
-        }
+        RGB c = float_to_rgb(
+            cell.get_cut().right_value(solution_idx), min(solution_idx), max(solution_idx));
 
         if (!canvas.draw_polygon(canvas_points, graph_box, c, true)) {
           Igor::Warn("Could not draw right polygon.");
@@ -226,8 +194,7 @@ template <typename Float, size_t DIM>
                                 const Eigen::Vector<Float, DIM>& min,
                                 const Eigen::Vector<Float, DIM>& max,
                                 const Box& graph_box,
-                                size_t scale,
-                                bool same_range) noexcept -> bool {
+                                size_t scale) noexcept -> bool {
   static_assert(DIM == 1, "2d matrix based solver is not implemented.");
   assert(scale > 0);
   assert(u_reader.rows() > 0);
@@ -246,7 +213,6 @@ template <typename Float, size_t DIM>
           .height = scale,
       };
 
-      (void)same_range;
       RGB c = float_to_rgb(u_reader(row, col), min(0), max(0));
 
       if (!canvas.draw_rect(rect, graph_box, c, true)) { success = false; }

@@ -10,8 +10,11 @@
 #include "Igor/Logging.hpp"
 #include "Igor/Timer.hpp"
 
+#include "Common.hpp"
+
 #define ZAP_PARALLEL_RENDERING
 
+using namespace std::string_view_literals;
 namespace Rd = Zap::Renderer;
 
 [[maybe_unused]] constexpr Rd::RGB BLACK  = {.r = 0x00, .g = 0x00, .b = 0x00};
@@ -26,14 +29,18 @@ struct Args {
   std::string u_input_file;
   std::string t_input_file;
   std::string output_file;
-  size_t scale                  = 1;
-  bool keep_range               = false;
-  bool same_range               = false;
+
+  size_t scale = 1;
+  size_t fps   = 60;
+  bool no_mass = false;
+
+  bool keep_range = false;
+
+  std::string v_input_file;
+
+  bool symmetry_error = false;
+
   ImageFormat save_frame_images = NO_SAVE;
-  size_t fps                    = 60;
-  bool two_dim                  = false;
-  bool no_mass                  = false;
-  bool symmetry_error           = false;
 };
 
 // -------------------------------------------------------------------------------------------------
@@ -42,26 +49,24 @@ constexpr void usage(std::string_view prog) {
   Args args{};
 
   std::cerr << Igor::detail::level_repr(level) << "Usage: " << prog
-            << " [--scale s] [--keep-range] [--same-range] [--save-frame-img <format>] [--fps f] "
-               "[--2d] [--no-mass] <u input file> <t input file> <output file>\n";
+            << " [--scale s] [--fps f] [--no-mass] [--keep-range] [--der <v input file>] "
+               "[--symmetry-error] [--save-frame-img <format>] "
+               "<u input file> <t input file> <output file>\n";
   std::cerr << "\t--scale           Number of pixels for single cell, default is " << args.scale
             << '\n';
-  std::cerr << "\t--keep-range      Keep min and max value of first frame for colormap, default is "
-            << std::boolalpha << args.keep_range << '\n';
-  std::cerr << "\t--same-range      Same min and max value for both plots in 2d, default is "
-            << std::boolalpha << args.same_range << '\n';
-  std::cerr << "\t--save-frame-img  Save each individual frame as .ppm or .jpeg image, default is "
-               "to not save the frames\n";
   std::cerr << "\t--fps             Frames per second for rendered video, default is " << args.fps
             << '\n';
-  std::cerr
-      << "\t--2d              Render solution of 2-dimensional solution (u in R^2), default is "
-      << std::boolalpha << args.two_dim << '\n';
   std::cerr << "\t--no-mass         Do not display the mass ||u||, this flag saves some "
                "computation time, default is "
             << std::boolalpha << args.no_mass << '\n';
+  std::cerr << "\t--keep-range      Keep min and max value of first frame for colormap, default is "
+            << std::boolalpha << args.keep_range << '\n';
+  std::cerr
+      << "\t--der             Input file for the derivative of u, default is no derivative.\n";
   std::cerr << "\t--symmetry-error  Show the symmetry error with symmetry axis [1, 1], default is "
             << std::boolalpha << args.symmetry_error << '\n';
+  std::cerr << "\t--save-frame-img  Save each individual frame as .ppm or .jpeg image, default is "
+               "to not save the frames\n";
   std::cerr << "\tu input file      Solution field for each iteration\n";
   std::cerr << "\tt input file      Time for each iteration\n";
   std::cerr << "\toutput file       File for the rendered video\n";
@@ -71,119 +76,105 @@ constexpr void usage(std::string_view prog) {
 [[nodiscard]] auto parse_args(int argc, char** argv) noexcept -> std::optional<Args> {
   Args args{};
 
-  argc -= 1;
-  std::string_view prog = *argv;
-  argv += 1;  // NOLINT
-  auto parse_size_t = [](const char* cstr) -> size_t {
-    char* end        = nullptr;
-    const size_t val = std::strtoul(cstr, &end, 10);
-    if (end != cstr + std::strlen(cstr)) {  // NOLINT
-      Igor::Panic("String `{}` contains non-digits.", cstr);
-    }
-    if (val == 0UL) {
-      Igor::Panic("Could not parse string `{}` to size_t or number is zero.", cstr);
-    }
-    if (val == std::numeric_limits<unsigned long>::max()) {
-      Igor::Panic("Could not parse string `{}` to size_t: {}", cstr, std::strerror(errno));
-    }
-    return val;
-  };
+  const auto prog = next_arg(argc, argv);
+  IGOR_ASSERT(prog.has_value(), "Missing program name, this should never happen.");
 
-  while (argc > 0) {
-    using namespace std::string_view_literals;
-    if (*argv == "--help"sv || *argv == "-h"sv) {
-      usage<Igor::detail::Level::INFO>(prog);
-      return std::nullopt;
-    } else if (*argv == "--scale"sv) {
-      argc -= 1;
-      argv += 1;  // NOLINT
-      if (argc <= 0) {
-        usage<Igor::detail::Level::WARN>(prog);
-        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+  for (auto arg = next_arg(argc, argv); arg.has_value(); arg = next_arg(argc, argv)) {
+    // ImageFormat save_frame_images = NO_SAVE;
+    if (*arg == "--scale"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
                   << "Did not provide value for scale.\n";
         return std::nullopt;
       }
-      args.scale = parse_size_t(*argv);
+      args.scale = parse_size_t(*arg);
       if (args.scale == 0) {
-        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
                   << "Scale must be larger than zero but is " << args.scale << '\n';
+        return std::nullopt;
       }
-    } else if (*argv == "--fps"sv) {
-      argc -= 1;
-      argv += 1;  // NOLINT
-      if (argc <= 0) {
-        usage<Igor::detail::Level::WARN>(prog);
-        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+    } else if (*arg == "--fps"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
                   << "Did not provide value for fps.\n";
         return std::nullopt;
       }
-      args.fps = parse_size_t(*argv);
+      args.fps = parse_size_t(*arg);
       if (args.fps == 0) {
-        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
                   << "FPS must be larger than zero but is " << args.fps << '\n';
         return std::nullopt;
       }
-    } else if (*argv == "--keep-range"sv) {
+    } else if (*arg == "--no-mass"sv) {
+      args.no_mass = true;
+    } else if (*arg == "--keep-range"sv) {
       args.keep_range = true;
-    } else if (*argv == "--same-range"sv) {
-      args.same_range = true;
-    } else if (*argv == "--save-frame-img"sv) {
-      argc -= 1;
-      argv += 1;  // NOLINT
-      if (argc <= 0) {
-        usage<Igor::detail::Level::WARN>(prog);
-        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+    } else if (*arg == "--der"sv || *arg == "--derivative"sv || *arg == "-v"sv || *arg == "--v"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide input file for derivative data.\n";
+        return std::nullopt;
+      }
+      args.v_input_file = *arg;
+    } else if (*arg == "--symmetry-error"sv) {
+      args.symmetry_error = true;
+    } else if (*arg == "--save-frame-img"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
                   << "Did not provide format to save the frame images.\n";
         return std::nullopt;
       }
-      if (*argv == "ppm"sv) {
+      if (*arg == "ppm"sv) {
         args.save_frame_images = Args::PPM;
-      } else if (*argv == "jpeg"sv || *argv == "jpg"sv) {
+      } else if (*arg == "jpeg"sv || *arg == "jpg"sv) {
         args.save_frame_images = Args::JPEG;
       } else {
-        usage<Igor::detail::Level::WARN>(prog);
-        std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN) << "Invalid format `"
-                  << *argv
+        usage<Igor::detail::Level::PANIC>(*prog);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC) << "Invalid format `"
+                  << *arg
                   << "` to save the frames as image. Available formats are `ppm` and `jpeg`\n";
         return std::nullopt;
       }
-    } else if (*argv == "--2d"sv) {
-      args.two_dim = true;
-    } else if (*argv == "--no-mass"sv) {
-      args.no_mass = true;
-    } else if (*argv == "--symmetry-error"sv) {
-      args.symmetry_error = true;
+    } else if (*arg == "--help"sv || *arg == "-h"sv) {
+      usage<Igor::detail::Level::INFO>(*prog);
+      return std::nullopt;
     } else if (args.u_input_file.empty()) {
-      args.u_input_file = *argv;
+      args.u_input_file = *arg;
     } else if (args.t_input_file.empty()) {
-      args.t_input_file = *argv;
+      args.t_input_file = *arg;
     } else if (args.output_file.empty()) {
-      args.output_file = *argv;
+      args.output_file = *arg;
     } else {
-      usage<Igor::detail::Level::WARN>(prog);
-      std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
-                << "Provided too many arguments.\n";
+      usage<Igor::detail::Level::PANIC>(*prog);
+      std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                << "Provided too many arguments or invalid switch.\n";
       return std::nullopt;
     }
-    argc -= 1;
-    argv += 1;  // NOLINT
   }
 
   if (args.u_input_file.empty()) {
-    usage<Igor::detail::Level::WARN>(prog);
-    std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+    usage<Igor::detail::Level::PANIC>(*prog);
+    std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
               << "Did not provide u input file.\n";
     return std::nullopt;
   }
   if (args.t_input_file.empty()) {
-    usage<Igor::detail::Level::WARN>(prog);
-    std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+    usage<Igor::detail::Level::PANIC>(*prog);
+    std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
               << "Did not provide t input file.\n";
     return std::nullopt;
   }
   if (args.output_file.empty()) {
-    usage<Igor::detail::Level::WARN>(prog);
-    std::cerr << Igor::detail::level_repr(Igor::detail::Level::WARN)
+    usage<Igor::detail::Level::PANIC>(*prog);
+    std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
               << "Did not provide output file.\n";
     return std::nullopt;
   }
@@ -292,7 +283,7 @@ template <typename Float, size_t DIM>
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto render_1d(const Args& args) noexcept -> bool {
+[[nodiscard]] auto render_u(const Args& args) noexcept -> bool {
   using Float          = double;
   constexpr size_t DIM = 1;
   const auto scale     = args.scale;
@@ -446,33 +437,16 @@ template <typename Float, size_t DIM>
         }
       }
 
-      if (std::holds_alternative<CellReader>(u_reader)) {
-        if (!Rd::render_graph<Float, DIM>(canvas,
-                                          std::get<CellReader>(u_reader),
-                                          0,
-                                          min,
-                                          max,
-                                          graph_box,
-                                          args.scale,
-                                          args.same_range)) {
-          // return false;
-        }
-      } else {
-        if (!Rd::render_graph<Float, DIM>(canvas,
-                                          std::get<MatrixReader>(u_reader),
-                                          0,
-                                          min,
-                                          max,
-                                          graph_box,
-                                          args.scale,
-                                          args.same_range)) {
-          // return false;
-        }
-      }
+      std::visit(
+          [&](auto& reader) {
+            bool _ =
+                Rd::render_graph<Float, DIM>(canvas, reader, 0, min, max, graph_box, args.scale);
+          },
+          u_reader);
 
       constexpr size_t NUM_COLORBAR_BLOCKS = 10;
       if (!Rd::render_color_bar<Float, DIM>(
-              canvas, colorbar_box, 0, min, max, args.same_range, NUM_COLORBAR_BLOCKS)) {
+              canvas, colorbar_box, 0, min, max, NUM_COLORBAR_BLOCKS)) {
         // return false;
       }
 
@@ -505,22 +479,63 @@ template <typename Float, size_t DIM>
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto render_2d(const Args& args) noexcept -> bool {
+[[nodiscard]] auto render_uv(const Args& args) noexcept -> bool {
   using Float          = double;
-  constexpr size_t DIM = 2;
+  constexpr size_t DIM = 1;
   const auto scale     = args.scale;
 
   try {
-    Zap::IO::IncMatrixReader<Float> t_reader(args.t_input_file);
+    using CellReader   = Zap::IO::IncCellReader<Float, DIM>;
+    using MatrixReader = Zap::IO::IncMatrixReader<Float>;
+    using Readers      = std::variant<CellReader, MatrixReader>;
+
+    MatrixReader t_reader(args.t_input_file);
     Igor::Info("#frames      = {}", t_reader.num_elem());
 
-    Zap::IO::IncCellReader<Float, DIM> u_reader(args.u_input_file);
+    auto u_reader = [&args]() -> Readers {
+      if (args.u_input_file.ends_with(".grid")) {
+        return CellReader(args.u_input_file);
+      } else if (args.u_input_file.ends_with(".mat")) {
+        return MatrixReader(args.u_input_file);
+      } else {
+        Igor::Panic("Unknown file format, use file extension `.grid` for cell-based solution or "
+                    "`.mat` for matrix-based solution. Filename is {}",
+                    args.u_input_file);
+        std::unreachable();
+      }
+    }();
+
+    auto v_reader = [&args]() -> Readers {
+      if (args.v_input_file.ends_with(".grid")) {
+        return CellReader(args.v_input_file);
+      } else if (args.v_input_file.ends_with(".mat")) {
+        return MatrixReader(args.v_input_file);
+      } else {
+        Igor::Panic("Unknown file format, use file extension `.grid` for cell-based solution or "
+                    "`.mat` for matrix-based solution. Filename is {}",
+                    args.v_input_file);
+        std::unreachable();
+      }
+    }();
 
     constexpr size_t TEXT_HEIGHT    = 100UZ;
     constexpr size_t GRAPH_PADDING  = 25UZ;
     constexpr size_t COLORBAR_WIDTH = 200UZ;
-    const size_t graph_width        = u_reader.nx() * scale;
-    const size_t graph_height       = u_reader.ny() * scale;
+    size_t graph_width              = 0;
+    size_t graph_height             = 0;
+    if (std::holds_alternative<CellReader>(u_reader)) {
+      graph_width  = std::get<CellReader>(u_reader).nx() * scale;
+      graph_height = std::get<CellReader>(u_reader).ny() * scale;
+    } else {
+      const auto n_rows = std::get<MatrixReader>(u_reader).rows();
+      const auto n_cols = std::get<MatrixReader>(u_reader).cols();
+      assert(n_rows > 0);
+      assert(n_cols > 0);
+
+      graph_width  = static_cast<size_t>(n_rows) * scale;
+      graph_height = static_cast<size_t>(n_cols) * scale;
+    }
+
     Rd::Canvas canvas(2 * graph_width + 2 * COLORBAR_WIDTH + 8 * GRAPH_PADDING,
                       graph_height + TEXT_HEIGHT);
     const Rd::Box text_box{
@@ -573,52 +588,99 @@ template <typename Float, size_t DIM>
       }
     });
 
-    Eigen::Vector<Float, DIM> min{};
-    Eigen::Vector<Float, DIM> max{};
+    Eigen::Vector<Float, DIM> u_min{};
+    Eigen::Vector<Float, DIM> u_max{};
+    Eigen::Vector<Float, DIM> v_min{};
+    Eigen::Vector<Float, DIM> v_max{};
     for (size_t iter = 0; true; ++iter) {
       const auto got_next_t = t_reader.read_next<false>();
-      const auto got_next_u = u_reader.read_next<false>();
-      if (!got_next_u && !got_next_t) {
+      const auto got_next_u =
+          std::visit([](auto& r) { return r.template read_next<false>(); }, u_reader);
+      const auto got_next_v =
+          std::visit([](auto& r) { return r.template read_next<false>(); }, v_reader);
+      if (!got_next_u && !got_next_v && !got_next_t) {
         break;
       } else if (!got_next_u) {
-        Igor::Warn("Got more t-entries than u-entries.");
+        Igor::Warn("No more u-entries.");
+        return false;
+      } else if (!got_next_v) {
+        Igor::Warn("No more v-entries.");
         return false;
       } else if (!got_next_t) {
-        Igor::Warn("Got more u-entries than t-entries.");
+        Igor::Warn("No more t-entries.");
         return false;
       }
 
       canvas.clear(BLACK);
 
       if (!canvas.set_font_size(16)) { return false; }
-      if (const std::string str = std::format("t = {:.6f}", t_reader(0, 0));
-          !canvas.draw_text(str, text_box, true)) {
-        Igor::Warn("Could not render string `{}` to canvas.", str);
-        return false;
+      if (args.no_mass) {
+        if (const std::string str = std::format("t = {:.6f}", t_reader(0, 0));
+            !canvas.draw_text(str, text_box, true)) {
+          Igor::Warn("Could not render string `{}` to canvas.", str);
+          return false;
+        }
+      } else {
+        if (const std::string str = std::format("t = {:.6f}, ||u|| = {:.6f}, ||v|| = {:.6f}",
+                                                t_reader(0, 0),
+                                                calculate_mass<Float, DIM>(u_reader)(0),
+                                                calculate_mass<Float, DIM>(v_reader)(0));
+            !canvas.draw_text(str, text_box, true)) {
+          Igor::Warn("Could not render string `{}` to canvas.", str);
+          return false;
+        }
       }
 
-      const auto& cells = u_reader.cells();
-      assert(cells.size() > 0);
-      if (iter == 0 || !args.keep_range) {
-        std::tie(min, max) = min_max_cell_value<Float, DIM>(cells);
+      if (std::holds_alternative<CellReader>(u_reader)) {
+        const auto& cells = std::get<CellReader>(u_reader).cells();
+        assert(cells.size() > 0);
+        if (iter == 0 || !args.keep_range) {
+          std::tie(u_min, u_max) = min_max_cell_value<Float, DIM>(cells);
+        }
+      } else {
+        const auto& data = std::get<MatrixReader>(u_reader).data();
+        if (iter == 0 || !args.keep_range) {
+          const auto min_max = std::minmax_element(std::cbegin(data), std::cend(data));
+          u_min(0)           = *min_max.first;
+          u_max(0)           = *min_max.second;
+        }
+      }
+      if (std::holds_alternative<CellReader>(v_reader)) {
+        const auto& cells = std::get<CellReader>(v_reader).cells();
+        assert(cells.size() > 0);
+        if (iter == 0 || !args.keep_range) {
+          std::tie(v_min, v_max) = min_max_cell_value<Float, DIM>(cells);
+        }
+      } else {
+        const auto& data = std::get<MatrixReader>(v_reader).data();
+        if (iter == 0 || !args.keep_range) {
+          const auto min_max = std::minmax_element(std::cbegin(data), std::cend(data));
+          v_min(0)           = *min_max.first;
+          v_max(0)           = *min_max.second;
+        }
       }
 
-      if (!Rd::render_graph<Float, DIM>(
-              canvas, u_reader, 0, min, max, left_graph_box, args.scale, args.same_range)) {
-        // return false;
-      }
-      if (!Rd::render_graph<Float, DIM>(
-              canvas, u_reader, 1, min, max, right_graph_box, args.scale, args.same_range)) {
-        // return false;
-      }
+      std::visit(
+          [&](auto& reader) {
+            bool _ = Rd::render_graph<Float, DIM>(
+                canvas, reader, 0, u_min, u_max, left_graph_box, args.scale);
+          },
+          u_reader);
+
+      std::visit(
+          [&](auto& reader) {
+            bool _ = Rd::render_graph<Float, DIM>(
+                canvas, reader, 0, v_min, v_max, right_graph_box, args.scale);
+          },
+          v_reader);
 
       constexpr size_t NUM_COLORBAR_BLOCKS = 10;
       if (!Rd::render_color_bar<Float, DIM>(
-              canvas, left_colorbar_box, 0, min, max, args.same_range, NUM_COLORBAR_BLOCKS)) {
+              canvas, left_colorbar_box, 0, u_min, u_max, NUM_COLORBAR_BLOCKS)) {
         // return false;
       }
       if (!Rd::render_color_bar<Float, DIM>(
-              canvas, right_colorbar_box, 1, min, max, args.same_range, NUM_COLORBAR_BLOCKS)) {
+              canvas, right_colorbar_box, 0, v_min, v_max, NUM_COLORBAR_BLOCKS)) {
         // return false;
       }
 
@@ -655,18 +717,22 @@ auto main(int argc, char** argv) -> int {
   const auto args = parse_args(argc, argv);
   if (!args.has_value()) { return 1; }
 
+  // std::string v_input_file;
+  // bool symmetry_error = false;
+  // ImageFormat save_frame_images = NO_SAVE;
+
   Igor::Info("scale        = {}", args->scale);
   Igor::Info("fps          = {}", args->fps);
+  Igor::Info("no-mass      = {}", args->no_mass);
   Igor::Info("keep-range   = {}", args->keep_range);
-  Igor::Info("same-range   = {}", args->same_range);
-  Igor::Info("dimension    = {}", !args->two_dim ? "1d" : "2d");
+  Igor::Info("v input file = {}", args->v_input_file.empty() ? "None" : args->v_input_file);
   Igor::Info("u input file = {}", args->u_input_file);
   Igor::Info("t input file = {}", args->t_input_file);
   Igor::Info("output file  = {}", args->output_file);
 
-  if (!args->two_dim) {
-    return render_1d(*args) ? 0 : 1;
+  if (args->v_input_file.empty()) {
+    return render_u(*args) ? 0 : 1;
   } else {
-    return render_2d(*args) ? 0 : 1;
+    return render_uv(*args) ? 0 : 1;
   }
 }
