@@ -1,13 +1,17 @@
 #include <numbers>
 
+#ifdef USE_MP
 #include <boost/multiprecision/cpp_bin_float.hpp>
 namespace mp = boost::multiprecision;
+#endif  // USE_MP
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
 
 #include "Igor/Logging.hpp"
 #include "Igor/Timer.hpp"
+
+#ifdef USE_MP
 
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat = mp::number<mp::cpp_bin_float<128>, mp::expression_template_option::et_on>;
@@ -38,17 +42,109 @@ using mp::sqrt;
 }  // namespace std
 // - Multiprecision adapter ------------------------------------------------------------------------
 
+#else
+
+// - Setup -----------------------------------------------------------------------------------------
+using PassiveFloat           = double;
+using ActiveFloat            = PassiveFloat;
+constexpr PassiveFloat X_MIN = 0.0;
+constexpr PassiveFloat X_MAX = 5.0;
+constexpr PassiveFloat Y_MIN = 0.0;
+constexpr PassiveFloat Y_MAX = 5.0;
+constexpr PassiveFloat R     = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
+
+#endif  // USE_MP
+
 // #define ZAP_SERIAL
 // #define ZAP_SINGLE_ITERATION
-#define ZAP_NO_TANGENTIAL_CORRECTION
+// #define ZAP_STATIC_CUT
+// #define ZAP_NO_TANGENTIAL_CORRECTION
 #define ZAP_NO_CHUNK_INFO
 #include "CellBased/Solver.hpp"
 #include "IO/NoopWriter.hpp"
 
 #include "Igor/Logging.hpp"
 
+#include "Common.hpp"
+
 using namespace Zap::CellBased;
 using namespace Zap::IO;
+
+// -------------------------------------------------------------------------------------------------
+struct Args {
+  PassiveFloat tend = 1.0;
+  PassiveFloat tol  = 1e-6;
+  size_t N          = 2000UZ;
+  bool plus_one     = true;
+};
+
+// - Print usage -----------------------------------------------------------------------------------
+template <Igor::detail::Level level>
+void usage(std::string_view prog, std::ostream& out) noexcept {
+  Args args{};
+
+  out << Igor::detail::level_repr(level) << "Usage: " << prog
+      << " [--tend tend] [--tol tol] [--N N] [--no-plus-one]\n";
+  out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
+  out << "\t--tol             Tolerance to classiyfy a value as equal, default is " << args.tol
+      << '\n';
+  out << "\t--N               Number of points in x- and y-direction to check for symmetry, "
+         "default is "
+      << args.N << '\n';
+  out << "\t--no-plus-one     Do not make number of cells odd, default is " << std::boolalpha
+      << !args.plus_one << '\n';
+}
+
+// - Parse command line arguments ------------------------------------------------------------------
+[[nodiscard]] auto parse_args(int& argc, char**& argv) noexcept -> std::optional<Args> {
+  Args args{};
+
+  const auto prog = next_arg(argc, argv);
+  IGOR_ASSERT(prog.has_value(), "Could not get program name from command line arguments.");
+
+  for (auto arg = next_arg(argc, argv); arg.has_value(); arg = next_arg(argc, argv)) {
+    using namespace std::string_view_literals;
+    if (arg == "--tend"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --tend.\n";
+        return std::nullopt;
+      }
+      args.tend = parse_double(*arg);
+    } else if (arg == "--tol"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --tol.\n";
+        return std::nullopt;
+      }
+      args.tol = parse_double(*arg);
+    } else if (arg == "--N"sv || arg == "-N") {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --N.\n";
+        return std::nullopt;
+      }
+      args.N = parse_size_t(*arg);
+    } else if (arg == "--no-plus-one") {
+      args.plus_one = false;
+    } else if (arg == "-h"sv || arg == "--help"sv) {
+      usage<Igor::detail::Level::INFO>(*prog, std::cout);
+      std::exit(0);
+    } else {
+      usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+      std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC) << "Unknown argument `"
+                << *arg << "`.\n";
+      return std::nullopt;
+    }
+  }
+  return args;
+}
 
 // -------------------------------------------------------------------------------------------------
 [[nodiscard]] constexpr auto sqr(auto x) noexcept { return x * x; }
@@ -141,40 +237,50 @@ struct SymmetryResults {
 }
 
 // -------------------------------------------------------------------------------------------------
-auto main() -> int {
-  const PassiveFloat tend = 1.0;
-  const PassiveFloat tol  = 1e-4;
-  const size_t N          = 500UZ;
+auto main(int argc, char** argv) -> int {
+  const auto args = parse_args(argc, argv);
+  if (!args.has_value()) { return 1; }
 
-  // Igor::Info("| Gridsize | #non-symmetric | %non-symmetric |  %cut  | abs. non-symmetric error |
-  // "
-  //            "rel. non-symmetric error |");
-  // Igor::Info("-------------------------------------------------------------------------------------"
-  //            "------------------------");
+  Igor::Info("tend     = {}", args->tend);
+  Igor::Info("tol      = {}", args->tol);
+  Igor::Info("N        = {}", args->N);
+  Igor::Info("plus-one = {}", args->plus_one);
+
+#ifndef USE_MP
+  Igor::Info("| Gridsize | #non-symmetric | %non-symmetric |  %cut  | abs. non-symmetric error | "
+             "rel. non-symmetric error |");
+  Igor::Info("-------------------------------------------------------------------------------------"
+             "------------------------");
+#else
   Igor::Info("Gridsize,#non-symmetric,%non-symmetric,%cut,abs. non-symmetric error,"
              "rel. non-symmetric error");
-  for (size_t n = 11; n <= 401; n += n > 150 ? 50 : 10) {
-    const PassiveFloat cfl = n <= 101 ? 0.5 : 0.2;
-    const auto res         = run(n, n, tend, cfl);
+#endif  // USE_MP
+  for (size_t n = 10 + static_cast<size_t>(args->plus_one);
+       n <= 400 + static_cast<size_t>(args->plus_one);
+       n += n > 150 ? 50 : 10) {
+    const PassiveFloat cfl = n < 50 ? 0.5 : 0.2;
+    const auto res         = run(n, n, args->tend, cfl);
     if (!res.has_value()) {
-      Igor::Warn("Solver for nx={}, ny={}, tend={} failed.", n, n, tend);
+      Igor::Warn("Solver for nx={}, ny={}, tend={} failed.", n, n, args->tend);
     } else {
-      const auto sym_res = check_symmetry(*res, N, tol);
-      // Igor::Info("| {:>3}x{:<3}  |"
-      //            "    {:>8}    |"
-      //            "     {:>5.2f}%     |"
-      //            " {:>5.2f}% |"
-      //            "       {:>12.8f}       |"
-      //            "       {:>12.8f}       |",
-      //            n,
-      //            n,
-      //            sym_res.num_non_symmetric,
-      //            static_cast<PassiveFloat>(sym_res.num_non_symmetric * 100) /
-      //                static_cast<PassiveFloat>(sym_res.num_points_checked),
-      //            static_cast<PassiveFloat>(res->cut_cell_idxs().size() * 100) /
-      //                static_cast<PassiveFloat>(res->size()),
-      //            sym_res.non_symmetric_error,
-      //            sym_res.non_symmetric_error / sym_res.entire_mass);
+      const auto sym_res = check_symmetry(*res, args->N, args->tol);
+#ifndef USE_MP
+      Igor::Info("| {:>3}x{:<3}  |"
+                 "    {:>8}    |"
+                 "     {:>5.2f}%     |"
+                 " {:>5.2f}% |"
+                 "       {:>12.8f}       |"
+                 "       {:>12.8f}       |",
+                 n,
+                 n,
+                 sym_res.num_non_symmetric,
+                 static_cast<PassiveFloat>(sym_res.num_non_symmetric * 100) /
+                     static_cast<PassiveFloat>(sym_res.num_points_checked),
+                 static_cast<PassiveFloat>(res->cut_cell_idxs().size() * 100) /
+                     static_cast<PassiveFloat>(res->size()),
+                 sym_res.non_symmetric_error,
+                 sym_res.non_symmetric_error / sym_res.entire_mass);
+#else
       Igor::Info(
           "{}x{},{},{}%,{}%,{},{}",
           n,
@@ -186,6 +292,7 @@ auto main() -> int {
                                     static_cast<PassiveFloat>(res->size())),
           sym_res.non_symmetric_error,
           static_cast<PassiveFloat>(sym_res.non_symmetric_error / sym_res.entire_mass));
+#endif  // USE_MP
     }
     std::cout << std::flush;
   }

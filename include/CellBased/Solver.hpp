@@ -295,17 +295,6 @@ class Solver {
         internal_waves.back().end +
         dt * internal_waves.back().normal_speed * internal_waves.back().normal +
         dt * internal_waves.back().tangent_speed * internal_waves.back().tangent);
-
-    // TODO: Is this necessary?
-    // Remove first and last point if they are to close to the next point
-    if ((avg_new_shock_points[0] - avg_new_shock_points[1]).norm() < 1e-2) {
-      avg_new_shock_points.erase(std::next(std::begin(avg_new_shock_points)));
-    }
-    if (avg_new_shock_points.size() >= 2 && (avg_new_shock_points[avg_new_shock_points.size() - 1] -
-                                             avg_new_shock_points[avg_new_shock_points.size() - 2])
-                                                    .norm() < 1e-2) {
-      avg_new_shock_points.erase(std::prev(std::end(avg_new_shock_points), 2));
-    }
   }
 
   // -----------------------------------------------------------------------------------------------
@@ -483,8 +472,6 @@ class Solver {
 
       // TODO: What happens when a subcell has area 0?
       //   -> cannot "uncut" the cell because that would loose shock position information
-
-      // TODO: Do parallelization that handles tangential correction
 
 #ifdef ZAP_SERIAL
       for (size_t cell_idx = 0; cell_idx < curr_grid.size(); ++cell_idx) {

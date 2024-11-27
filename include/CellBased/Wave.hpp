@@ -180,6 +180,7 @@ calc_wave_polygon(const AxisAlignedWave<ActiveFloat, PointType, orientation>& wa
                           dx,
                           dy);
 
+  // TODO: We always use normal_wave_speed = tangent_wave_speed, is this correct here?
   const PointType tangent =
       scale_if_grid_coord(PointType{-static_cast<PassiveFloat>(orientation == Y),
                                     static_cast<PassiveFloat>(orientation == X)},
