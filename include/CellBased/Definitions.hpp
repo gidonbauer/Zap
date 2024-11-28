@@ -57,31 +57,11 @@ requires mp::is_number<Float>::value
   return mp::sqrt(std::numeric_limits<Float>::epsilon());
 }
 
-// {
-//   if constexpr (std::is_same_v<Float, float>) {
-//     return 1e-6F;
-//   } else if constexpr (std::is_same_v<Float, double>) {
-//     return 1e-8;
-//   } else if
-// }
-
-// template <typename Float>
-// requires is_real<Float>
-// inline constexpr Float EPS;
-// template <>
-// inline constexpr float EPS<float> = 1e-6F;
-// template <>
-// inline constexpr double EPS<double> = 1e-8;
-//
-// template <>
-// inline constexpr float EPS<typename ad::gt1s<float>::type> = EPS<float>;
-// template <>
-// inline constexpr double EPS<typename ad::gt1s<double>::type> = EPS<double>;
-
 // - Sign function ---------------------------------------------------------------------------------
 template <typename T>
 [[nodiscard]] constexpr auto sign(const T& x) noexcept -> T {
-  return static_cast<T>(x > EPS<T>()) - static_cast<T>(x < -EPS<T>());
+  // return static_cast<T>(x > EPS<T>()) - static_cast<T>(x < -EPS<T>());
+  return static_cast<T>(x > T{0}) - static_cast<T>(x < T{0});
 }
 
 // - Points in grid and simulation coordinates -----------------------------------------------------
