@@ -295,7 +295,6 @@ constexpr void move_wave_front(std::vector<PointType>& avg_new_shock_points,
 template <typename ActiveFloat, typename PassiveFloat>
 void recalculate_cut_cell_values(UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
                                  const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid) noexcept {
-
 #ifndef ZAP_SERIAL
 #pragma omp parallel for
 #endif  // ZAP_SERIAL
@@ -377,7 +376,7 @@ template <ExtendType extend_type,
 
   // Buffer for the points on the new buffer
   std::vector<PointType> avg_new_shock_points{};
-  internal_waves.reserve(internal_waves.size() + 1);
+  avg_new_shock_points.reserve(internal_waves.size() + 1);
 
   if (!(CFL_safety_factor > 0 && CFL_safety_factor <= 1)) {
     Igor::Warn("CFL_safety_factor must be in (0, 1], is {}", CFL_safety_factor);
