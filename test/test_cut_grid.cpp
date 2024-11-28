@@ -61,6 +61,44 @@ TEST(CutGrid, CurveQuarterCircle) {
 }
 
 // =================================================================================================
+TEST(CutGrid, PiecewiseLinearEmpty) {
+  using Float = double;
+
+  const Float x_min = 0.0;
+  const Float x_max = 1.0;
+  const Float y_min = 0.0;
+  const Float y_max = 1.0;
+
+  UniformGrid<Float, Float> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+
+  std::vector<SimCoord<Float>> points;
+  const auto success = grid.cut_piecewise_linear<ExtendType::MAX>(points);
+  ASSERT_FALSE(success) << "Should not be able to cut a grid with empty points.";
+
+  const auto cut_idxs = grid.cut_cell_idxs();
+  ASSERT_EQ(cut_idxs.size(), 0UZ) << "Expected exactly zero cut cells.";
+}
+
+// =================================================================================================
+TEST(CutGrid, PiecewiseLinearNoExtendInsideSingleCell) {
+  using Float = double;
+
+  const Float x_min = 0.0;
+  const Float x_max = 1.0;
+  const Float y_min = 0.0;
+  const Float y_max = 1.0;
+
+  UniformGrid<Float, Float> grid(x_min, x_max, 5UZ, y_min, y_max, 5UZ);
+
+  std::vector<GridCoord<Float>> points = {{2.5, 2.5}, {2.7, 2.7}};
+  const auto success                   = grid.cut_piecewise_linear<ExtendType::NONE>(points);
+  ASSERT_TRUE(success) << "Could not cut the grid.";
+
+  const auto cut_idxs = grid.cut_cell_idxs();
+  ASSERT_EQ(cut_idxs.size(), 0UZ) << "Expected exactly zero cut cells.";
+}
+
+// =================================================================================================
 TEST(CutGrid, PiecewiseLinearSingleLine) {
   using Float = double;
 

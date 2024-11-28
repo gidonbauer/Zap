@@ -7,6 +7,7 @@ set(executables
         test_cut_grid
         test_outer_interfaces
         test_wave
+        test_internal_wave
         test_periodic_boundary
 )
 
@@ -21,6 +22,7 @@ foreach(exec ${executables})
 
     # - Link libraries ---------
     target_link_libraries(${exec} PRIVATE GTest::gtest_main)
+    target_link_libraries(${exec} PRIVATE OpenMP::OpenMP_CXX)
     target_link_libraries(${exec} PRIVATE fmt::fmt)
 
     gtest_discover_tests(${exec})
