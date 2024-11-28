@@ -1,3 +1,9 @@
+// #define ZAP_SERIAL
+// #define ZAP_SINGLE_ITERATION
+// #define ZAP_STATIC_CUT
+// #define ZAP_NO_TANGENTIAL_CORRECTION
+#define ZAP_NO_CHUNK_INFO
+
 #include <numbers>
 
 #ifdef USE_MP
@@ -55,15 +61,8 @@ constexpr PassiveFloat R     = (X_MIN + X_MAX + Y_MIN + Y_MAX) / 4;
 
 #endif  // USE_MP
 
-// #define ZAP_SERIAL
-// #define ZAP_SINGLE_ITERATION
-// #define ZAP_STATIC_CUT
-// #define ZAP_NO_TANGENTIAL_CORRECTION
-#define ZAP_NO_CHUNK_INFO
 #include "CellBased/Solver.hpp"
 #include "IO/NoopWriter.hpp"
-
-#include "Igor/Logging.hpp"
 
 #include "Common.hpp"
 
@@ -72,10 +71,10 @@ using namespace Zap::IO;
 
 // -------------------------------------------------------------------------------------------------
 struct Args {
-  PassiveFloat tend = 1.0;
-  PassiveFloat tol  = 1e-6;
-  size_t N          = 2000UZ;
-  bool plus_one     = true;
+  PassiveFloat tend   = 1.0;
+  PassiveFloat tol    = 1e-6;
+  size_t check_factor = 4UZ;
+  bool plus_one       = true;
 };
 
 // - Print usage -----------------------------------------------------------------------------------
@@ -84,13 +83,13 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   Args args{};
 
   out << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--tend tend] [--tol tol] [--N N] [--no-plus-one]\n";
+      << " [--tend tend] [--tol tol] [--factor f] [--no-plus-one]\n";
   out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
   out << "\t--tol             Tolerance to classiyfy a value as equal, default is " << args.tol
       << '\n';
-  out << "\t--N               Number of points in x- and y-direction to check for symmetry, "
-         "default is "
-      << args.N << '\n';
+  out << "\t--factor          Factor for number of points in x- and y-direction to check for "
+         "symmetry, used as factor * grid_size, default is "
+      << args.check_factor << '\n';
   out << "\t--no-plus-one     Do not make number of cells odd, default is " << std::boolalpha
       << !args.plus_one << '\n';
 }
@@ -122,15 +121,15 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
         return std::nullopt;
       }
       args.tol = parse_double(*arg);
-    } else if (arg == "--N"sv || arg == "-N") {
+    } else if (arg == "--factor"sv) {
       arg = next_arg(argc, argv);
       if (!arg.has_value()) {
         usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
         std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
-                  << "Did not provide number for option --N.\n";
+                  << "Did not provide number for option --factor.\n";
         return std::nullopt;
       }
-      args.N = parse_size_t(*arg);
+      args.check_factor = parse_size_t(*arg);
     } else if (arg == "--no-plus-one") {
       args.plus_one = false;
     } else if (arg == "-h"sv || arg == "--help"sv) {
@@ -240,10 +239,10 @@ auto main(int argc, char** argv) -> int {
   const auto args = parse_args(argc, argv);
   if (!args.has_value()) { return 1; }
 
-  Igor::Info("tend     = {}", args->tend);
-  Igor::Info("tol      = {}", args->tol);
-  Igor::Info("N        = {}", args->N);
-  Igor::Info("plus-one = {}", args->plus_one);
+  Igor::Info("tend          = {}", args->tend);
+  Igor::Info("tol           = {}", args->tol);
+  Igor::Info("check-factor  = {}", args->check_factor);
+  Igor::Info("plus-one      = {}", args->plus_one);
 
 #ifndef USE_MP
   Igor::Info("| Gridsize | #non-symmetric | %non-symmetric |  %cut  | abs. non-symmetric error | "
@@ -262,7 +261,7 @@ auto main(int argc, char** argv) -> int {
     if (!res.has_value()) {
       Igor::Warn("Solver for nx={}, ny={}, tend={} failed.", n, n, args->tend);
     } else {
-      const auto sym_res = check_symmetry(*res, args->N, args->tol);
+      const auto sym_res = check_symmetry(*res, args->check_factor * n, args->tol);
 #ifndef USE_MP
       Igor::Info("| {:>3}x{:<3}  |"
                  "    {:>8}    |"
