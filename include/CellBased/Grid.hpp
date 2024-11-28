@@ -430,9 +430,10 @@ class UniformGrid {
 
     // Remove points outside of grid
     std::erase_if(points, [this](const GridCoord<T>& p) { return !point_in_grid(p); });
-    IGOR_ASSERT(points.size() >= 2,
-                "Only {} points inside of the grid, require at least 2.",
-                points.size());
+    if (points.size() < 2) {
+      Igor::Warn("Only {} points inside of the grid, require at least 2.", points.size());
+      return false;
+    }
 
     // - Extend end points -------------------------------------------------------------------------
     if constexpr (extend_type != ExtendType::NONE) {
