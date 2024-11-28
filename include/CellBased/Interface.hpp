@@ -437,4 +437,50 @@ get_shared_interfaces(const Cell<ActiveFloat, PassiveFloat>& center_cell,
 
 }  // namespace Zap::CellBased
 
+// -------------------------------------------------------------------------------------------------
+template <typename ActiveFloat, Zap::CellBased::Point2D_c PointType>
+struct fmt::formatter<Zap::CellBased::HalfInterface<ActiveFloat, PointType>> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) const noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  constexpr auto format(const Zap::CellBased::HalfInterface<ActiveFloat, PointType>& half_interface,
+                        FormatContext& ctx) const noexcept {
+    return fmt::format_to(ctx.out(),
+                          "{{\n"
+                          "  .value = {}\n"
+                          "  .begin = {}\n"
+                          "  .end   = {}\n"
+                          "}}",
+                          half_interface.value,
+                          half_interface.begin,
+                          half_interface.end);
+  }
+};
+
+// -------------------------------------------------------------------------------------------------
+template <typename ActiveFloat, Zap::CellBased::Point2D_c PointType>
+struct fmt::formatter<Zap::CellBased::FullInterface<ActiveFloat, PointType>> {
+  template <typename ParseContext>
+  constexpr auto parse(ParseContext& ctx) const noexcept {
+    return ctx.begin();
+  }
+  template <typename FormatContext>
+  constexpr auto format(const Zap::CellBased::FullInterface<ActiveFloat, PointType>& full_interface,
+                        FormatContext& ctx) const noexcept {
+    return fmt::format_to(ctx.out(),
+                          "{{\n"
+                          "  .left_value  = {}\n"
+                          "  .right_value = {}\n"
+                          "  .begin       = {}\n"
+                          "  .end         = {}\n"
+                          "}}",
+                          full_interface.left_value,
+                          full_interface.right_value,
+                          full_interface.begin,
+                          full_interface.end);
+  }
+};
+
 #endif  // ZAP_CELL_BASED_INTERFACE_HPP_
