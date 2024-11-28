@@ -242,8 +242,8 @@ void print_solution_error(
   const auto t_file = OUTPUT_DIR "t_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  Zap::CellBased::Solver<Zap::CellBased::ExtendType::MAX> solver;
-  const auto res = solver.solve(grid, tend, grid_writer, t_writer, 0.25);
+  const auto res = Zap::CellBased::solve_2d_burgers<Zap::CellBased::ExtendType::MAX>(
+      grid, tend, grid_writer, t_writer, 0.25);
   if (!res.has_value()) {
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);
     return false;

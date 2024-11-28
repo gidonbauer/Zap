@@ -228,12 +228,11 @@ struct SymmetryResults {
   //   return std::nullopt;
   // }
 
-  Solver<ExtendType::NEAREST> solver;
   NoopWriter grid_writer;
   NoopWriter time_writer;
 
   // Igor::ScopeTimer timer("Solver");
-  return solver.solve(grid, tend, grid_writer, time_writer, cfl);
+  return solve_2d_burgers<ExtendType::NEAREST>(grid, tend, grid_writer, time_writer, cfl);
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -264,8 +264,8 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(PassiveFloat{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    Solver<ExtendType::NEAREST> solver;
-    const auto res = solver.solve(grid, args->tend, grid_writer, t_writer, args->CFL_safety_factor);
+    const auto res = solve_2d_burgers<ExtendType::NEAREST>(
+        grid, args->tend, grid_writer, t_writer, args->CFL_safety_factor);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;

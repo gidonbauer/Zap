@@ -59,11 +59,10 @@ auto run_cell_based(size_t nx, size_t ny, Float tend, Float CFL_safety_factor) n
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
   grid.fill_four_point(u0);
 
-  Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
-
   NoopWriter u_writer;
   NoopWriter t_writer;
-  return solver.solve(grid, tend, u_writer, t_writer, CFL_safety_factor);
+  return Zap::CellBased::solve_2d_burgers<Zap::CellBased::ExtendType::NEAREST>(
+      grid, tend, u_writer, t_writer, CFL_safety_factor);
 }
 
 // -------------------------------------------------------------------------------------------------

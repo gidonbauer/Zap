@@ -108,9 +108,8 @@ auto main(int argc, char** argv) -> int {
   if (!t_writer.write_data(Float{0})) { return 1; }
 #else
   IGOR_TIME_SCOPE("Solver") {
-    Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
-    const auto res =
-        solver.solve(grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
+    const auto res = Zap::CellBased::solve_2d_burgers<Zap::CellBased::ExtendType::NEAREST>(
+        grid, static_cast<PassiveFloat>(tend), grid_writer, t_writer, 0.25);
     if (!res.has_value()) {
       Igor::Warn("Solver failed.");
       return 1;

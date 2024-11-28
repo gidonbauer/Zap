@@ -47,8 +47,8 @@ constexpr Float Y_MAX = 1.0;
   const auto t_file = OUTPUT_DIR "t_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<Float, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  Zap::CellBased::Solver<Zap::CellBased::ExtendType::MAX> solver;
-  const auto res = solver.solve(grid, tend, grid_writer, t_writer, CFL_safety_factor);
+  const auto res = Zap::CellBased::solve_2d_burgers<Zap::CellBased::ExtendType::MAX>(
+      grid, tend, grid_writer, t_writer, CFL_safety_factor);
   if (!res.has_value()) {
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);
     return false;

@@ -175,8 +175,6 @@ auto run_cell_based(size_t nx,
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
   grid.fill_four_point(u0);
 
-  Zap::CellBased::Solver<Zap::CellBased::ExtendType::NEAREST> solver;
-
   const std::string u_filename =
       OUTPUT_DIR "u_cell_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".grid";
   Zap::IO::IncCellWriter u_writer(u_filename, grid);
@@ -184,7 +182,8 @@ auto run_cell_based(size_t nx,
       OUTPUT_DIR "t_cell_based_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_filename, 1, 1, 0);
 
-  return solver.solve(grid, tend, u_writer, t_writer, CFL_safety_factor);
+  return Zap::CellBased::solve_2d_burgers<Zap::CellBased::ExtendType::NEAREST>(
+      grid, tend, u_writer, t_writer, CFL_safety_factor);
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -172,8 +172,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 
   Zap::IO::NoopWriter grid_writer;
   Zap::IO::NoopWriter t_writer;
-  Solver<ExtendType::NEAREST> solver;
-  return solver.solve(grid, tend, grid_writer, t_writer, CFL_safety_factor);
+  return solve_2d_burgers<ExtendType::NEAREST>(
+      grid, tend, grid_writer, t_writer, CFL_safety_factor);
 }
 
 // -------------------------------------------------------------------------------------------------

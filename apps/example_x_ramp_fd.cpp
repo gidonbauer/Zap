@@ -63,8 +63,7 @@ constexpr Float Y_MAX = 2.0;
   NoopWriter grid_writer;
   NoopWriter t_writer;
 
-  Solver<ExtendType::MAX> solver;
-  const auto res = solver.solve(grid, tend, grid_writer, t_writer, 0.25);
+  const auto res = solve_2d_burgers<ExtendType::MAX>(grid, tend, grid_writer, t_writer, 0.25);
   IGOR_ASSERT(res.has_value(), "Expected the solver to succeed, but did not.");
   return *res;
 }
