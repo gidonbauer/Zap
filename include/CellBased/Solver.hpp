@@ -2,7 +2,6 @@
 #define ZAP_CELL_BASED_SOLVER_HPP_
 
 #include <numeric>
-#include <unordered_set>
 
 #ifndef ZAP_SERIAL
 #include <omp.h>

@@ -639,3 +639,26 @@ TEST(CutGrid, HandleCutOnSingleSide) {
     }
   }
 }
+
+// =================================================================================================
+TEST(CutGrid, PiecewiseLinearRoundingBug) {
+  UniformGrid<double, double> grid(0.0, 5.0, 5UZ, 0.0, 5.0, 5UZ);
+
+  const std::vector<GridCoord<double>> points = {
+      {3.2663460232270394, 0.05915286922710798},
+      {3.3001116149507848, 1.0830318867396005},
+      {3.1653095473707733, 2.0765210702248598},
+      {3.0838033071117104, 2.267462824652602},
+      {2.2576268619934536, 3.0912892589539536},
+      {2.0824742005628303, 3.1510810962845373},
+      {1.081172302885356, 3.279781651119647},
+      {0.05849934452716325, 3.254446826278905},
+  };
+  const bool success = grid.cut_piecewise_linear<ExtendType::NEAREST>(points);
+  ASSERT_TRUE(success) << "Could not cut the grid.";
+
+  EXPECT_EQ(grid.cut_cell_idxs().size(), 7UZ)
+      << "Expected 7 cut cells but got only " << grid.cut_cell_idxs().size();
+
+  EXPECT_EQ(grid.cut_cell_idxs(), (std::vector<size_t>{3UZ, 8UZ, 13UZ, 12UZ, 17UZ, 16UZ, 15UZ}));
+}
