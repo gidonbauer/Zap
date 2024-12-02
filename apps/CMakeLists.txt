@@ -16,6 +16,8 @@ set(executables
 
   compare_clawpack
   is_symmetric
+
+  shock_ad_reference
 )
 
 foreach(exec ${executables})
