@@ -5,6 +5,9 @@
 // #define ZAP_SERIAL
 #define ZAP_NO_TANGENTIAL_CORRECTION
 
+// TODO: Why does this only work if t is active?
+#define ZAP_T_ACTIVE
+
 #include <AD/ad.hpp>
 
 #include "CellBased/Solver.hpp"
@@ -29,10 +32,11 @@ constexpr PassiveFloat Y_MAX = 2.0;
 
 // - Available command line options ----------------------------------------------------------------
 struct Args {
-  bool run_benchmark = false;
-  size_t nx          = 25;
-  size_t ny          = 25;
-  PassiveFloat tend  = 1.0;
+  bool run_benchmark    = false;
+  bool square_benchmark = false;
+  size_t nx             = 25;
+  size_t ny             = 25;
+  PassiveFloat tend     = 1.0;
 };
 
 // - Print usage -----------------------------------------------------------------------------------
@@ -41,13 +45,15 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   Args args{};
 
   out << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--run-benchmark] [--nx nx] [--ny ny] [--tend tend]\n";
-  out << "\t--run-benchmark   Run the solver for different grid sizes and compare result against "
-         "high-resolution Godunov solver, default is "
+      << " [--run-benchmark] [--square-benchmark] [--nx nx] [--ny ny] [--tend tend]\n";
+  out << "\t--run-benchmark      Run the solver for different grid sizes and compare result "
+         "against analytical solution, default is "
       << std::boolalpha << args.run_benchmark << '\n';
-  out << "\t--nx              Number of cells in x-direction, default is " << args.nx << '\n';
-  out << "\t--ny              Number of cells in y-direction, default is " << args.ny << '\n';
-  out << "\t--tend            Final time for simulation, default is " << args.tend << '\n';
+  out << "\t--square-benchmark   Run the benchmark with nxn grid instead of nx3 grid, default is "
+      << std::boolalpha << args.square_benchmark << '\n';
+  out << "\t--nx                 Number of cells in x-direction, default is " << args.nx << '\n';
+  out << "\t--ny                 Number of cells in y-direction, default is " << args.ny << '\n';
+  out << "\t--tend               Final time for simulation, default is " << args.tend << '\n';
 }
 
 // - Parse command line arguments ------------------------------------------------------------------
@@ -61,6 +67,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
     using namespace std::string_view_literals;
     if (arg == "--run-benchmark"sv) {
       args.run_benchmark = true;
+    } else if (arg == "--square-benchmark"sv) {
+      args.square_benchmark = true;
     } else if (arg == "--nx"sv) {
       arg = next_arg(argc, argv);
       if (!arg.has_value()) {
@@ -278,8 +286,9 @@ auto main(int argc, char** argv) -> int {
   }
 
   Igor::Info("Save results in `" OUTPUT_DIR "`.");
-  Igor::Info("run-benchmark = {}", args->run_benchmark);
-  Igor::Info("tend          = {}", args->tend);
+  Igor::Info("run-benchmark    = {}", args->run_benchmark);
+  Igor::Info("square-benchmark = {}", args->square_benchmark);
+  Igor::Info("tend             = {}", args->tend);
 
   if (args->run_benchmark) {
     constexpr auto output_file = "./x_ramp_results.txt";
@@ -288,16 +297,17 @@ auto main(int argc, char** argv) -> int {
       Igor::Warn("Could not open output file `{}`: {}", output_file, std::strerror(errno));
     }
 
-    bool all_success        = true;
-    constexpr std::array ns = {
-        10UZ,  15UZ,  20UZ,  25UZ,  30UZ,  35UZ,  40UZ,  45UZ,  50UZ,  55UZ,  60UZ,  65UZ,
-        70UZ,  75UZ,  80UZ,  85UZ,  90UZ,  95UZ,  100UZ, 105UZ, 110UZ, 115UZ, 120UZ, 125UZ,
-        130UZ, 135UZ, 140UZ, 145UZ, 150UZ, 155UZ, 160UZ, 165UZ, 170UZ, 175UZ, 180UZ, 185UZ,
-        190UZ, 195UZ, 200UZ, 205UZ, 210UZ, 215UZ, 220UZ, 225UZ, 230UZ, 235UZ, 240UZ, 245UZ,
-        250UZ, 255UZ, 260UZ, 265UZ, 270UZ, 275UZ, 280UZ, 285UZ, 290UZ, 295UZ, 300UZ,
-    };
-    for (size_t n : ns) {
-      const auto success = run(n, 3, args->tend, out);
+    bool all_success = true;
+    // constexpr std::array ns = {
+    //     10UZ,  15UZ,  20UZ,  25UZ,  30UZ,  35UZ,  40UZ,  45UZ,  50UZ,  55UZ,  60UZ,  65UZ,
+    //     70UZ,  75UZ,  80UZ,  85UZ,  90UZ,  95UZ,  100UZ, 105UZ, 110UZ, 115UZ, 120UZ, 125UZ,
+    //     130UZ, 135UZ, 140UZ, 145UZ, 150UZ, 155UZ, 160UZ, 165UZ, 170UZ, 175UZ, 180UZ, 185UZ,
+    //     190UZ, 195UZ, 200UZ, 205UZ, 210UZ, 215UZ, 220UZ, 225UZ, 230UZ, 235UZ, 240UZ, 245UZ,
+    //     250UZ, 255UZ, 260UZ, 265UZ, 270UZ, 275UZ, 280UZ, 285UZ, 290UZ, 295UZ, 300UZ,
+    // };
+    // for (size_t n : ns) {
+    for (size_t n = 5; n <= 400UZ; n += n < 100 ? 5 : 50) {
+      const auto success = run(n, args->square_benchmark ? n : 3, args->tend, out);
       all_success        = all_success && success;
     }
 

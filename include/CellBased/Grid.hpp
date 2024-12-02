@@ -422,12 +422,12 @@ class UniformGrid {
     }
 
     auto get_whole_min = [](T x1, T x2) -> int {
-      const auto x = std::min(x1, x2);
+      const T x = std::min(x1, x2);
       if (x - std::floor(x) < EPS<T>()) { return static_cast<int>(std::floor(x)); }
       return static_cast<int>(std::ceil(x));
     };
     auto get_whole_max = [](T x1, T x2) -> int {
-      const auto x = std::max(x1, x2);
+      const T x = std::max(x1, x2);
       if (std::ceil(x) - x < EPS<T>()) { return static_cast<int>(std::ceil(x)); }
       return static_cast<int>(std::floor(x));
     };

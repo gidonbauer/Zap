@@ -403,7 +403,12 @@ template <ExtendType extend_type,
     return std::nullopt;
   }
 
-  for (PassiveFloat t = 0.0; t < tend;) {
+#ifdef ZAP_T_ACTIVE
+  using TimeFloat = ActiveFloat;
+#else
+  using TimeFloat = PassiveFloat;
+#endif  // ZAP_T_ACTIVE
+  for (TimeFloat t = 0.0; t < tend;) {
     const ActiveFloat CFL_factor = cfl_factor(curr_grid);
     if (std::isnan(CFL_factor) || std::isinf(CFL_factor)) {
       Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
@@ -411,12 +416,16 @@ template <ExtendType extend_type,
     }
 
     const ActiveFloat dt = [&] {
-      ActiveFloat local_dt          = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
-      const PassiveFloat missing_dt = tend - t;
+      ActiveFloat local_dt       = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
+      const TimeFloat missing_dt = tend - t;
       // TODO: Is this the right way to handle the final timestep?
       if (local_dt > missing_dt) {
+#ifdef ZAP_T_ACTIVE
+        return missing_dt;
+#else
         ad::value(local_dt) = missing_dt;
         if constexpr (ad::mode<ActiveFloat>::is_ad_type) { ad::derivative(local_dt) = -missing_dt; }
+#endif  // ZAP_T_ACTIVE
       }
       return local_dt;
     }();
@@ -567,11 +576,17 @@ template <ExtendType extend_type,
 #endif  // ZAP_SERIAL
 
     // Update time
+#ifdef ZAP_T_ACTIVE
+    t += dt;
+#else
     t += ad::value(dt);
+#endif  // ZAP_T_ACTIVE
 
     curr_grid = next_grid;
 
-    if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(t)) { return std::nullopt; }
+    if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
+      return std::nullopt;
+    }
 
 #ifdef ZAP_SINGLE_ITERATION
     break;
