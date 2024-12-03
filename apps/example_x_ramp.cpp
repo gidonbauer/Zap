@@ -72,9 +72,9 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 
   for (auto arg = next_arg(argc, argv); arg.has_value(); arg = next_arg(argc, argv)) {
     using namespace std::string_view_literals;
-    if (arg == "--run-benchmark"sv) {
+    if (arg == "--run-benchmark"sv || arg == "--run-benchmarks"sv) {
       args.run_benchmark = true;
-    } else if (arg == "--square-benchmark"sv) {
+    } else if (arg == "--square-benchmark"sv || arg == "--square-benchmarks"sv) {
       args.square_benchmark = true;
     } else if (arg == "--nx"sv) {
       arg = next_arg(argc, argv);
@@ -238,6 +238,13 @@ void print_solution_error(const UniformGrid<ActiveFloat, PassiveFloat>& numerica
                                                  std::plus<>{},
                                                  [](const auto& p) { return ad::value(p.x); }) /
                            static_cast<PassiveFloat>(final_shock.size());
+  const auto avg_xi_shock =
+      std::transform_reduce(std::cbegin(final_shock),
+                            std::cend(final_shock),
+                            PassiveFloat{0},
+                            std::plus<>{},
+                            [](const auto& p) { return ad::derivative(p.x); }) /
+      static_cast<PassiveFloat>(final_shock.size());
 
   std::vector<PassiveFloat> xs;
   std::vector<PassiveFloat> us;
@@ -262,12 +269,18 @@ void print_solution_error(const UniformGrid<ActiveFloat, PassiveFloat>& numerica
     }
   }
 
-  constexpr auto x_file = OUTPUT_DIR "x.npy";
-  constexpr auto u_file = OUTPUT_DIR "u.npy";
-  constexpr auto v_file = OUTPUT_DIR "v.npy";
+  constexpr auto x_file   = OUTPUT_DIR "x.npy";
+  constexpr auto x1_file  = OUTPUT_DIR "x1.npy";
+  constexpr auto xi1_file = OUTPUT_DIR "xi1.npy";
+  constexpr auto u_file   = OUTPUT_DIR "u.npy";
+  constexpr auto v_file   = OUTPUT_DIR "v.npy";
 
   if (!Zap::IO::vector_to_npy(x_file, xs)) { return false; }
   Igor::Info("Saved one-dimensional grid to {}", x_file);
+  if (!Zap::IO::vector_to_npy(x1_file, std::vector{avg_x_shock})) { return false; }
+  Igor::Info("Saved shock location to {}", x1_file);
+  if (!Zap::IO::vector_to_npy(xi1_file, std::vector{avg_xi_shock})) { return false; }
+  Igor::Info("Saved change of shock location to {}", xi1_file);
   if (!Zap::IO::vector_to_npy(u_file, us)) { return false; }
   Igor::Info("Saved one-dimensional solution to {}", u_file);
   if (!Zap::IO::vector_to_npy(v_file, vs)) { return false; }
@@ -362,7 +375,7 @@ auto main(int argc, char** argv) -> int {
     //     250UZ, 255UZ, 260UZ, 265UZ, 270UZ, 275UZ, 280UZ, 285UZ, 290UZ, 295UZ, 300UZ,
     // };
     // for (size_t n : ns) {
-    for (size_t n = 5; n <= 400UZ; n += n < 100 ? 5 : 50) {
+    for (size_t n = 10; n <= 400UZ; n += 10) {
       const auto success = run(n, args->square_benchmark ? n : 3, args->tend, out, false);
       all_success        = all_success && success;
     }
