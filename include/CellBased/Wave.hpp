@@ -65,7 +65,7 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 [[nodiscard]] constexpr auto calc_wave(const FullInterface<ActiveFloat, PointType>& interface,
                                        PassiveFloat dx,
                                        PassiveFloat dy,
-                                       [[maybe_unused]] const ActiveFloat& dt) noexcept
+                                       [[maybe_unused]] PassiveFloat dt) noexcept
     -> std::optional<std::conditional_t<orientation == FREE,
                                         FreeWave<ActiveFloat, PointType>,
                                         AxisAlignedWave<ActiveFloat, PointType, orientation>>> {
@@ -165,9 +165,9 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, typename PointType>
+template <typename ActiveFloat, typename PassiveFloat, typename PointType>
 [[nodiscard]] constexpr auto calc_wave_polygon(const FreeWave<ActiveFloat, PointType>& wave,
-                                               const ActiveFloat& dt) noexcept
+                                               PassiveFloat dt) noexcept
     -> Geometry::Polygon<PointType> {
   return Geometry::Polygon<PointType>({
       wave.begin,
@@ -183,7 +183,7 @@ template <typename ActiveFloat, typename PassiveFloat, typename PointType, Orien
 calc_wave_polygon(const AxisAlignedWave<ActiveFloat, PointType, orientation>& wave,
                   PassiveFloat dx,
                   PassiveFloat dy,
-                  const ActiveFloat& dt) noexcept -> Geometry::Polygon<PointType> {
+                  PassiveFloat dt) noexcept -> Geometry::Polygon<PointType> {
   const PointType normal =
       scale_if_grid_coord(PointType{static_cast<PassiveFloat>(orientation == X),
                                     static_cast<PassiveFloat>(orientation == Y)},

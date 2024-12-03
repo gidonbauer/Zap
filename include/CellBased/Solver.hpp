@@ -21,21 +21,21 @@ namespace Zap::CellBased {
 // -------------------------------------------------------------------------------------------------
 template <typename ActiveFloat, typename PassiveFloat>
 [[nodiscard]] constexpr auto cfl_factor(const UniformGrid<ActiveFloat, PassiveFloat>& grid) noexcept
-    -> ActiveFloat {
+    -> PassiveFloat {
   auto max = [](const auto& a, const auto& b) { return std::max(a, b); };
 
-  auto max_abs_cell_u = [](const Cell<ActiveFloat, PassiveFloat>& cell) -> ActiveFloat {
+  auto max_abs_cell_u = [](const Cell<ActiveFloat, PassiveFloat>& cell) -> PassiveFloat {
     assert(cell.is_cartesian() || cell.is_cut());
     if (cell.is_cartesian()) {
-      return std::abs(cell.get_cartesian().value);
+      return std::abs(ad::value(cell.get_cartesian().value));
     } else {
-      return std::max<PassiveFloat>(std::abs(cell.get_cut().left_value),
-                                    std::abs(cell.get_cut().right_value));
+      return std::max<PassiveFloat>(std::abs(ad::value(cell.get_cut().left_value)),
+                                    std::abs(ad::value(cell.get_cut().right_value)));
     }
   };
 
   return std::transform_reduce(
-      std::cbegin(grid.cells()), std::cend(grid.cells()), ActiveFloat{0}, max, max_abs_cell_u);
+      std::cbegin(grid.cells()), std::cend(grid.cells()), PassiveFloat{0}, max, max_abs_cell_u);
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -79,7 +79,7 @@ template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 constexpr void update_cell_by_free_wave(UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
                                         size_t cell_idx,
                                         const FreeWave<ActiveFloat, PointType>& wave,
-                                        const ActiveFloat& dt,
+                                        PassiveFloat dt,
                                         const Side translate) noexcept {
   auto& cell = next_grid[cell_idx];
 
@@ -115,7 +115,7 @@ requires(side == BOTTOM || side == RIGHT || side == TOP || side == LEFT)
 void handle_side_iterface(size_t cell_idx,
                           UniformGrid<ActiveFloat, PassiveFloat>& next_grid,
                           const UniformGrid<ActiveFloat, PassiveFloat>& curr_grid,
-                          const ActiveFloat& dt,
+                          PassiveFloat dt,
                           Side cell_on_boundary) noexcept {
   const auto& curr_cell = curr_grid[cell_idx];
   auto& next_cell       = next_grid[cell_idx];
@@ -263,10 +263,10 @@ get_internal_interface(const Cell<ActiveFloat, PassiveFloat>& cell) noexcept
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, Point2D_c PointType>
+template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 constexpr void move_wave_front(std::vector<PointType>& avg_new_shock_points,
                                const std::vector<FreeWave<ActiveFloat, PointType>>& internal_waves,
-                               const ActiveFloat& dt) noexcept {
+                               PassiveFloat dt) noexcept {
   avg_new_shock_points.clear();
   if (internal_waves.empty()) { return; }
 
@@ -403,32 +403,28 @@ template <ExtendType extend_type,
     return std::nullopt;
   }
 
-#ifdef ZAP_T_ACTIVE
-  using TimeFloat = ActiveFloat;
-#else
-  using TimeFloat = PassiveFloat;
-#endif  // ZAP_T_ACTIVE
-  for (TimeFloat t = 0.0; t < tend;) {
-    const ActiveFloat CFL_factor = cfl_factor(curr_grid);
+  for (PassiveFloat t = 0.0; t < tend;) {
+    const PassiveFloat CFL_factor = cfl_factor(curr_grid);
     if (std::isnan(CFL_factor) || std::isinf(CFL_factor)) {
       Igor::Warn("CFL_factor is invalid at time t={}: CFL_factor = {}", t, CFL_factor);
       return std::nullopt;
     }
 
-    const ActiveFloat dt = [&] {
-      ActiveFloat local_dt       = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
-      const TimeFloat missing_dt = tend - t;
-      // TODO: Is this the right way to handle the final timestep?
-      if (local_dt > missing_dt) {
-#ifdef ZAP_T_ACTIVE
-        return missing_dt;
-#else
-        ad::value(local_dt) = missing_dt;
-        if constexpr (ad::mode<ActiveFloat>::is_ad_type) { ad::derivative(local_dt) = -missing_dt; }
-#endif  // ZAP_T_ACTIVE
-      }
-      return local_dt;
-    }();
+    const PassiveFloat dt =
+        std::min(CFL_safety_factor * curr_grid.min_delta() / CFL_factor, tend - t);
+    // const ActiveFloat dt = [&] {
+    //   ActiveFloat local_dt          = CFL_safety_factor * curr_grid.min_delta() / CFL_factor;
+    //   const PassiveFloat missing_dt = tend - t;
+    //   // TODO: Is this the right way to handle the final timestep?
+    //   if (local_dt > missing_dt) {
+    //     ad::value(local_dt) = missing_dt;
+    //     if constexpr (ad::mode<ActiveFloat>::is_ad_type) { ad::derivative(local_dt) = missing_dt;
+    //     }
+    //   } else {
+    //     if constexpr (ad::mode<ActiveFloat>::is_ad_type) { ad::derivative(local_dt) *= -1; }
+    //   }
+    //   return local_dt;
+    // }();
 
     next_grid = curr_grid;
 
@@ -576,17 +572,11 @@ template <ExtendType extend_type,
 #endif  // ZAP_SERIAL
 
     // Update time
-#ifdef ZAP_T_ACTIVE
-    t += dt;
-#else
     t += ad::value(dt);
-#endif  // ZAP_T_ACTIVE
 
     curr_grid = next_grid;
 
-    if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(ad::value(t))) {
-      return std::nullopt;
-    }
+    if (!grid_writer.write_data(curr_grid) || !time_writer.write_data(t)) { return std::nullopt; }
 
 #ifdef ZAP_SINGLE_ITERATION
     break;
