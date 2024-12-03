@@ -6,13 +6,14 @@
 #define ZAP_NO_TANGENTIAL_CORRECTION
 
 // TODO: Why does this only work if t is active?
-#define ZAP_T_ACTIVE
+// #define ZAP_T_ACTIVE
 
 #include <AD/ad.hpp>
 
 #include "CellBased/Solver.hpp"
 #include "IO/IncCellWriter.hpp"
 #include "IO/IncMatrixWriter.hpp"
+#include "IO/ToNpy.hpp"
 
 #include "Igor/Logging.hpp"
 #include "Igor/Macros.hpp"
@@ -21,6 +22,8 @@
 #include "Common.hpp"
 
 #define OUTPUT_DIR IGOR_STRINGIFY(ZAP_OUTPUT_DIR) "example_x_ramp/"
+
+using namespace Zap::CellBased;
 
 // - Setup -----------------------------------------------------------------------------------------
 using PassiveFloat           = double;
@@ -37,6 +40,7 @@ struct Args {
   size_t nx             = 25;
   size_t ny             = 25;
   PassiveFloat tend     = 1.0;
+  bool dump_npy         = false;
 };
 
 // - Print usage -----------------------------------------------------------------------------------
@@ -45,7 +49,7 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   Args args{};
 
   out << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--run-benchmark] [--square-benchmark] [--nx nx] [--ny ny] [--tend tend]\n";
+      << " [--run-benchmark] [--square-benchmark] [--nx nx] [--ny ny] [--tend tend] [--dump-npy]\n";
   out << "\t--run-benchmark      Run the solver for different grid sizes and compare result "
          "against analytical solution, default is "
       << std::boolalpha << args.run_benchmark << '\n';
@@ -54,6 +58,9 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   out << "\t--nx                 Number of cells in x-direction, default is " << args.nx << '\n';
   out << "\t--ny                 Number of cells in y-direction, default is " << args.ny << '\n';
   out << "\t--tend               Final time for simulation, default is " << args.tend << '\n';
+  out << "\t--dump-npy           Write the averaged one-dimensional solution along x-axis to a "
+         ".npy file, default is "
+      << std::boolalpha << args.dump_npy << '\n';
 }
 
 // - Parse command line arguments ------------------------------------------------------------------
@@ -96,6 +103,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
         return std::nullopt;
       }
       args.tend = parse_double(*arg);
+    } else if (arg == "--dump-npy") {
+      args.dump_npy = true;
     } else if (arg == "-h"sv || arg == "--help"sv) {
       usage<Igor::detail::Level::INFO>(*prog, std::cout);
       return std::nullopt;
@@ -139,10 +148,9 @@ template <typename AT>
 }
 
 // -------------------------------------------------------------------------------------------------
-void print_shock_error(
-    const Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat>& numerical_solution,
-    PassiveFloat tend,
-    std::ostream& out) noexcept {
+void print_shock_error(const UniformGrid<ActiveFloat, PassiveFloat>& numerical_solution,
+                       PassiveFloat tend,
+                       std::ostream& out) noexcept {
   const auto final_shock = numerical_solution.get_shock_curve();
 
   const auto avg_x_shock = std::transform_reduce(std::cbegin(final_shock),
@@ -199,23 +207,20 @@ void print_shock_error(
 }
 
 // -------------------------------------------------------------------------------------------------
-void print_solution_error(
-    const Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat>& numerical_solution,
-    PassiveFloat tend,
-    size_t n,
-    std::ostream& out) noexcept {
+void print_solution_error(const UniformGrid<ActiveFloat, PassiveFloat>& numerical_solution,
+                          PassiveFloat tend,
+                          size_t n,
+                          std::ostream& out) noexcept {
 
   auto L1_func_u = [&](PassiveFloat x) -> PassiveFloat {
-    return std::abs(
-        ad::value(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})) -
-        u_eps(x, tend, PassiveFloat{0}));
+    return std::abs(ad::value(numerical_solution.eval(SimCoord<PassiveFloat>{x, 1.0})) -
+                    u_eps(x, tend, PassiveFloat{0}));
   };
   const auto L1_err_u = simpsons_rule_1d(L1_func_u, X_MIN, X_MAX, n);
 
   auto L1_func_v = [&](PassiveFloat x) -> PassiveFloat {
-    return std::abs(
-        ad::derivative(numerical_solution.eval(Zap::CellBased::SimCoord<PassiveFloat>{x, 1.0})) -
-        v(x, tend));
+    return std::abs(ad::derivative(numerical_solution.eval(SimCoord<PassiveFloat>{x, 1.0})) -
+                    v(x, tend));
   };
   const auto L1_err_v = simpsons_rule_1d(L1_func_v, X_MIN, X_MAX, n);
 
@@ -224,18 +229,66 @@ void print_solution_error(
 }
 
 // -------------------------------------------------------------------------------------------------
-[[nodiscard]] auto run(size_t nx, size_t ny, PassiveFloat tend, std::ostream& out) noexcept
+[[nodiscard]] auto dump_to_npy(const UniformGrid<ActiveFloat, PassiveFloat>& grid) noexcept
     -> bool {
-  Zap::CellBased::UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
+  const auto final_shock = grid.get_shock_curve();
+  const auto avg_x_shock = std::transform_reduce(std::cbegin(final_shock),
+                                                 std::cend(final_shock),
+                                                 PassiveFloat{0},
+                                                 std::plus<>{},
+                                                 [](const auto& p) { return ad::value(p.x); }) /
+                           static_cast<PassiveFloat>(final_shock.size());
+
+  std::vector<PassiveFloat> xs;
+  std::vector<PassiveFloat> us;
+  std::vector<PassiveFloat> vs;
+
+  for (size_t xi = 0; xi < grid.nx(); ++xi) {
+    const size_t yi = grid.ny() / 2UZ;
+
+    const auto& cell = grid[grid.to_vec_idx(xi, yi)];
+    if (cell.is_cartesian()) {
+      xs.push_back(cell.x_min<SIM_C>() + cell.dx<SIM_C>() / 2);
+      us.push_back(ad::value(cell.get_cartesian().value));
+      vs.push_back(ad::derivative(cell.get_cartesian().value));
+    } else {
+      xs.push_back((cell.x_min<SIM_C>() + avg_x_shock) / 2);
+      us.push_back(ad::value(cell.get_cut().left_value));
+      vs.push_back(ad::derivative(cell.get_cut().left_value));
+
+      xs.push_back((cell.x_min<SIM_C>() + cell.dx<SIM_C>() + avg_x_shock) / 2);
+      us.push_back(ad::value(cell.get_cut().right_value));
+      vs.push_back(ad::derivative(cell.get_cut().right_value));
+    }
+  }
+
+  constexpr auto x_file = OUTPUT_DIR "x.npy";
+  constexpr auto u_file = OUTPUT_DIR "u.npy";
+  constexpr auto v_file = OUTPUT_DIR "v.npy";
+
+  if (!Zap::IO::vector_to_npy(x_file, xs)) { return false; }
+  Igor::Info("Saved one-dimensional grid to {}", x_file);
+  if (!Zap::IO::vector_to_npy(u_file, us)) { return false; }
+  Igor::Info("Saved one-dimensional solution to {}", u_file);
+  if (!Zap::IO::vector_to_npy(v_file, vs)) { return false; }
+  Igor::Info("Saved one-dimensional derivative to {}", v_file);
+
+  return true;
+}
+
+// -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto
+run(size_t nx, size_t ny, PassiveFloat tend, std::ostream& out, bool dump_npy) noexcept -> bool {
+  UniformGrid<ActiveFloat, PassiveFloat> grid(X_MIN, X_MAX, nx, Y_MIN, Y_MAX, ny);
   grid.periodic_boundary();
 
   // if (!grid.cut_curve(init_shock)) { return false; }
   {
-    std::vector<Zap::CellBased::SimCoord<PassiveFloat>> points{
+    std::vector<SimCoord<PassiveFloat>> points{
         {(X_MAX - X_MIN) / 2, 0.0},
         {(X_MAX - X_MIN) / 2, (Y_MAX - Y_MIN) + Y_MIN},
     };
-    if (!grid.cut_piecewise_linear<Zap::CellBased::ExtendType::MAX>(points)) { return false; }
+    if (!grid.cut_piecewise_linear<ExtendType::MAX>(points)) { return false; }
   }
 
   ActiveFloat eps     = 0.0;
@@ -250,8 +303,7 @@ void print_solution_error(
   const auto t_file = OUTPUT_DIR "t_1d_" + std::to_string(nx) + "x" + std::to_string(ny) + ".mat";
   Zap::IO::IncMatrixWriter<PassiveFloat, 1, 1, 0> t_writer(t_file, 1, 1, 0);
 
-  const auto res = Zap::CellBased::solve_2d_burgers<Zap::CellBased::ExtendType::MAX>(
-      grid, tend, grid_writer, t_writer, 0.25);
+  const auto res = solve_2d_burgers<ExtendType::MAX>(grid, tend, grid_writer, t_writer, 0.25);
   if (!res.has_value()) {
     Igor::Warn("Solver for {}x{}-grid failed.", nx, ny);
     return false;
@@ -261,6 +313,10 @@ void print_solution_error(
   print_shock_error(*res, tend, out);
   print_solution_error(*res, tend, 10'000, out);
   out << "--------------------------------------------------------------------------------\n";
+
+  if (dump_npy) {
+    if (!dump_to_npy(*res)) { return false; }
+  }
 
   Igor::Info("Solver for {}x{}-grid finished successfully.", nx, ny);
   return true;
@@ -307,17 +363,17 @@ auto main(int argc, char** argv) -> int {
     // };
     // for (size_t n : ns) {
     for (size_t n = 5; n <= 400UZ; n += n < 100 ? 5 : 50) {
-      const auto success = run(n, args->square_benchmark ? n : 3, args->tend, out);
+      const auto success = run(n, args->square_benchmark ? n : 3, args->tend, out, false);
       all_success        = all_success && success;
     }
 
     Igor::Info("Saved errors to `{}`.", output_file);
     return all_success ? 0 : 1;
   } else {
-    Igor::Info("nx            = {}", args->nx);
-    Igor::Info("ny            = {}", args->ny);
+    Igor::Info("nx               = {}", args->nx);
+    Igor::Info("ny               = {}", args->ny);
 
-    const auto success = run(args->nx, args->ny, args->tend, std::cout);
+    const auto success = run(args->nx, args->ny, args->tend, std::cout, args->dump_npy);
     return success ? 0 : 1;
   }
 }
