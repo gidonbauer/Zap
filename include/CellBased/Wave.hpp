@@ -73,15 +73,17 @@ requires(orientation == X || orientation == Y || orientation == FREE)
 
   const ActiveFloat wave = interface.right_value - interface.left_value;  // As in LeVeque Book
 
-  if (interface.left_value < -EPS<PassiveFloat>() && EPS<PassiveFloat>() < interface.right_value) {
-    Igor::Debug("u_L = {}", interface.left_value);
-    Igor::Debug("u_R = {}", interface.right_value);
-    Igor::Warn("TODO: Apply Entropy Fix: LeVeque, Finite Volume Methods for Hyperbolic Problems, "
-               "Chapter 12.3.");
-    // Igor::Todo(
-    //     "Apply Entropy Fix: LeVeque, Finite Volume Methods for Hyperbolic Problems,
-    //     Chapter 12.3.");
-  }
+  // if (interface.left_value < -EPS<PassiveFloat>() && EPS<PassiveFloat>() < interface.right_value)
+  // {
+  //   Igor::Debug("u_L = {}", interface.left_value);
+  //   Igor::Debug("u_R = {}", interface.right_value);
+  //   Igor::Warn("TODO: Apply Entropy Fix: LeVeque, Finite Volume Methods for Hyperbolic Problems,
+  //   "
+  //              "Chapter 12.3.");
+  //   // Igor::Todo(
+  //   //     "Apply Entropy Fix: LeVeque, Finite Volume Methods for Hyperbolic Problems,
+  //   //     Chapter 12.3.");
+  // }
 
   // - Axis aligned wave ---------------------------------------------------------------------------
   if constexpr (orientation == X || orientation == Y) {

@@ -9,6 +9,7 @@ set(executables
         test_wave
         test_internal_wave
         test_periodic_boundary
+        test_quadrature
 )
 
 include(GoogleTest)
