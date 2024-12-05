@@ -4,6 +4,8 @@
 #include <cmath>
 #include <numeric>
 
+#include <AD/ad.hpp>
+
 #include "CellBased/Geometry.hpp"
 #include "CellBased/QuadratureTables.hpp"
 
@@ -21,53 +23,64 @@ quadrature_four_corners(FUNC f, const Geometry::Polygon<PointType>& domain) noex
       std::is_same_v<decltype(std::declval<PointType>().x), decltype(std::declval<PointType>().y)>,
       "Expect x- and y-component of PointType to have the same type.");
 
-  using Float = decltype(std::declval<PointType>().x);
+  using ActiveFloat  = decltype(std::declval<PointType>().x);
+  using PassiveFloat = std::conditional_t<ad::mode<ActiveFloat>::is_ad_type,
+                                          typename ad::mode<ActiveFloat>::passive_t,
+                                          ActiveFloat>;
 
   IGOR_ASSERT(domain.size() == 4UZ, "Domain has to have exactly four corners.");
 
-  constexpr auto& gauss_points  = detail::gauss_points_table<Float>[N - 1UZ];
-  constexpr auto& gauss_weights = detail::gauss_weights_table<Float>[N - 1UZ];
+  constexpr auto& gauss_points  = detail::gauss_points_table<PassiveFloat>[N - 1UZ];
+  constexpr auto& gauss_weights = detail::gauss_weights_table<PassiveFloat>[N - 1UZ];
   static_assert(gauss_points.size() == gauss_weights.size(),
                 "Weights and points must have the same size.");
   static_assert(gauss_points.size() == N, "Number of weights and points must be equal to N.");
-  static_assert(
-      approx_eq(std::reduce(gauss_weights.cbegin(), gauss_weights.cend()), static_cast<Float>(2)),
-      "Weights must add up to 2.");
+  static_assert(approx_eq(std::reduce(gauss_weights.cbegin(), gauss_weights.cend()),
+                          static_cast<PassiveFloat>(2)),
+                "Weights must add up to 2.");
 
   // Jacobian matrix of coordinate transform
   // J11
-  auto dxdxi = [&domain](Float eta) {
+  auto dxdxi = [&domain](PassiveFloat eta) -> ActiveFloat {
     return 1.0 / 4.0 *
            ((domain[1].x - domain[0].x) * (1 - eta) + (domain[2].x - domain[3].x) * (1 + eta));
   };
   // J12
-  auto dydxi = [&domain](Float eta) {
+  auto dydxi = [&domain](PassiveFloat eta) -> ActiveFloat {
     return 1.0 / 4.0 *
            ((domain[1].y - domain[0].y) * (1 - eta) + (domain[2].y - domain[3].y) * (1 + eta));
   };
   // J21
-  auto dxdeta = [&domain](Float xi) {
+  auto dxdeta = [&domain](PassiveFloat xi) -> ActiveFloat {
     return 1.0 / 4.0 *
            ((domain[3].x - domain[0].x) * (1 - xi) + (domain[2].x - domain[1].x) * (1 + xi));
   };
   // J22
-  auto dydeta = [&domain](Float xi) {
+  auto dydeta = [&domain](PassiveFloat xi) -> ActiveFloat {
     return 1.0 / 4.0 *
            ((domain[3].y - domain[0].y) * (1 - xi) + (domain[2].y - domain[1].y) * (1 + xi));
   };
 
-  auto abs_det_J = [&](Float xi, Float eta) {
+  auto abs_det_J = [&](PassiveFloat xi, PassiveFloat eta) -> ActiveFloat {
     return std::abs(dxdxi(eta) * dydeta(xi) - dydxi(eta) * dxdeta(xi));
   };
 
-  constexpr std::array<Float (*)(Float, Float), 4UZ> psi = {
-      [](Float xi, Float eta) -> Float { return (1.0 / 4.0) * (1.0 - xi) * (1.0 - eta); },
-      [](Float xi, Float eta) -> Float { return (1.0 / 4.0) * (1.0 + xi) * (1.0 - eta); },
-      [](Float xi, Float eta) -> Float { return (1.0 / 4.0) * (1.0 + xi) * (1.0 + eta); },
-      [](Float xi, Float eta) -> Float { return (1.0 / 4.0) * (1.0 - xi) * (1.0 + eta); },
+  constexpr std::array<PassiveFloat (*)(PassiveFloat, PassiveFloat), 4UZ> psi = {
+      [](PassiveFloat xi, PassiveFloat eta) -> PassiveFloat {
+        return (1.0 / 4.0) * (1.0 - xi) * (1.0 - eta);
+      },
+      [](PassiveFloat xi, PassiveFloat eta) -> PassiveFloat {
+        return (1.0 / 4.0) * (1.0 + xi) * (1.0 - eta);
+      },
+      [](PassiveFloat xi, PassiveFloat eta) -> PassiveFloat {
+        return (1.0 / 4.0) * (1.0 + xi) * (1.0 + eta);
+      },
+      [](PassiveFloat xi, PassiveFloat eta) -> PassiveFloat {
+        return (1.0 / 4.0) * (1.0 - xi) * (1.0 + eta);
+      },
   };
 
-  auto integral = static_cast<Float>(0);
+  auto integral = static_cast<ActiveFloat>(0);
   for (size_t xidx = 0; xidx < gauss_points.size(); ++xidx) {
     for (size_t yidx = 0; yidx < gauss_points.size(); ++yidx) {
       const auto xi  = gauss_points[xidx];
@@ -75,8 +88,8 @@ quadrature_four_corners(FUNC f, const Geometry::Polygon<PointType>& domain) noex
       const auto eta = gauss_points[yidx];
       const auto wy  = gauss_weights[yidx];
 
-      auto x = static_cast<Float>(0);
-      auto y = static_cast<Float>(0);
+      auto x = static_cast<ActiveFloat>(0);
+      auto y = static_cast<ActiveFloat>(0);
       for (size_t i = 0; i < psi.size(); ++i) {
         x += psi[i](xi, eta) * domain[i].x;
         y += psi[i](xi, eta) * domain[i].y;
