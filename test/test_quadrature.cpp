@@ -2,22 +2,22 @@
 
 #include <numbers>
 
-// #define ZAP_QUAD_2
 #include "CellBased/Definitions.hpp"
 #include "CellBased/Grid.hpp"
 #include "CellBased/Quadrature.hpp"
 
 using namespace Zap::CellBased;
 
-using Float     = double;
-using PointType = GenCoord<Float>;
+using Float        = double;
+using PointType    = GenCoord<Float>;
+constexpr size_t N = 15UZ;
 
 // -------------------------------------------------------------------------------------------------
 TEST(Quadrature, UnitSquare) {
   Geometry::Polygon<PointType> polygon({{-1.0, -1.0}, {-1.0, 1.0}, {1.0, 1.0}, {1.0, -1.0}});
   auto f = [](Float x, Float y) { return x * x * y * y; };
 
-  const auto integral = quadrature(f, polygon);
+  const auto integral = quadrature<N>(f, polygon);
   static_assert(std::is_same_v<decltype(integral), const double>);
 
   EXPECT_NEAR(integral, 4.0 / 9.0, EPS<Float>());
@@ -32,10 +32,39 @@ TEST(Quadrature, TranslatedUnitSquare) {
     return x * x * y * y;
   };
 
-  const auto integral = quadrature(f, polygon);
+  const auto integral = quadrature<N>(f, polygon);
   static_assert(std::is_same_v<decltype(integral), const double>);
 
   EXPECT_NEAR(integral, 4.0 / 9.0, EPS<Float>());
+}
+
+// -------------------------------------------------------------------------------------------------
+TEST(Quadrature, TranslatedScaledSquare) {
+  Geometry::Polygon<PointType> polygon({{1.0, 3.0}, {1.0, 7.0}, {10.0, 7.0}, {10.0, 3.0}});
+  auto f = [](Float x, Float y) -> Float { return std::sin(x) + std::exp(-y); };
+
+  const auto integral = quadrature<N>(f, polygon);
+  static_assert(std::is_same_v<decltype(integral), const double>);
+  const Float expected_integral =
+      -4 * std::cos(10.0) + 4 * std::cos(1.0) - 9 * (std::exp(-7.0) - std::exp(-3.0));
+
+  EXPECT_NEAR(integral, expected_integral, EPS<Float>());
+}
+
+// -------------------------------------------------------------------------------------------------
+TEST(Quadrature, Quadrilateral) {
+  const Geometry::Polygon<PointType> polygon({{1.0, 0.5}, {5.0, 0.5}, {5.0, 2.0}, {1.0, 3.0}});
+  auto f = [](Float x, Float y) -> Float { return std::sin(x) + std::exp(-y); };
+
+  const auto integral = quadrature<N>(f, polygon);
+  static_assert(std::is_same_v<decltype(integral), const double>);
+  // From Wolfram Alpha
+  const Float expected_integral =
+      4.0 / std::pow(std::numbers::e_v<Float>, 3.0) -
+      4.0 / std::pow(std::numbers::e_v<Float>, 2.0) + 4.0 / std::sqrt(std::numbers::e_v<Float>) +
+      1.0 / 4.0 * (std::sin(1.0) - std::sin(5.0) + 10.0 * std::cos(1.0) - 6.0 * std::cos(5.0));
+
+  EXPECT_NEAR(integral, expected_integral, EPS<Float>());
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -49,7 +78,7 @@ TEST(Quadrature, FourPointsArea) {
     });
     auto f = [](Float /*x*/, Float /*y*/) { return static_cast<Float>(1); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     static_assert(std::is_same_v<decltype(integral), const double>);
 
     EXPECT_NEAR(integral, polygon.area(), EPS<Float>());
@@ -64,7 +93,7 @@ TEST(Quadrature, FourPointsArea) {
     });
     auto f = [](Float /*x*/, Float /*y*/) { return static_cast<Float>(1); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     static_assert(std::is_same_v<decltype(integral), const double>);
 
     EXPECT_NEAR(integral, polygon.area(), EPS<Float>());
@@ -81,7 +110,7 @@ TEST(Quadrature, TriangleArea) {
     });
     auto f = [](Float /*x*/, Float /*y*/) { return static_cast<Float>(1); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     static_assert(std::is_same_v<decltype(integral), const double>);
 
     EXPECT_NEAR(integral, polygon.area(), EPS<Float>());
@@ -100,7 +129,7 @@ TEST(Quadrature, PentagonArea) {
     });
     auto f = [](Float /*x*/, Float /*y*/) { return static_cast<Float>(1); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     static_assert(std::is_same_v<decltype(integral), const double>);
 
     EXPECT_NEAR(integral, polygon.area(), EPS<Float>());
@@ -132,19 +161,19 @@ TEST(Quadrature, GridCellArea) {
   for (const auto& cell : grid) {
     if (cell.is_cartesian()) {
       const auto polygon  = cell.get_cartesian_polygon<SIM_C>();
-      const auto integral = quadrature(f, polygon);
+      const auto integral = quadrature<N>(f, polygon);
       const auto area     = polygon.area();
       EXPECT_NEAR(integral, area, EPS<Float>());
     } else {
       {
         const auto polygon  = cell.get_cut_left_polygon<SIM_C>();
-        const auto integral = quadrature(f, polygon);
+        const auto integral = quadrature<N>(f, polygon);
         const auto area     = polygon.area();
         EXPECT_NEAR(integral, area, EPS<Float>());
       }
       {
         const auto polygon  = cell.get_cut_right_polygon<SIM_C>();
-        const auto integral = quadrature(f, polygon);
+        const auto integral = quadrature<N>(f, polygon);
         const auto area     = polygon.area();
         EXPECT_NEAR(integral, area, EPS<Float>());
       }
@@ -163,9 +192,9 @@ TEST(Quadrature, IntegrateOverPentagon) {
 
     auto f = [](Float x, Float y) -> Float { return std::sin(x) + std::exp(-y); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     // From scipy dblquad
-    constexpr auto expected_integral = static_cast<Float>(7.229971054944182);
+    constexpr auto expected_integral = static_cast<Float>(0.4975755788114332);
 
     EXPECT_NEAR(integral, expected_integral, EPS<Float>());
   }
@@ -180,9 +209,9 @@ TEST(Quadrature, IntegrateOverPentagon) {
 
     auto f = [](Float x, Float y) -> Float { return std::sin(x) + std::exp(-y); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     // From scipy dblquad
-    constexpr auto expected_integral = static_cast<Float>(34.710327710602606);
+    constexpr auto expected_integral = static_cast<Float>(19.6588273896563095);
 
     EXPECT_NEAR(integral, expected_integral, EPS<Float>());
   }
@@ -198,9 +227,9 @@ TEST(Quadrature, IntegrateOverPentagon) {
 
     auto f = [](Float x, Float y) -> Float { return std::sin(x) + std::exp(-y); };
 
-    const auto integral = quadrature(f, polygon);
+    const auto integral = quadrature<N>(f, polygon);
     // From scipy dblquad
-    constexpr auto expected_integral = static_cast<Float>(37.7994083154342064);
+    constexpr auto expected_integral = static_cast<Float>(64.2509552141199833);
 
     EXPECT_NEAR(integral, expected_integral, EPS<Float>());
   }
