@@ -7,6 +7,27 @@
 using namespace Zap::CellBased;
 
 // =================================================================================================
+TEST(GridHelper, ApproxEq) {
+  EXPECT_TRUE(approx_eq(3.0, 3.0 + EPS<double>() / 2.0));
+  EXPECT_TRUE(approx_eq(3.0 + EPS<double>() / 2.0, 3.0));
+
+  EXPECT_TRUE(approx_eq(3.0, 3.0 + EPS<double>()));
+  EXPECT_TRUE(approx_eq(3.0 + EPS<double>(), 3.0));
+
+  EXPECT_FALSE(approx_eq(3.0, 3.0 + 2.0 * EPS<double>()));
+  EXPECT_FALSE(approx_eq(3.0 + 2.0 * EPS<double>(), 3.0));
+
+  EXPECT_TRUE(approx_eq(-3.0, -3.0 + EPS<double>()));
+  EXPECT_TRUE(approx_eq(-3.0 + EPS<double>(), -3.0));
+
+  EXPECT_TRUE(approx_eq(-3.0, -3.0 + EPS<double>() / 2.0));
+  EXPECT_TRUE(approx_eq(-3.0 + EPS<double>() / 2.0, -3.0));
+
+  EXPECT_FALSE(approx_eq(-3.0, -3.0 + 2.0 * EPS<double>()));
+  EXPECT_FALSE(approx_eq(-3.0 + 2.0 * EPS<double>(), -3.0));
+}
+
+// =================================================================================================
 TEST(CutGrid, CurveQuarterCircle) {
   using Float = double;
 
