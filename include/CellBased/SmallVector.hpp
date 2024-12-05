@@ -1,15 +1,20 @@
 #ifndef ZAP_CELL_BASED_SMALL_VECTOR_HPP_
 #define ZAP_CELL_BASED_SMALL_VECTOR_HPP_
 
-// TODO: Replace by Igor::StaticVector
-
+#ifdef ZAP_STANDALONE_SMALL_VECTOR
 #include <array>
 #include <initializer_list>
+#endif  // ZAP_STANDALONE_SMALL_VECTOR
+
 #ifdef ZAP_SMALL_VECTOR_CAPACITY
 #include <type_traits>
 #endif  // ZAP_SMALL_VECTOR_CAPACITY
 
+#ifdef ZAP_STANDALONE_SMALL_VECTOR
 #include "Igor/Logging.hpp"
+#else
+#include "Igor/StaticVector.hpp"
+#endif  // ZAP_STANDALONE_SMALL_VECTOR
 
 namespace Zap::CellBased {
 
@@ -21,6 +26,13 @@ static_assert(std::is_convertible_v<decltype(ZAP_SMALL_VECTOR_CAPACITY), size_t>
 constexpr size_t SMALL_VECTOR_CAPACITY = ZAP_SMALL_VECTOR_CAPACITY;
 #endif  // ZAP_SMALL_VECTOR_CAPACITY
 
+#ifndef ZAP_STANDALONE_SMALL_VECTOR
+
+// TODO: Replace SmallVector completely by Igor::StaticVector
+template <typename Element>
+using SmallVector = Igor::StaticVector<Element, SMALL_VECTOR_CAPACITY>;
+
+#else
 template <typename Element>
 class SmallVector {
   std::array<Element, SMALL_VECTOR_CAPACITY> m_data{};
@@ -167,6 +179,7 @@ class SmallVector {
     return std::next(crbegin(), static_cast<difference_type>(m_size));
   }
 };
+#endif
 
 }  // namespace Zap::CellBased
 
