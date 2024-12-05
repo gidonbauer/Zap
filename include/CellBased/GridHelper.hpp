@@ -6,12 +6,6 @@
 
 namespace Zap::CellBased {
 
-template <typename Float>
-[[nodiscard]] constexpr auto approx_eq(Float a, Float b, Float tol = EPS<Float>()) noexcept
-    -> bool {
-  return std::abs(a - b) <= tol;
-};
-
 template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto point_on_boundary(const PointType& p,
                                                const Cell<ActiveFloat, PassiveFloat>& cell)

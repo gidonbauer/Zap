@@ -57,6 +57,13 @@ requires mp::is_number<Float>::value
   return mp::sqrt(std::numeric_limits<Float>::epsilon());
 }
 
+// - Check if two floating point values are approximately equal ------------------------------------
+template <typename Float>
+[[nodiscard]] constexpr auto approx_eq(Float a, Float b, Float tol = EPS<Float>()) noexcept
+    -> bool {
+  return a >= b ? (a - b <= tol) : (b - a <= tol);
+};
+
 // - Sign function ---------------------------------------------------------------------------------
 template <typename T>
 [[nodiscard]] constexpr auto sign(const T& x) noexcept -> T {
