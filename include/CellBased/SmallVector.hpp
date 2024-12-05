@@ -144,6 +144,28 @@ class SmallVector {
   [[nodiscard]] constexpr auto cend() const noexcept {
     return std::next(m_data.cbegin(), static_cast<difference_type>(m_size));
   }
+
+  [[nodiscard]] constexpr auto rbegin() noexcept {
+    return std::next(m_data.rbegin(), static_cast<difference_type>(SMALL_VECTOR_CAPACITY - m_size));
+  }
+  [[nodiscard]] constexpr auto rbegin() const noexcept {
+    return std::next(m_data.crbegin(),
+                     static_cast<difference_type>(SMALL_VECTOR_CAPACITY - m_size));
+  }
+  [[nodiscard]] constexpr auto crbegin() const noexcept {
+    return std::next(m_data.crbegin(),
+                     static_cast<difference_type>(SMALL_VECTOR_CAPACITY - m_size));
+  }
+
+  [[nodiscard]] constexpr auto rend() noexcept {
+    return std::next(rbegin(), static_cast<difference_type>(m_size));
+  }
+  [[nodiscard]] constexpr auto rend() const noexcept {
+    return std::next(crbegin(), static_cast<difference_type>(m_size));
+  }
+  [[nodiscard]] constexpr auto crend() const noexcept {
+    return std::next(crbegin(), static_cast<difference_type>(m_size));
+  }
 };
 
 }  // namespace Zap::CellBased
