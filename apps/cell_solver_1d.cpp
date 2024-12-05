@@ -249,7 +249,7 @@ auto main(int argc, char** argv) -> int {
   IGOR_TIME_SCOPE("Cutting the grid") {
     if (!grid.cut_curve(init_shock)) { return 1; }
   }
-  grid.fill_four_point(u0);
+  grid.fill_quad(u0);
 
   constexpr auto u_file = OUTPUT_DIR "u.grid";
   constexpr auto v_file = OUTPUT_DIR "v.grid";

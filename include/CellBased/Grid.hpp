@@ -1,11 +1,10 @@
 #ifndef ZAP_CELL_BASED_GRID_HPP_
 #define ZAP_CELL_BASED_GRID_HPP_
 
-#include <bit>
-
 #include "CellBased/Cell.hpp"
 #include "CellBased/Definitions.hpp"
 #include "CellBased/GridHelper.hpp"
+#include "CellBased/Quadrature.hpp"
 
 #include "Igor/TypeName.hpp"
 
@@ -266,6 +265,31 @@ class UniformGrid {
         }
       } else {
         Igor::Panic("Unknown cell type with variant index {}.", cell.cell_type.index());
+      }
+    }
+  }
+
+  // -----------------------------------------------------------------------------------------------
+  template <size_t N = 15UZ, typename FUNC>
+  constexpr void fill_quad(FUNC f) noexcept {
+    for (auto& cell : m_cells) {
+      if (cell.is_cartesian()) {
+        const auto polygon         = cell.template get_cartesian_polygon<SIM_C>();
+        const auto integral        = quadrature<N>(f, polygon);
+        cell.get_cartesian().value = integral / polygon.area();
+      } else {
+        // Left subcell
+        {
+          const auto polygon        = cell.template get_cut_left_polygon<SIM_C>();
+          const auto integral       = quadrature<N>(f, polygon);
+          cell.get_cut().left_value = integral / polygon.area();
+        }
+        // Right subcell
+        {
+          const auto polygon         = cell.template get_cut_right_polygon<SIM_C>();
+          const auto integral        = quadrature<N>(f, polygon);
+          cell.get_cut().right_value = integral / polygon.area();
+        }
       }
     }
   }

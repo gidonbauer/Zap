@@ -57,7 +57,7 @@ auto run_cell_based(size_t nx, size_t ny, Float tend, Float CFL_safety_factor) n
 
   grid.periodic_boundary();
   if (!grid.cut_curve(init_shock)) { return std::nullopt; }
-  grid.fill_four_point(u0);
+  grid.fill_quad(u0);
 
   NoopWriter u_writer;
   NoopWriter t_writer;
