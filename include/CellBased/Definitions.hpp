@@ -1,6 +1,7 @@
 #ifndef ZAP_CELL_BASED_DEFINITIONS_HPP_
 #define ZAP_CELL_BASED_DEFINITIONS_HPP_
 
+#include <bit>
 #include <concepts>
 #include <cstddef>
 
