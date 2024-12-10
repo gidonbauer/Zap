@@ -65,6 +65,7 @@ quadrature_four_corners(FUNC f, const Geometry::Polygon<PointType>& domain) noex
     return std::abs(dxdxi(eta) * dydeta(xi) - dydxi(eta) * dxdeta(xi));
   };
 
+  // Shape functions
   constexpr std::array<PassiveFloat (*)(PassiveFloat, PassiveFloat), 4UZ> psi = {
       [](PassiveFloat xi, PassiveFloat eta) -> PassiveFloat {
         return (1.0 / 4.0) * (1.0 - xi) * (1.0 - eta);
