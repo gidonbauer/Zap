@@ -7,7 +7,7 @@
 
 namespace Zap::CellBased::detail {
 
-// Tables taken from: https://pomax.github.io/bezierinfo/legendre-gauss.html#n64
+// Tables taken from: https://pomax.github.io/bezierinfo/legendre-gauss.html
 
 inline constexpr size_t MAX_QUAD_N = 64UZ;
 
