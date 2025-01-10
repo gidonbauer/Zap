@@ -8,6 +8,7 @@
 #include <omp.h>
 
 #include "Igor/Logging.hpp"
+#include "Igor/Math.hpp"
 
 namespace Zap::CellBased {
 
@@ -41,7 +42,7 @@ struct Chunk {
   auto opt_val                       = calc_val(opt_pair);
 
   const auto upper_bound =
-      static_cast<size_t>(std::floor(std::sqrt(static_cast<double>(nt_target))));
+      static_cast<size_t>(Igor::constexpr_sqrt(static_cast<double>(nt_target)));
   for (size_t lower = 2; lower <= upper_bound; ++lower) {
     if (nt_target % lower == 0) {
       const std::pair<size_t, size_t> p = {lower, nt_target / lower};
