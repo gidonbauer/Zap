@@ -25,7 +25,7 @@ template <typename ActiveFloat, typename PassiveFloat>
   auto max = [](const auto& a, const auto& b) { return std::max(a, b); };
 
   auto max_abs_cell_u = [](const Cell<ActiveFloat, PassiveFloat>& cell) -> PassiveFloat {
-    assert(cell.is_cartesian() || cell.is_cut());
+    IGOR_ASSERT(cell.is_cartesian() || cell.is_cut(), "Invalid cell type.");
     if (cell.is_cartesian()) {
       return std::abs(ad::value(cell.get_cartesian().value));
     } else {
@@ -56,7 +56,7 @@ constexpr void update_value_by_overlap(ActiveFloat& value,
   // clang-format on
 
   const auto cell_area = cell_polygon.area();
-  assert(cell_area > 0 || std::abs(cell_area) <= EPS<ActiveFloat>());
+  IGOR_ASSERT(cell_area > 0 || std::abs(cell_area) <= EPS<ActiveFloat>(), "Negative cell area.");
   if (std::abs(cell_area) <= EPS<ActiveFloat>()) { return; }
 
   const auto intersect_area = (cell_polygon & wave_polygon).area();
@@ -250,7 +250,7 @@ template <typename ActiveFloat, typename PassiveFloat, Point2D_c PointType>
 [[nodiscard]] constexpr auto
 get_internal_interface(const Cell<ActiveFloat, PassiveFloat>& cell) noexcept
     -> FullInterface<ActiveFloat, PointType> {
-  assert(cell.is_cut());
+  IGOR_ASSERT(cell.is_cut(), "Expected cut cell.");
 
   constexpr CoordType coord_type = PointType2CoordType<PointType>;
 
@@ -300,8 +300,8 @@ void recalculate_cut_cell_values(UniformGrid<ActiveFloat, PassiveFloat>& next_gr
   for (size_t new_cut_idx : next_grid.cut_cell_idxs()) {
     auto& next_cell       = next_grid[new_cut_idx];
     const auto& curr_cell = curr_grid[new_cut_idx];
-    assert(next_cell.is_cut());
-    assert(curr_cell.is_cartesian() || curr_cell.is_cut());
+    IGOR_ASSERT(next_cell.is_cut(), "Expected cut cell.");
+    IGOR_ASSERT(curr_cell.is_cartesian() || curr_cell.is_cut(), "Invalid cell type.");
 
     if (curr_cell.is_cut()) {
       const auto curr_cell_left_polygon  = curr_cell.template get_cut_left_polygon<GRID_C>();
@@ -310,8 +310,9 @@ void recalculate_cut_cell_values(UniformGrid<ActiveFloat, PassiveFloat>& next_gr
       // Left subcell
       {
         const auto next_subcell_polygon = next_cell.template get_cut_left_polygon<GRID_C>();
-        assert(next_subcell_polygon.area() > 0 ||
-               std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>());
+        IGOR_ASSERT(next_subcell_polygon.area() > 0 ||
+                        std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>(),
+                    "Negative cell area.");
         if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>()) {
           const auto left_intersect_area  = (next_subcell_polygon & curr_cell_left_polygon).area();
           const auto right_intersect_area = (next_subcell_polygon & curr_cell_right_polygon).area();
@@ -335,13 +336,15 @@ void recalculate_cut_cell_values(UniformGrid<ActiveFloat, PassiveFloat>& next_gr
       // Right subcell
       {
         const auto next_subcell_polygon = next_cell.template get_cut_right_polygon<GRID_C>();
-        assert(next_subcell_polygon.area() > 0 ||
-               std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>());
+        IGOR_ASSERT(next_subcell_polygon.area() > 0 ||
+                        std::abs(next_subcell_polygon.area()) <= EPS<PassiveFloat>(),
+                    "Negative cell area.");
         if (std::abs(next_subcell_polygon.area()) > EPS<PassiveFloat>()) {
           const auto left_intersect_area  = (next_subcell_polygon & curr_cell_left_polygon).area();
           const auto right_intersect_area = (next_subcell_polygon & curr_cell_right_polygon).area();
-          assert(std::abs(left_intersect_area + right_intersect_area -
-                          next_subcell_polygon.area()) < 1e-6);
+          IGOR_ASSERT(std::abs(left_intersect_area + right_intersect_area -
+                               next_subcell_polygon.area()) < 1e-6,
+                      "Sum of subcell areas does not match area of entire cell.");
 
           next_cell.get_cut().right_value =
               (curr_cell.get_cut().left_value * left_intersect_area +
@@ -481,10 +484,10 @@ template <ExtendType extend_type,
     // = Handle outer interfaces: LEFT, RIGHT, BOTTOM, and TOP ===================================
 
     // = Handle internal interface ===============================================================
-    assert(curr_grid.cut_cell_idxs().size() == internal_waves.size());
+    IGOR_ASSERT(curr_grid.cut_cell_idxs().size() == internal_waves.size(), "");
     for (size_t i = 0; i < internal_waves.size(); ++i) {
       const auto cell_idx = curr_grid.cut_cell_idxs()[i];
-      assert(curr_grid[cell_idx].is_cut());
+      IGOR_ASSERT(curr_grid[cell_idx].is_cut(), "Expected cut cell.");
 
       const auto& internal_wave   = internal_waves[i];
       const auto cell_neighbours  = curr_grid.get_neighbours(cell_idx);

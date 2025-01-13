@@ -26,8 +26,8 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")            # Disable -DNDEBUG flag because I want to keep assertions
-set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")  # Disable -DNDEBUG flag because I want to keep assertions
+# set(CMAKE_CXX_FLAGS_RELEASE "-O3")            # Disable -DNDEBUG flag because I want to keep assertions
+# set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -g")  # Disable -DNDEBUG flag because I want to keep assertions
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-fsanitize=address,undefined,leak -O0)
@@ -84,4 +84,22 @@ if (ZAP_BUILD_TESTS)
     message(STATUS "Build tests")
     
     add_subdirectory(${CMAKE_SOURCE_DIR}/test/)
+endif()
+
+option(ZAP_BUILD_BENCHMARKS "Build benchmarks" ON)
+if (ZAP_BUILD_BENCHMARKS)
+    set(BENCHMARK_ENABLE_TESTING OFF)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF)
+    set(BENCHMARK_USE_BUNDLED_GTEST OFF)
+    set(BENCHMARK_INSTALL_DOCS OFF)
+    FetchContent_Declare(
+        benchmark
+        GIT_REPOSITORY https://github.com/google/benchmark.git
+        GIT_TAG        main
+    )
+    FetchContent_MakeAvailable(benchmark)
+
+    message(STATUS "Build tests")
+    
+    add_subdirectory(${CMAKE_SOURCE_DIR}/bench/)
 endif()

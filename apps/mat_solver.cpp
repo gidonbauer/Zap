@@ -1,3 +1,4 @@
+#include <cassert>
 #include <filesystem>
 
 #include "IO/IncMatrixWriter.hpp"

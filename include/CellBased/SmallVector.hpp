@@ -19,7 +19,7 @@
 namespace Zap::CellBased {
 
 #ifndef ZAP_SMALL_VECTOR_CAPACITY
-constexpr size_t SMALL_VECTOR_CAPACITY = 16;
+constexpr size_t SMALL_VECTOR_CAPACITY = 8;
 #else
 static_assert(std::is_convertible_v<decltype(ZAP_SMALL_VECTOR_CAPACITY), size_t>,
               "ZAP_SMALL_VECTOR_CAPACITY must be a value that can be convertible to size_t.");

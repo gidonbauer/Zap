@@ -1,7 +1,6 @@
 #ifndef ZAP_CELL_BASED_CELL_HPP_
 #define ZAP_CELL_BASED_CELL_HPP_
 
-#include <cassert>
 #include <cstddef>
 #include <iostream>
 #include <limits>
@@ -103,7 +102,7 @@ struct Cell {
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto cut_entry() const noexcept
       -> CoordType2PointType<ActiveFloat, COORD_TYPE> {
-    assert(is_cut());
+    IGOR_ASSERT(is_cut(), "Expected cut cell.");
 
     return CoordType2PointType<ActiveFloat, COORD_TYPE>{
         get_cut().rel_cut_entry.x * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
@@ -114,7 +113,7 @@ struct Cell {
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto cut_exit() const noexcept
       -> CoordType2PointType<ActiveFloat, COORD_TYPE> {
-    assert(is_cut());
+    IGOR_ASSERT(is_cut(), "Expected cut cell.");
 
     return CoordType2PointType<ActiveFloat, COORD_TYPE>{
         get_cut().rel_cut_exit.x * dx<COORD_TYPE>() + x_min<COORD_TYPE>(),
@@ -130,20 +129,20 @@ struct Cell {
     return std::holds_alternative<CutValue<ActiveFloat>>(cell_type);
   }
   [[nodiscard]] constexpr auto get_cartesian() noexcept -> CartesianValue<ActiveFloat>& {
-    assert(is_cartesian());
+    IGOR_ASSERT(is_cartesian(), "Expected cartesian cell.");
     return std::get<CartesianValue<ActiveFloat>>(cell_type);
   }
   [[nodiscard]] constexpr auto get_cartesian() const noexcept
       -> const CartesianValue<ActiveFloat>& {
-    assert(is_cartesian());
+    IGOR_ASSERT(is_cartesian(), "Expected cartesian cell.");
     return std::get<CartesianValue<ActiveFloat>>(cell_type);
   }
   [[nodiscard]] constexpr auto get_cut() noexcept -> CutValue<ActiveFloat>& {
-    assert(is_cut());
+    IGOR_ASSERT(is_cut(), "Expected cut cell.");
     return std::get<CutValue<ActiveFloat>>(cell_type);
   }
   [[nodiscard]] constexpr auto get_cut() const noexcept -> const CutValue<ActiveFloat>& {
-    assert(is_cut());
+    IGOR_ASSERT(is_cut(), "Expected cut cell.");
     return std::get<CutValue<ActiveFloat>>(cell_type);
   }
 
@@ -158,7 +157,7 @@ struct Cell {
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cut_left_polygon() const noexcept
       -> Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
-    assert(is_cut());
+    IGOR_ASSERT(is_cut(), "Expected cut cell.");
     return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{
         get_left_points<COORD_TYPE>()};
   }
@@ -166,7 +165,7 @@ struct Cell {
   template <CoordType COORD_TYPE>
   [[nodiscard]] constexpr auto get_cut_right_polygon() const noexcept
       -> Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>> {
-    assert(is_cut());
+    IGOR_ASSERT(is_cut(), "Expected cut cell.");
     return Geometry::Polygon<CoordType2PointType<ActiveFloat, COORD_TYPE>>{
         get_right_points<COORD_TYPE>()};
   }

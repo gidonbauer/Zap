@@ -52,16 +52,12 @@ class StaticVector {
 
   constexpr StaticVector(size_t size) noexcept
       : m_size(size) {
-    if (size > CAPACITY) {
-      Igor::Panic("Size {} is greater than capacity {}.", size, CAPACITY);
-    }
+    if (size > CAPACITY) { Igor::Panic("Size {} is greater than capacity {}.", size, CAPACITY); }
   }
 
   constexpr StaticVector(size_t size, Element value) noexcept
       : m_size(size) {
-    if (size > CAPACITY) {
-      Igor::Panic("Size {} is greater than capacity {}.", size, CAPACITY);
-    }
+    if (size > CAPACITY) { Igor::Panic("Size {} is greater than capacity {}.", size, CAPACITY); }
     std::fill(begin(), end(), value);
   }
 
@@ -96,8 +92,8 @@ class StaticVector {
   }
 
   template <size_t OTHER_CAPACITY>
-  constexpr auto
-  operator=(const StaticVector<Element, OTHER_CAPACITY>& other) noexcept -> StaticVector& {
+  constexpr auto operator=(const StaticVector<Element, OTHER_CAPACITY>& other) noexcept
+      -> StaticVector& {
     if constexpr (CAPACITY < OTHER_CAPACITY) {
       if (other.size() > CAPACITY) {
         Igor::Panic("Size {} is greater than capacity {}.", other.size(), CAPACITY);
@@ -110,8 +106,8 @@ class StaticVector {
   }
 
   template <size_t OTHER_CAPACITY>
-  constexpr auto
-  operator=(StaticVector<Element, OTHER_CAPACITY>&& other) noexcept -> StaticVector& {
+  constexpr auto operator=(StaticVector<Element, OTHER_CAPACITY>&& other) noexcept
+      -> StaticVector& {
     if constexpr (CAPACITY < OTHER_CAPACITY) {
       if (other.size() > CAPACITY) {
         Igor::Panic("Size {} is greater than capacity {}.", other.size(), CAPACITY);
@@ -236,7 +232,7 @@ class StaticVector {
 
   constexpr void push_back(Element&& e) noexcept {
     IGOR_ASSERT(m_size + 1 <= CAPACITY, "StaticVector is already at max. capacity {}", CAPACITY);
-    m_data[m_size++] = e;
+    m_data[m_size++] = std::move(e);
   }
 
   template <typename... Params>

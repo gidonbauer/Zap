@@ -88,11 +88,13 @@ class Polygon {
   [[nodiscard]] constexpr auto empty() const noexcept -> bool { return m_points.empty(); }
   [[nodiscard]] constexpr auto size() const noexcept -> size_t { return m_points.size(); }
   [[nodiscard]] constexpr auto operator[](size_t idx) noexcept -> PointType& {
-    assert(idx < size());
+    IGOR_ASSERT(
+        idx < size(), "Index {} is out of bounds for polygon with {} vertices.", idx, size());
     return m_points[idx];
   }
   [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept -> const PointType& {
-    assert(idx < size());
+    IGOR_ASSERT(
+        idx < size(), "Index {} is out of bounds for polygon with {} vertices.", idx, size());
     return m_points[idx];
   }
   [[nodiscard]] constexpr auto points() noexcept -> SmallVector<PointType>& { return m_points; }

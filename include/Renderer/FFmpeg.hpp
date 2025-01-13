@@ -51,7 +51,7 @@ class FFmpeg {
                     "FFmpeg assumes that the pixels are in the rgb24 format, but the size of the "
                     "pixel datatype of the canvas is too large.");
 
-      assert(fps > 0);
+      if (fps == 0) { Igor::Panic("FPS must be > 0, is {}", fps); }
       const auto FPS = std::to_string(fps);
 
       const std::string loglevel = [quiet] {

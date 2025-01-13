@@ -30,14 +30,14 @@ class UniformGrid {
  public:
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto to_vec_idx(size_t xi, size_t yi) const noexcept -> size_t {
-    assert(xi < m_nx);
-    assert(yi < m_ny);
+    IGOR_ASSERT(xi < m_nx, "Index {} is out of bounds with max {}.", xi, m_nx);
+    IGOR_ASSERT(yi < m_ny, "Index {} is out of bounds with max {}.", yi, m_ny);
     return yi * m_nx + xi;
   }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto to_mat_idx(size_t i) const noexcept -> std::pair<size_t, size_t> {
-    assert(i < m_cells.size());
+    IGOR_ASSERT(i < m_cells.size(), "Index {} is out of bounds with max {}.", i, m_cells.size());
     return std::make_pair(i % m_nx, i / m_nx);
   }
 
@@ -77,8 +77,8 @@ class UniformGrid {
         m_y_max(y_max),
         m_dx((x_max - x_min) / static_cast<PassiveFloat>(nx)),
         m_dy((y_max - y_min) / static_cast<PassiveFloat>(ny)) {
-    assert(nx > 0);
-    assert(ny > 0);
+    IGOR_ASSERT(nx > 0, "nx must be greater than zero.");
+    IGOR_ASSERT(ny > 0, "ny must be greater than zero.");
 
     for (size_t yi = 0; yi < ny; ++yi) {
       for (size_t xi = 0; xi < nx; ++xi) {
@@ -873,8 +873,9 @@ class UniformGrid {
 
     // Bottom right diagonal cell
     if (is_cell(center_cell.right_idx) && is_cell(center_cell.bottom_idx)) {
-      assert(m_cells[center_cell.right_idx].bottom_idx ==
-             m_cells[center_cell.bottom_idx].right_idx);
+      IGOR_ASSERT(
+          m_cells[center_cell.right_idx].bottom_idx == m_cells[center_cell.bottom_idx].right_idx,
+          "Diagonal cell is different depending on path, grid was incorrectly constructed.");
       if (is_cell(m_cells[center_cell.right_idx].bottom_idx)) {
         neighbours[counter] = m_cells[center_cell.right_idx].bottom_idx;
       }
@@ -887,7 +888,9 @@ class UniformGrid {
 
     // Top right diagonal cell
     if (is_cell(center_cell.right_idx) && is_cell(center_cell.top_idx)) {
-      assert(m_cells[center_cell.right_idx].top_idx == m_cells[center_cell.top_idx].right_idx);
+      IGOR_ASSERT(
+          m_cells[center_cell.right_idx].top_idx == m_cells[center_cell.top_idx].right_idx,
+          "Diagonal cell is different depending on path, grid was incorrectly constructed.");
       if (is_cell(m_cells[center_cell.right_idx].top_idx)) {
         neighbours[counter] = m_cells[center_cell.right_idx].top_idx;
       }
@@ -900,7 +903,9 @@ class UniformGrid {
 
     // Top left diagonal cell
     if (is_cell(center_cell.left_idx) && is_cell(center_cell.top_idx)) {
-      assert(m_cells[center_cell.left_idx].top_idx == m_cells[center_cell.top_idx].left_idx);
+      IGOR_ASSERT(
+          m_cells[center_cell.left_idx].top_idx == m_cells[center_cell.top_idx].left_idx,
+          "Diagonal cell is different depending on path, grid was incorrectly constructed.");
       if (is_cell(m_cells[center_cell.left_idx].top_idx)) {
         neighbours[counter] = m_cells[center_cell.left_idx].top_idx;
       }
@@ -913,14 +918,16 @@ class UniformGrid {
 
     // Bottom left diagonal cell
     if (is_cell(center_cell.left_idx) && is_cell(center_cell.bottom_idx)) {
-      assert(m_cells[center_cell.left_idx].bottom_idx == m_cells[center_cell.bottom_idx].left_idx);
+      IGOR_ASSERT(
+          m_cells[center_cell.left_idx].bottom_idx == m_cells[center_cell.bottom_idx].left_idx,
+          "Diagonal cell is different depending on path, grid was incorrectly constructed.");
       if (is_cell(m_cells[center_cell.left_idx].bottom_idx)) {
         neighbours[counter] = m_cells[center_cell.left_idx].bottom_idx;
       }
     }
     counter += 1;
 
-    assert(counter == 8UZ);
+    IGOR_ASSERT(counter == 8UZ, "Expected array with exactly 8 entries.");
     return neighbours;
   }
 
@@ -971,7 +978,7 @@ class UniformGrid {
   [[nodiscard]] constexpr auto mass() const noexcept -> ActiveFloat {
     ActiveFloat mass = 0.0;
     for (const auto& cell : m_cells) {
-      assert(cell.is_cartesian() || cell.is_cut());
+      IGOR_ASSERT(cell.is_cartesian() || cell.is_cut(), "Invalid cell type.");
       if (cell.is_cartesian()) {
         mass += cell.get_cartesian().value * cell.template dx<SIM_C>() * cell.template dy<SIM_C>();
       } else {
@@ -1010,13 +1017,13 @@ class UniformGrid {
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto operator[](size_t idx) const noexcept
       -> const Cell<ActiveFloat, PassiveFloat>& {
-    assert(idx < m_nx * m_ny);
+    IGOR_ASSERT(idx < m_nx * m_ny, "Index {} is out of bounds with max {}.", idx, m_nx * m_ny);
     return m_cells[idx];
   }
 
   // -----------------------------------------------------------------------------------------------
   [[nodiscard]] constexpr auto operator[](size_t idx) noexcept -> Cell<ActiveFloat, PassiveFloat>& {
-    assert(idx < m_nx * m_ny);
+    IGOR_ASSERT(idx < m_nx * m_ny, "Index {} is out of bounds with max {}.", idx, m_nx * m_ny);
     return m_cells[idx];
   }
 
