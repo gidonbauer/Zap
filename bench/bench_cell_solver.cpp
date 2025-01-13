@@ -4,8 +4,8 @@
 #include <numbers>
 
 #define ZAP_NO_CHUNK_INFO
-// #define ZAP_STATIC_CUT
-// #define ZAP_TANGENTIAL_CORRECTION
+// #define ZAP_SERIAL
+// #define ZAP_STD_VECTOR_AS_SMALL_VECTOR
 
 #include "CellBased/Grid.hpp"
 #include "CellBased/Solver.hpp"

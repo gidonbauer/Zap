@@ -196,12 +196,14 @@ template <typename Float, size_t DIM>
                                 const Box& graph_box,
                                 size_t scale) noexcept -> bool {
   static_assert(DIM == 1, "2d matrix based solver is not implemented.");
-  assert(scale > 0);
-  assert(u_reader.rows() > 0);
-  assert(u_reader.cols() > 0);
-  assert(graph_box.width % static_cast<size_t>(u_reader.rows()) == 0);
-  assert(graph_box.height % static_cast<size_t>(u_reader.cols()) == 0);
-  assert(solution_idx == 0 && "2d matrix based solver is not implemented.");
+  IGOR_ASSERT(scale > 0, "Assertion failed without message.");
+  IGOR_ASSERT(u_reader.rows() > 0, "Assertion failed without message.");
+  IGOR_ASSERT(u_reader.cols() > 0, "Assertion failed without message.");
+  IGOR_ASSERT(graph_box.width % static_cast<size_t>(u_reader.rows()) == 0,
+              "Assertion failed without message.");
+  IGOR_ASSERT(graph_box.height % static_cast<size_t>(u_reader.cols()) == 0,
+              "Assertion failed without message.");
+  IGOR_ASSERT(solution_idx == 0, "2d matrix based solver is not implemented.");
 
   bool success = true;
   for (int64_t row = 0; row < u_reader.rows(); ++row) {

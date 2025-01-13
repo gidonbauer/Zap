@@ -1,6 +1,10 @@
 #ifndef ZAP_CELL_BASED_SMALL_VECTOR_HPP_
 #define ZAP_CELL_BASED_SMALL_VECTOR_HPP_
 
+#ifdef ZAP_STD_VECTOR_AS_SMALL_VECTOR
+#include <vector>
+#endif  // ZAP_STD_VECTOR_AS_SMALL_VECTOR
+
 #ifdef ZAP_STANDALONE_SMALL_VECTOR
 #include <array>
 #include <initializer_list>
@@ -26,13 +30,19 @@ static_assert(std::is_convertible_v<decltype(ZAP_SMALL_VECTOR_CAPACITY), size_t>
 constexpr size_t SMALL_VECTOR_CAPACITY = ZAP_SMALL_VECTOR_CAPACITY;
 #endif  // ZAP_SMALL_VECTOR_CAPACITY
 
-#ifndef ZAP_STANDALONE_SMALL_VECTOR
+#if !defined(ZAP_STANDALONE_SMALL_VECTOR) && !defined(ZAP_STD_VECTOR_AS_SMALL_VECTOR)
 
 // TODO: Replace SmallVector completely by Igor::StaticVector
 template <typename Element>
 using SmallVector = Igor::StaticVector<Element, SMALL_VECTOR_CAPACITY>;
 
+#elif defined(ZAP_STD_VECTOR_AS_SMALL_VECTOR)
+
+template <typename Element>
+using SmallVector = std::vector<Element>;
+
 #else
+
 template <typename Element>
 class SmallVector {
   std::array<Element, SMALL_VECTOR_CAPACITY> m_data{};
