@@ -47,7 +47,7 @@ template <std::floating_point Float>
   // Data order, Fortran order (column major) or C order (row major)
   header += "'fortran_order': "s + (row_major ? "False"s : "True"s) + ", "s;
   // Data shape
-  assert(shape.size() >= 1UZ);
+  IGOR_ASSERT(shape.size() >= 1UZ, "Shape must have at least one entry but has {}", shape.size());
   header += "'shape': ("s;
   for (size_t s : shape) {
     header += std::to_string(s) + ", "s;
@@ -66,7 +66,9 @@ template <std::floating_point Float>
   header.push_back('\n');
 
   // Write header length
-  assert(header.size() <= std::numeric_limits<uint16_t>::max());
+  IGOR_ASSERT(
+      header.size() <= std::numeric_limits<uint16_t>::max(),
+      "Size cannot be larger than the max for an unsigned 16-bit integer as it is stored in one.");
   const auto header_len = static_cast<uint16_t>(header.size());
   if (!out.write(reinterpret_cast<const char*>(&header_len), header_len_len)) {  // NOLINT
     Igor::Warn("Could not write header length to  {}: {}", filename, std::strerror(errno));
@@ -138,10 +140,12 @@ requires ad::mode<ActiveFloat>::is_ad_type
 template <std::floating_point Float>
 [[nodiscard]] auto matrix_to_npy(const std::string& filename,
                                  const std::vector<std::vector<Float>>& mat) noexcept -> bool {
-  assert(mat.size() >= 1UZ);
+  IGOR_ASSERT(mat.size() >= 1UZ, "Size must be at least one but is {}", mat.size());
   const auto n_cols = mat[0].size();
-  assert(std::all_of(
-      std::cbegin(mat), std::cend(mat), [n_cols](auto& vec) { return vec.size() == n_cols; }));
+  IGOR_ASSERT(std::all_of(std::cbegin(mat),
+                          std::cend(mat),
+                          [n_cols](auto& vec) { return vec.size() == n_cols; }),
+              "All rows must have the same number of columns.");
 
   std::ofstream out(filename, std::ios::out | std::ios::binary);
   if (!out) {
@@ -174,10 +178,12 @@ requires ad::mode<ActiveFloat>::is_ad_type
                                  const std::string& derivative_filename,
                                  const std::vector<std::vector<ActiveFloat>>& mat) noexcept
     -> bool {
-  assert(mat.size() >= 1UZ);
+  IGOR_ASSERT(mat.size() >= 1UZ, "Size must be at least one but is {}", mat.size());
   const auto n_cols = mat[0].size();
-  assert(std::all_of(
-      std::cbegin(mat), std::cend(mat), [n_cols](auto& vec) { return vec.size() == n_cols; }));
+  IGOR_ASSERT(std::all_of(std::cbegin(mat),
+                          std::cend(mat),
+                          [n_cols](auto& vec) { return vec.size() == n_cols; }),
+              "All rows must have the same number of columns.");
 
   using PassiveFloat = ad::mode<ActiveFloat>::passive_t;
   static_assert(std::is_floating_point_v<PassiveFloat>,

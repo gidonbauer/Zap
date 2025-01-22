@@ -41,6 +41,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   out << "\t--eps                Initial perturbation, default is " << args.eps << '\n';
   out << "\t--C                  First un-smoothing parameter, default is " << args.C << '\n';
   out << "\t--alpha              Second un-smoothing parameter, default is " << args.alpha << '\n';
+  out << "\t--run-benchmark      Run the benchmark, default is " << std::boolalpha
+      << args.run_benchmark << '\n';
 }
 
 // - Parse command line arguments ------------------------------------------------------------------
@@ -236,7 +238,7 @@ auto main(int argc, char** argv) -> int {
     }
     Igor::Info("Write results to `{}`.", output_file);
 
-    constexpr size_t N_SIMPSON = 1000UZ;
+    constexpr size_t N_SIMPSON = 10'000UZ;
     for (size_t n = 10; n <= 400UZ; n += 10) {
       const PassiveFloat dx = (X_MAX - X_MIN) / static_cast<PassiveFloat>(n - 1UZ);
       std::vector<PassiveFloat> x(n);
@@ -277,7 +279,9 @@ auto main(int argc, char** argv) -> int {
         return std::abs(ad::derivative(piecewise_linear(x, u.back(), ActiveFloat{x_eval})) -
                         v(x_eval, args->tend));
       };
-      const auto offset   = 0.0;  // args->C * std::pow(dx, args->alpha);
+
+      // TODO: What is the correct(?) offset, fixed, based on dx, zero? -> Shock tracking solver has offset 0
+      const auto offset   = 0.35;  // args->C * std::pow(dx, args->alpha);
       const auto L1_err_v = simpsons_rule_1d(L1_func_v, X_MIN, x1_expect - offset, N_SIMPSON / 2) +
                             simpsons_rule_1d(L1_func_v, x1_expect + offset, X_MAX, N_SIMPSON / 2);
 

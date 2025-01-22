@@ -7,6 +7,8 @@ set(executables
   mat_solver
 
   shock_approx
+  predict_shock
+  fd
 
   example_quarter_circle
   example_full_circle

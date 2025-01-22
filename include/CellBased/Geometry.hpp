@@ -118,7 +118,7 @@ class Polygon {
 };
 
 // - Utility function to compute intersection point of line segment ab with cd ---------------------
-template <Point2D_c PointType>
+template <bool first_line_is_infinite = false, Point2D_c PointType>
 [[nodiscard]] constexpr auto
 line_intersect(const PointType& A, const PointType& B, const PointType& C, const PointType& D)
     -> std::optional<PointType> {
@@ -133,7 +133,7 @@ line_intersect(const PointType& A, const PointType& B, const PointType& C, const
   const Float r = ((C.y - D.y) * (C.x - A.x) + (D.x - C.x) * (C.y - A.y)) / det;
   const Float s = ((A.y - B.y) * (C.x - A.x) + (B.x - A.x) * (C.y - A.y)) / det;
 
-  if (!(0 - EPS<Float>() <= r && r <= 1 + EPS<Float>()) ||
+  if ((!first_line_is_infinite && !(0 - EPS<Float>() <= r && r <= 1 + EPS<Float>())) ||
       !(0 - EPS<Float>() <= s && s <= 1 + EPS<Float>())) {
     return std::nullopt;
   }

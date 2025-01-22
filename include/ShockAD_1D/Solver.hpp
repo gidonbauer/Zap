@@ -9,6 +9,8 @@
 
 #include <AD/ad.hpp>
 
+#include "Igor/Logging.hpp"
+
 namespace Zap::ShockAD_1D {
 
 // -------------------------------------------------------------------------------------------------
@@ -89,6 +91,9 @@ solve_1d_burgers(const std::vector<PT>& x,   // x grid
                  const PT& C,                // Un-smoothing parameters for derivative calculation
                  const PT& alpha             // Un-smoothing parameters for derivative calculation
                  ) -> std::tuple<std::vector<PT>, std::vector<std::vector<AT>>, std::vector<AT>> {
+  if (!(0 <= alpha && alpha <= 1)) { Igor::Panic("Alpha must be in [0, 1] but is {}.", alpha); }
+  if (!(0 < C)) { Igor::Panic("C must be greater than 0 but is {}.", C); }
+
   assert(x.size() == u0.size() && "x and u0 must have same size");
   assert(x.size() >= 2UL && "x and u0 must have at least two entries");
 
