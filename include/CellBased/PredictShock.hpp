@@ -41,10 +41,12 @@ eval_piecewise_linear(PassiveFloat t, const std::vector<SimCoord<PassiveFloat>>&
 }
 
 // -------------------------------------------------------------------------------------------------
-template <typename ActiveFloat, typename PassiveFloat>
+template <typename PassiveFloat>
 [[nodiscard]] constexpr auto
-predict_shock_front(const std::vector<SimCoord<ActiveFloat>>& original_shock,
-                    PassiveFloat eps) noexcept -> std::vector<SimCoord<PassiveFloat>> {
+predict_shock_front(const std::vector<SimCoord<PassiveFloat>>& original_shock,
+                    const std::vector<SimCoord<PassiveFloat>>& derivative_shock,
+                    PassiveFloat eps,
+                    bool do_projection = true) noexcept -> std::vector<SimCoord<PassiveFloat>> {
   IGOR_ASSERT(original_shock.size() >= 2UZ,
               "Require at least two points on the shock curve but got only {}",
               original_shock.size());
@@ -54,30 +56,24 @@ predict_shock_front(const std::vector<SimCoord<ActiveFloat>>& original_shock,
 
   // First point
   {
-    const SimCoord<PassiveFloat> p1 = {ad::value(original_shock[0].x),
-                                       ad::value(original_shock[0].y)};
-    const SimCoord<PassiveFloat> p2 = {ad::value(original_shock[1].x),
-                                       ad::value(original_shock[1].y)};
+    const SimCoord<PassiveFloat>& p1 = original_shock[0];
+    const SimCoord<PassiveFloat>& p2 = original_shock[1];
 
     const SimCoord<PassiveFloat> t = p2 - p1;
     const SimCoord<PassiveFloat> n = SimCoord<PassiveFloat>{t.y, -t.x}.normalized();
 
-    const SimCoord<PassiveFloat> d = {ad::derivative(original_shock[0].x),
-                                      ad::derivative(original_shock[0].y)};
+    const SimCoord<PassiveFloat>& d = derivative_shock[0];
 
     const SimCoord<PassiveFloat> projected_d = d.dot(n) * n;
 
-    pred_shock[0] = p1 + eps * projected_d;
+    pred_shock[0] = p1 + eps * (do_projection ? projected_d : d);
   }
 
   // Intermediate points
   for (size_t i = 1; i < N - 1; ++i) {
-    const SimCoord<PassiveFloat> p  = {ad::value(original_shock[i].x),
-                                       ad::value(original_shock[i].y)};
-    const SimCoord<PassiveFloat> pp = {ad::value(original_shock[i - 1].x),
-                                       ad::value(original_shock[i - 1].y)};
-    const SimCoord<PassiveFloat> pn = {ad::value(original_shock[i + 1].x),
-                                       ad::value(original_shock[i + 1].y)};
+    const SimCoord<PassiveFloat>& p  = original_shock[i];
+    const SimCoord<PassiveFloat>& pp = original_shock[i - 1];
+    const SimCoord<PassiveFloat>& pn = original_shock[i + 1];
 
     const SimCoord<PassiveFloat> tp = p - pp;
     const SimCoord<PassiveFloat> np = SimCoord<PassiveFloat>{tp.y, -tp.x}.normalized();
@@ -85,46 +81,43 @@ predict_shock_front(const std::vector<SimCoord<ActiveFloat>>& original_shock,
     const SimCoord<PassiveFloat> tn = pn - p;
     const SimCoord<PassiveFloat> nn = SimCoord<PassiveFloat>{tn.y, -tn.x}.normalized();
 
-    const SimCoord<PassiveFloat> n = ((np + nn) / 2).normalized();
+    const SimCoord<PassiveFloat> n = ((np + nn) / 2).template normalized<true>();
 
-    const SimCoord<PassiveFloat> d           = {ad::derivative(original_shock[i].x),
-                                                ad::derivative(original_shock[i].y)};
+    const SimCoord<PassiveFloat>& d          = derivative_shock[i];
     const SimCoord<PassiveFloat> projected_d = d.dot(n) * n;
 
-    pred_shock[i] = p + eps * projected_d;
+    pred_shock[i] = p + eps * (do_projection ? projected_d : d);
   }
 
   // Last point
   {
-    const SimCoord<PassiveFloat> p1 = {ad::value(original_shock[N - 2].x),
-                                       ad::value(original_shock[N - 2].y)};
-    const SimCoord<PassiveFloat> p2 = {ad::value(original_shock[N - 1].x),
-                                       ad::value(original_shock[N - 1].y)};
+    const SimCoord<PassiveFloat>& p1 = original_shock[N - 2];
+    const SimCoord<PassiveFloat>& p2 = original_shock[N - 1];
 
     const SimCoord<PassiveFloat> t = p2 - p1;
     const SimCoord<PassiveFloat> n = SimCoord<PassiveFloat>{t.y, -t.x}.normalized();
 
-    const SimCoord<PassiveFloat> d = {ad::derivative(original_shock[N - 1].x),
-                                      ad::derivative(original_shock[N - 1].y)};
+    const SimCoord<PassiveFloat>& d = derivative_shock[N - 1];
 
     const SimCoord<PassiveFloat> projected_d = d.dot(n) * n;
 
-    pred_shock[N - 1] = p1 + eps * projected_d;
+    pred_shock[N - 1] = p2 + eps * (do_projection ? projected_d : d);
   }
 
   return pred_shock;
 }
 
 // -------------------------------------------------------------------------------------------------
-template <size_t N = 15UZ, bool simple_dif_func = false, typename PassiveFloat>
+template <size_t N = 15UZ, typename PassiveFloat>
 [[nodiscard]] constexpr auto compare_curves(const std::vector<SimCoord<PassiveFloat>>& real_curve,
                                             const std::vector<SimCoord<PassiveFloat>>& pred_curve,
-                                            size_t num_slices = 1) noexcept -> PassiveFloat {
+                                            size_t num_slices    = 1,
+                                            bool simple_dif_func = false) noexcept -> PassiveFloat {
   IGOR_ASSERT(num_slices > 0,
               "Number of slices for the calculation of the integral must be larger than zero.");
 
   auto dif_func = [&](PassiveFloat t) {
-    if constexpr (simple_dif_func) {
+    if (simple_dif_func) {
       return (std::get<0>(eval_piecewise_linear(t, pred_curve)) -
               std::get<0>(eval_piecewise_linear(t, real_curve)))
           .norm();

@@ -36,6 +36,7 @@ struct Args {
   PassiveFloat tend              = 1.0;
   PassiveFloat CFL_safety_factor = 0.25;
   bool first_order               = false;
+  PassiveFloat delta_eps         = 1e-8;
 };
 
 // - Print usage -----------------------------------------------------------------------------------
@@ -44,7 +45,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
   Args args{};
 
   out << Igor::detail::level_repr(level) << "Usage: " << prog
-      << " [--nx nx] [--ny ny] [--tend tend] [--CFL CFL-safety-factor] [--first-order]\n";
+      << " [--nx nx] [--ny ny] [--tend tend] [--CFL CFL-safety-factor] [--first-order] "
+         "[--delta-eps delta-eps]\n";
   out << "\t--nx              Number of cells in x-direction, default is " << args.nx << '\n';
   out << "\t--ny              Number of cells in y-direction, default is " << args.ny << '\n';
   out << "\t--tend            Final time of simulation, default is " << args.tend << '\n';
@@ -52,6 +54,8 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
       << args.CFL_safety_factor << '\n';
   out << "\t--first-order     Use first order finite differences, default is " << std::boolalpha
       << args.first_order << '\n';
+  out << "\t--delta-eps       Delta epsilon for finite difference derivative, default is "
+      << args.delta_eps << '\n';
 }
 
 // - Parse command line arguments ------------------------------------------------------------------
@@ -101,6 +105,15 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
       args.CFL_safety_factor = parse_double(*arg);
     } else if (arg == "--first-order"sv) {
       args.first_order = true;
+    } else if (arg == "--delta-eps"sv || arg == "--eps"sv) {
+      arg = next_arg(argc, argv);
+      if (!arg.has_value()) {
+        usage<Igor::detail::Level::PANIC>(*prog, std::cerr);
+        std::cerr << Igor::detail::level_repr(Igor::detail::Level::PANIC)
+                  << "Did not provide number for option --delta-eps.\n";
+        return std::nullopt;
+      }
+      args.delta_eps = parse_double(*arg);
     } else if (arg == "-h"sv || arg == "--help"sv) {
       usage<Igor::detail::Level::INFO>(*prog, std::cout);
       return std::nullopt;
@@ -190,6 +203,47 @@ void usage(std::string_view prog, std::ostream& out) noexcept {
 }
 
 // -------------------------------------------------------------------------------------------------
+[[nodiscard]] auto fd_derivative(size_t nx,
+                                 size_t ny,
+                                 PassiveFloat tend,
+                                 PassiveFloat CFL_safety_factor,
+                                 bool first_order,
+                                 size_t expected_num_cuts,
+                                 PassiveFloat delta_eps) noexcept {
+  const auto res_plus_eps = run_passive(nx, ny, tend, delta_eps, CFL_safety_factor);
+  if (!res_plus_eps.has_value()) { Igor::Panic("Solver for eps={} failed.", delta_eps); }
+
+  const auto res_minus_eps =
+      run_passive(nx, ny, tend, first_order ? PassiveFloat{0} : -delta_eps, CFL_safety_factor);
+  if (!res_minus_eps.has_value()) {
+    Igor::Panic("Solver for eps={} failed.", first_order ? PassiveFloat{0} : -delta_eps);
+  }
+
+  const auto shock_plus_eps  = res_plus_eps->get_shock_curve();
+  const auto shock_minus_eps = res_minus_eps->get_shock_curve();
+
+  if (shock_plus_eps.size() != shock_minus_eps.size() ||
+      shock_plus_eps.size() != expected_num_cuts) {
+    Igor::Warn("Incompatible shock curve sizes: eps=0 => {}, eps={} => {}, eps={} => {}",
+               expected_num_cuts,
+               delta_eps,
+               shock_plus_eps.size(),
+               first_order ? PassiveFloat{0} : -delta_eps,
+               shock_minus_eps.size());
+  }
+
+  std::vector<SimCoord<PassiveFloat>> der_shock_fd(expected_num_cuts);
+  for (size_t i = 0; i < expected_num_cuts; ++i) {
+    der_shock_fd[i].x =
+        (shock_plus_eps[i].x - shock_minus_eps[i].x) / (first_order ? delta_eps : 2 * delta_eps);
+    der_shock_fd[i].y =
+        (shock_plus_eps[i].y - shock_minus_eps[i].y) / (first_order ? delta_eps : 2 * delta_eps);
+  }
+
+  return std::make_tuple(shock_plus_eps, shock_minus_eps, der_shock_fd);
+}
+
+// -------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
   const auto args = parse_args(argc, argv);
   if (!args.has_value()) { return 1; }
@@ -205,13 +259,12 @@ auto main(int argc, char** argv) -> int {
     }
   }
 
-  const PassiveFloat eps = 1e-8;
-
   Igor::Info("nx   = {}", args->nx);
   Igor::Info("ny   = {}", args->ny);
   Igor::Info("tend = {}", args->tend);
   Igor::Info("CFL  = {}", args->CFL_safety_factor);
   Igor::Info("first-order FD = {}", args->first_order);
+  Igor::Info("delta-eps = {}", args->delta_eps);
   std::cout << "------------------------------------------------------------\n";
 
   const auto res_ad = run(args->nx, args->ny, args->tend, PassiveFloat{0}, args->CFL_safety_factor);
@@ -230,42 +283,14 @@ auto main(int argc, char** argv) -> int {
     der_shock_ad[i].y = ad::derivative(shock_curve_ad[i].y);
   }
 
-  const auto res_plus_eps =
-      run_passive(args->nx, args->ny, args->tend, eps, args->CFL_safety_factor);
-  if (!res_plus_eps.has_value()) {
-    Igor::Warn("Solver for eps={} failed.", eps);
-    return 1;
-  }
-  const auto res_minus_eps =
-      run_passive(args->nx, args->ny, args->tend, -eps, args->CFL_safety_factor);
-  if (!res_minus_eps.has_value()) {
-    Igor::Warn("Solver for eps={} failed.", -eps);
-    return 1;
-  }
-
-  const auto shock_plus_eps  = res_plus_eps->get_shock_curve();
-  const auto shock_minus_eps = res_minus_eps->get_shock_curve();
-
-  if (shock_plus_eps.size() != shock_minus_eps.size() || shock_plus_eps.size() != shock_ad.size()) {
-    Igor::Warn("Incompatible shock curve sizes: eps=0 => {}, eps={} => {}, eps={} => {}",
-               shock_ad.size(),
-               eps,
-               shock_plus_eps.size(),
-               -eps,
-               shock_minus_eps.size());
-  }
-  const auto ns = shock_ad.size();
-
-  std::vector<SimCoord<PassiveFloat>> der_shock_fd(ns);
-  for (size_t i = 0; i < ns; ++i) {
-    if (args->first_order) {
-      der_shock_fd[i].x = (shock_plus_eps[i].x - shock_ad[i].x) / eps;
-      der_shock_fd[i].y = (shock_plus_eps[i].y - shock_ad[i].y) / eps;
-    } else {
-      der_shock_fd[i].x = (shock_plus_eps[i].x - shock_minus_eps[i].x) / (2 * eps);
-      der_shock_fd[i].y = (shock_plus_eps[i].y - shock_minus_eps[i].y) / (2 * eps);
-    }
-  }
+  const auto [shock_plus_eps, shock_minus_eps, der_shock_fd] =
+      fd_derivative(args->nx,
+                    args->ny,
+                    args->tend,
+                    args->CFL_safety_factor,
+                    args->first_order,
+                    shock_ad.size(),
+                    args->delta_eps);
 
   // Save shock curve for eps=0
   {
@@ -284,7 +309,7 @@ auto main(int argc, char** argv) -> int {
       Igor::Warn("Could not save points to `{}`", filename);
       return 1;
     }
-    Igor::Info("Saved shock curve for eps={} to `{}`.", eps, filename);
+    Igor::Info("Saved shock curve for eps={} to `{}`.", args->delta_eps, filename);
   }
 
   // Save shock curve for eps=-eps
@@ -294,7 +319,9 @@ auto main(int argc, char** argv) -> int {
       Igor::Warn("Could not save points to `{}`", filename);
       return 1;
     }
-    Igor::Info("Saved shock curve for eps={} to `{}`.", -eps, filename);
+    Igor::Info("Saved shock curve for eps={} to `{}`.",
+               args->first_order ? PassiveFloat{0} : -args->delta_eps,
+               filename);
   }
 
   // Save derivative calculated via AD

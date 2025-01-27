@@ -128,9 +128,14 @@ concept Point2D_c = requires(PointType t) {
       return std::sqrt(x * x + y * y);                                                             \
     }                                                                                              \
                                                                                                    \
+    template <bool zero_if_null_vec = false>                                                       \
     [[nodiscard]] constexpr auto normalized() const noexcept -> name {                             \
       const auto n = norm();                                                                       \
-      IGOR_ASSERT(std::abs(n) >= EPS<Scalar>(), "Cannot normalize null vector.");                  \
+      if constexpr (zero_if_null_vec) {                                                            \
+        if (std::abs(n) < EPS<Scalar>()) { return {0, 0}; }                                        \
+      } else {                                                                                     \
+        IGOR_ASSERT(std::abs(n) >= EPS<Scalar>(), "Cannot normalize null vector {}.", *this);      \
+      }                                                                                            \
       return *this / norm();                                                                       \
     }                                                                                              \
                                                                                                    \
